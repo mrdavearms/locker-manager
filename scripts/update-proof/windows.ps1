@@ -7,6 +7,8 @@ $repo = $env:GITHUB_REPOSITORY
 $exe = Join-Path $env:LOCALAPPDATA 'Programs\Locker Manager\Locker Manager.exe'
 $log = Join-Path $env:APPDATA 'Locker Manager\logs\main.log'
 
+# Windows reports file versions with four parts (0.1.0.0); compare on three.
+function Installed-Version { if (Test-Path $exe) { ((Get-Item $exe).VersionInfo.ProductVersion -replace '^(\d+\.\d+\.\d+)\.0$', '$1') } else { '' } }
 function Show-Log { if (Test-Path $log) { Write-Host '----- app log -----'; Get-Content $log -Tail 60 } }
 function Wait-For([scriptblock]$cond, [int]$seconds, [string]$what) {
   $deadline = (Get-Date).AddSeconds($seconds)
@@ -20,7 +22,7 @@ New-Item -ItemType Directory -Force prev | Out-Null
 gh release download $env:PREV_TAG --repo $repo --pattern "Locker-Manager-Setup-$prev.exe" --dir prev --clobber
 Start-Process -Wait -FilePath "prev\Locker-Manager-Setup-$prev.exe" -ArgumentList '/S'
 Wait-For { Test-Path $exe } 120 'the installed app'
-$v = (Get-Item $exe).VersionInfo.ProductVersion
+$v = Installed-Version
 Write-Host "Installed version: $v"
 if ($v -ne $prev) { throw "Expected $prev to be installed, found $v" }
 
@@ -33,7 +35,7 @@ Select-String -Path $log -Pattern "Found version|has been downloaded" | ForEach-
 Write-Host 'Closing the app normally; the update installs on quit'
 taskkill /IM "Locker Manager.exe" | Out-Null
 Wait-For { -not (Get-Process -Name 'Locker Manager' -ErrorAction SilentlyContinue) } 60 'the app to close'
-Wait-For { (Test-Path $exe) -and ((Get-Item $exe).VersionInfo.ProductVersion -eq $new) } 300 "the installed version to become $new"
+Wait-For { (Installed-Version) -eq $new } 300 "the installed version to become $new"
 
 Write-Host "Starting $new to check it runs"
 Remove-Item $log -ErrorAction SilentlyContinue
