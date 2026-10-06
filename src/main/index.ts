@@ -10,6 +10,7 @@ import {
   registerFileHandlers
 } from './fileService'
 import { noteStartAttempt, noteStarted, showRecovery } from './recovery'
+import { openLockerLink } from './links'
 import { registerIpcHandlers } from './ipc/handlers'
 import { handlers as rpcHandlers } from './rpc/handlers'
 import { registerRenderHandlers } from './renderService'
@@ -37,6 +38,9 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   // Files double-clicked before the app is ready wait here.
   const pendingFiles: string[] = process.argv.slice(1).filter((a) => /\.lockers$/i.test(a))
+  const pendingLinks: string[] = process.argv
+    .slice(1)
+    .filter((a) => a.startsWith(`${brand.protocol}://`))
   let ready = false
 
   app.on('second-instance', (_event, argv) => {
@@ -47,6 +51,8 @@ if (!app.requestSingleInstanceLock()) {
     }
     const file = argv.slice(1).find((a) => /\.lockers$/i.test(a))
     if (file) void openFromOs(file)
+    const link = argv.slice(1).find((a) => a.startsWith(`${brand.protocol}://`))
+    if (link) openLockerLink(link)
   })
 
   if (app.isPackaged) {
@@ -59,9 +65,11 @@ if (!app.requestSingleInstanceLock()) {
     if (ready) void openFromOs(path)
     else pendingFiles.push(path)
   })
-  app.on('open-url', (event) => {
+  // A scanned label QR code (SPEC.md 5.6): lockermanager://locker/<id> opens that locker.
+  app.on('open-url', (event, url) => {
     event.preventDefault()
-    log.info('open-url received (not handled before M1)')
+    if (ready) openLockerLink(url)
+    else pendingLinks.push(url)
   })
 
   void app.whenReady().then(async () => {
@@ -101,6 +109,8 @@ if (!app.requestSingleInstanceLock()) {
       void noteStarted(preferences())
       const file = pendingFiles.pop()
       if (file) void openFromOs(file)
+      const link = pendingLinks.pop()
+      if (link) setTimeout(() => openLockerLink(link), 1500)
     })
 
     app.on('activate', () => {

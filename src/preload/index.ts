@@ -5,6 +5,7 @@ import type { LabelSelection } from '../shared/labels'
 import type { LetterLanguage, LetterSelection, LetterTemplate } from '../shared/letters'
 import type { ExportFormat, ReportRequest } from '../shared/reports'
 import type { ComputerSettings, ComputerView } from '../shared/computer'
+import type { RecordRestorePreview } from '../shared/history'
 import type { BackupPreview, BackupView, FileState } from '../shared/fileState'
 import type {
   ActionResult,
@@ -45,6 +46,8 @@ const api = {
   getComputer: (): Promise<ComputerView> => ipcRenderer.invoke(channels.computerGet),
   setComputer: (patch: Partial<ComputerSettings>): Promise<ComputerView> =>
     ipcRenderer.invoke(channels.computerSet, patch),
+  onOpenLocker: (listener: (v: { lockerId: string | null; message: string | null }) => void) =>
+    subscribe(channels.openLocker, listener),
   onComputerChanged: (listener: (v: ComputerView) => void) =>
     subscribe(channels.computerChanged, listener),
 
@@ -102,6 +105,20 @@ const api = {
   showInFolder: (): Promise<void> => ipcRenderer.invoke(channels.fileShowInFolder),
   takeOver: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileTakeOver),
   startEditing: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileStartEditing),
+  previewRecordRestore: (
+    entryId: string
+  ): Promise<{ ok: true; value: RecordRestorePreview } | { ok: false; message: string }> =>
+    ipcRenderer.invoke(channels.recordRestorePreview, { entryId }),
+  restoreRecord: (
+    entryId: string
+  ): Promise<{ ok: true; value: RecordRestorePreview } | { ok: false; message: string }> =>
+    ipcRenderer.invoke(channels.recordRestore, { entryId }),
+  mergeConflict: (
+    picks: number[]
+  ): Promise<
+    | { ok: true; added: number; skipped: { action: string; message: string }[] }
+    | { ok: false; message: string }
+  > => ipcRenderer.invoke(channels.fileMergeConflict, { picks }),
   resolveConflict: (choice: 'keep_mine' | 'keep_theirs'): Promise<ActionResult> =>
     ipcRenderer.invoke(channels.fileResolveConflict, { choice }),
   compareCopy: (name: string): Promise<ActionResult> =>

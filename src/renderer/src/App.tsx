@@ -71,6 +71,7 @@ export function App(): React.JSX.Element {
   const [operatorOpen, setOperatorOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [notice, setNotice] = useState<{ title: string; body: string } | null>(null)
   const [newOpen, setNewOpen] = useState(false)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -101,6 +102,21 @@ export function App(): React.JSX.Element {
   const focus = nav.path === openPath ? nav.focus : null
   const setScreen = useCallback(
     (next: Screen) => setNav({ path: openPath, screen: next, focus: null }),
+    [openPath]
+  )
+
+  // A scanned label QR code opens its locker (SPEC.md 5.6).
+  useEffect(
+    () =>
+      window.api.onOpenLocker(({ lockerId, message }) => {
+        if (message) setError(message)
+        if (lockerId)
+          setNav({
+            path: openPath,
+            screen: 'lockers',
+            focus: { lockerId, intent: null, n: Date.now() }
+          })
+      }),
     [openPath]
   )
 
@@ -310,7 +326,24 @@ export function App(): React.JSX.Element {
         />
       )}
 
-      {open?.conflict && <ConflictDialog conflict={open.conflict} canEdit={open.mode === 'edit'} />}
+      {open?.conflict && (
+        <ConflictDialog
+          conflict={open.conflict}
+          canEdit={open.mode === 'edit'}
+          onMerged={(title, body) => setNotice({ title, body })}
+        />
+      )}
+      <Modal
+        open={notice !== null}
+        onOpenChange={(o) => !o && setNotice(null)}
+        title={notice?.title ?? ''}
+        description={notice?.body ?? ''}
+        testId="notice-dialog"
+      >
+        <div className="mt-6 flex justify-end">
+          <Button onClick={() => setNotice(null)}>OK</Button>
+        </div>
+      </Modal>
       <BackupsDialog
         open={backupsOpen}
         onOpenChange={setBackupsOpen}

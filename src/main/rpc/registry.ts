@@ -5,7 +5,7 @@ import { channels } from '@shared/channels'
 import { isRpcMethod, rpcParams, type RpcMethod, type RpcResults } from '@shared/rpc'
 import type { LockerDb } from '../db/db'
 import type { AuditEntry, OperatorContext } from '../db/context'
-import type { DataFileSession } from '../file/session'
+import type { DataFileSession, Replayable } from '../file/session'
 
 // Every data request goes through here: the method must be in the shared
 // contract, its input must pass the method's Zod schema, and writes go through
@@ -25,7 +25,23 @@ export type Handler<M extends RpcMethod> =
 
 export type Handlers = { [M in RpcMethod]: Handler<M> }
 
+let registered: Handlers | null = null
+
+/**
+ * Makes one recorded change again on another version of the file: the conflict
+ * merge (SPEC.md 6.4). Runs the same handler, with the same checks, as the first time.
+ */
+export function replayChange(db: LockerDb, ctx: OperatorContext, change: Replayable): void {
+  if (!registered || !isRpcMethod(change.method)) throw new Error('That change cannot be repeated.')
+  const h = registered[change.method] as Handler<RpcMethod>
+  if (h.kind !== 'write') throw new Error('That change cannot be repeated.')
+  const parsed = rpcParams[change.method].safeParse(change.params)
+  if (!parsed.success) throw new Error('That change cannot be repeated.')
+  h.run(db, ctx, parsed.data as never)
+}
+
 export function registerRpc(session: () => DataFileSession, handlers: Handlers): void {
+  registered = handlers
   ipcMain.handle(channels.rpc, async (_event, method: unknown, raw: unknown) => {
     if (!isRpcMethod(method)) return { ok: false, message: 'Unknown request.' }
     const parsed = rpcParams[method].safeParse(raw ?? {})
@@ -44,7 +60,8 @@ export function registerRpc(session: () => DataFileSession, handlers: Handlers):
         return { ok: true, value: s.read((db) => h.run(db, parsed.data as never)) }
       const value = s.write<RpcResults[RpcMethod]>(
         (result) => h.audit(parsed.data as never, result),
-        (db, ctx) => h.run(db, ctx, parsed.data as never)
+        (db, ctx) => h.run(db, ctx, parsed.data as never),
+        { method, params: parsed.data }
       )
       return { ok: true, value }
     } catch (error) {

@@ -44,6 +44,9 @@ export const channels = {
   fileNamedBackup: 'file:namedBackup',
   filePractice: 'file:practice',
   settingsExport: 'file:settingsExport',
+  fileMergeConflict: 'file:mergeConflict',
+  recordRestorePreview: 'history:restorePreview',
+  recordRestore: 'history:restore',
   settingsImport: 'file:settingsImport',
   fileFromExport: 'file:fromExport',
   fileRedo: 'file:redo',
@@ -51,6 +54,7 @@ export const channels = {
   computerSet: 'computer:set',
   // main -> renderer events
   computerChanged: 'computer:changed',
+  openLocker: 'event:ui:openLocker',
   updateStatus: 'event:update:status',
   openAbout: 'event:ui:openAbout',
   fileState: 'event:file:state'

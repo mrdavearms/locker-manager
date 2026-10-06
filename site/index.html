@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Locker Manager</title>
+    <meta
+      name="description"
+      content="Free, open-source desktop app for schools: student lockers, lock codes, labels and letters. Windows and Mac. Your data stays in your school."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=Big+Shoulders+Stencil+Display:wght@700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --canvas: #f3efe6;
+        --surface: #fffdf8;
+        --ink: #17222b;
+        --muted: #56616b;
+        --line: #ddd5c6;
+        --panel: #0e4a57;
+        --on-panel: #fffdf8;
+        --accent: #c4511c;
+        --soft: #dceae9;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --canvas: #0f1518;
+          --surface: #172026;
+          --ink: #ece7dc;
+          --muted: #a7b0b5;
+          --line: #29363e;
+          --panel: #123b44;
+          --on-panel: #eef4f3;
+          --accent: #f0915c;
+          --soft: #16343a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font:
+          17px/1.55 'Atkinson Hyperlegible Next',
+          system-ui,
+          sans-serif;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+        letter-spacing: -0.01em;
+        line-height: 1.1;
+      }
+      a {
+        color: inherit;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 16px;
+      }
+      header.top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 0;
+      }
+      .mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--panel);
+        display: grid;
+        place-items: center;
+      }
+      .mark span {
+        width: 18px;
+        height: 24px;
+        border-radius: 3px;
+        background: var(--on-panel);
+        position: relative;
+      }
+      .mark span::after {
+        content: '';
+        position: absolute;
+        left: 6px;
+        bottom: 4px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+      .brand {
+        font-family: 'Bricolage Grotesque', sans-serif;
+        font-weight: 700;
+        font-size: 20px;
+      }
+      .hero {
+        background: var(--panel);
+        color: var(--on-panel);
+        border-radius: 28px;
+        padding: 56px 40px;
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(rgb(255 255 255 / 0.1) 1.5px, transparent 1.6px);
+        background-size: 14px 14px;
+        mask-image: linear-gradient(90deg, transparent 40%, #000);
+      }
+      .hero > * {
+        position: relative;
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 13px;
+        font-weight: 700;
+        opacity: 0.8;
+      }
+      .hero h1 {
+        font-size: clamp(36px, 6vw, 60px);
+        margin: 12px 0 16px;
+        max-width: 14ch;
+      }
+      .hero p {
+        max-width: 52ch;
+        opacity: 0.9;
+        font-size: 19px;
+      }
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 22px;
+        border-radius: 14px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .btn.primary {
+        background: var(--on-panel);
+        color: #0e4a57;
+      }
+      .btn.ghost {
+        border: 2px solid rgb(255 255 255 / 0.5);
+      }
+      .bank {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 6px;
+        max-width: 360px;
+        margin-top: 36px;
+      }
+      .door {
+        aspect-ratio: 3 / 4;
+        border-radius: 6px;
+        background: rgb(255 255 255 / 0.12);
+        border: 1px solid rgb(255 255 255 / 0.2);
+        display: grid;
+        place-items: center;
+        font-family: 'Big Shoulders Stencil Display', sans-serif;
+        font-weight: 800;
+        font-size: 20px;
+      }
+      .door.spare {
+        background: transparent;
+        border-style: dashed;
+        opacity: 0.6;
+      }
+      section {
+        margin: 64px 0;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 24px;
+      }
+      .card h3 {
+        margin: 0 0 6px;
+        font-size: 20px;
+      }
+      .card p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .num {
+        font-family: 'Big Shoulders Stencil Display', sans-serif;
+        font-size: 34px;
+        color: var(--accent);
+        line-height: 1;
+      }
+      h2 {
+        font-size: clamp(28px, 4vw, 38px);
+        margin: 0 0 20px;
+      }
+      .privacy {
+        background: var(--soft);
+        border-radius: 22px;
+        padding: 32px;
+      }
+      .privacy ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+      .privacy li {
+        margin: 8px 0;
+      }
+      .steps ol {
+        padding-left: 22px;
+      }
+      .steps li {
+        margin: 8px 0;
+      }
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 28px 0 48px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      @media (max-width: 640px) {
+        .hero {
+          padding: 36px 20px;
+          border-radius: 20px;
+        }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .door {
+          animation: rise 600ms both;
+        }
+        .door:nth-child(n + 4) {
+          animation-delay: 80ms;
+        }
+        .door:nth-child(n + 8) {
+          animation-delay: 160ms;
+        }
+        @keyframes rise {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <div class="mark" aria-hidden="true"><span></span></div>
+        <span class="brand">Locker Manager</span>
+      </header>
+
+      <div class="hero">
+        <p class="eyebrow">Free for every school</p>
+        <h1>Every locker, every code, every student.</h1>
+        <p>
+          A desktop app for school offices: give out lockers, issue lock codes, print labels and
+          letters, and keep it right through the year. Windows and Mac. Your data stays in your
+          school’s own folder.
+        </p>
+        <div class="buttons">
+          <a class="btn primary" href="https://github.com/mrdavearms/locker-manager/releases"
+            >Download</a
+          >
+          <a
+            class="btn ghost"
+            href="https://github.com/mrdavearms/locker-manager/blob/main/docs/user-guide.md"
+            >Read the guide</a
+          >
+        </div>
+        <div class="bank" aria-hidden="true">
+          <div class="door">1</div>
+          <div class="door">2</div>
+          <div class="door">3</div>
+          <div class="door spare">4</div>
+          <div class="door">5</div>
+          <div class="door">6</div>
+          <div class="door">7</div>
+          <div class="door">8</div>
+          <div class="door spare">9</div>
+          <div class="door">10</div>
+          <div class="door">11</div>
+          <div class="door">12</div>
+        </div>
+      </div>
+
+      <section>
+        <h2>What it does</h2>
+        <div class="grid">
+          <div class="card">
+            <div class="num">01</div>
+            <h3>Import students</h3>
+            <p>
+              From Compass, Sentral, SIMON and others, with surname capitals fixed and the tricky
+              ones flagged.
+            </p>
+          </div>
+          <div class="card">
+            <div class="num">02</div>
+            <h3>Allocate in one go</h3>
+            <p>By year level, group and surname, with a draft you check before anything changes.</p>
+          </div>
+          <div class="card">
+            <div class="num">03</div>
+            <h3>Codes done properly</h3>
+            <p>
+              Codes follow lock makers’ advice, never repeat, stay hidden until asked for, and every
+              reveal is recorded.
+            </p>
+          </div>
+          <div class="card">
+            <div class="num">04</div>
+            <h3>Labels that line up</h3>
+            <p>
+              Exact millimetres on Avery sheets, your own measurements, and a calibration page for
+              each printer.
+            </p>
+          </div>
+          <div class="card">
+            <div class="num">05</div>
+            <h3>Letters, one per page</h3>
+            <p>
+              Each student’s locker and code, with the right steps for their lock, in more than one
+              language.
+            </p>
+          </div>
+          <div class="card">
+            <div class="num">06</div>
+            <h3>The whole year</h3>
+            <p>
+              New students, leavers, swaps, lost codes, reports, and a guided start to next year.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="privacy">
+        <h2>Your data stays at school</h2>
+        <ul>
+          <li>One data file in a folder your school chooses, with backups beside it.</li>
+          <li>No server, no accounts, no data sent anywhere. Updates come from GitHub.</li>
+          <li>Lock codes are stored scrambled, and can be protected with a PIN.</li>
+          <li>Open source under the MIT licence: anyone can check what it does.</li>
+        </ul>
+      </section>
+
+      <section class="steps">
+        <h2>Getting started</h2>
+        <ol>
+          <li>Download the installer for Windows or Mac from the releases page.</li>
+          <li>The first time, follow the short security steps on the release page.</li>
+          <li>Try the demo school, then start your school’s file.</li>
+        </ol>
+        <p>
+          School IT: see the
+          <a href="https://github.com/mrdavearms/locker-manager/blob/main/docs/it-guide.md"
+            >IT guide</a
+          >
+          for silent installs and managed settings.
+        </p>
+      </section>
+
+      <footer>
+        Locker Manager is free and open source (MIT), made for schools.
+        <a href="https://github.com/mrdavearms/locker-manager">Source on GitHub</a>.
+      </footer>
+    </div>
+  </body>
+</html>

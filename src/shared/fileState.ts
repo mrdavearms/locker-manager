@@ -59,6 +59,8 @@ export interface ConflictView {
   theirs: FileSummaryView | null
   onlyMine: HistoryLineView[]
   onlyTheirs: HistoryLineView[]
+  /** Changes made here since the last save, which can be added to the other version. */
+  myChanges: { index: number; action: string; at: string; canAdd: boolean }[]
 }
 
 export interface FileProblemView {

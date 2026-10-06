@@ -11,6 +11,13 @@ export interface HistoryEntryView {
   detail: string | null
 }
 
+/** What putting a record back from a backup would change (SPEC.md 4.12). */
+export interface RecordRestorePreview {
+  entity: 'student' | 'locker'
+  backupAt: string
+  changes: { field: string; now: string; before: string }[]
+}
+
 export interface QuickResult {
   kind: 'student' | 'locker'
   id: string
@@ -29,6 +36,8 @@ export function describeAction(action: string): string {
     'school.renamed': 'Renamed the school',
     'lock.taken_over': 'Took over editing',
     'conflict.kept_mine': 'Kept their own version in a conflict',
+    'record.restored': 'Put a record back to how it was',
+    'conflict.merged': 'Added their changes to the other version after a conflict',
     'copy.set_aside': 'Set aside a sync copy',
     'copy.used': 'Used a sync copy',
     'demo.generated': 'Built the demo school',

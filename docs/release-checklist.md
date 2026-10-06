@@ -4,6 +4,12 @@ One release is one version tag. The tag starts the Release workflow, which build
 Windows and Mac installers, checks every file is present, writes the release notes and
 publishes. Milestone builds (0.x) are published as pre-releases.
 
+## The quick way
+
+`scripts/release.sh 0.8.0` does the steps below in order: sets the version, commits, pushes,
+waits for CI on that commit, then tags it. It stops if CI fails, and can be run again with
+the same number once the fault is fixed. The Update proof workflow then runs by itself.
+
 ## Before tagging
 
 1. `main` is green on the Actions page: https://github.com/mrdavearms/locker-manager/actions
@@ -53,3 +59,23 @@ git tag -d v0.0.2 && git push origin :refs/tags/v0.0.2
 4. From M5 onwards, before any minor release: print one real label sheet on a laser
    printer and check it against the calibration page.
 5. Note anything learned in CLAUDE.md.
+
+## Hand checks before 1.0
+
+Automated tests cannot do these. Each needs a person, real paper or a real computer.
+
+1. **Labels**: print the calibration page on plain paper at Actual size. The bar measures
+   exactly 100 mm. Hold it over a real sheet of Avery L7163 against a window; save a nudge.
+   Print a full sheet of real labels and check every name sits inside its label.
+2. **Letters**: print five letters on the school printer. One student per page, nothing cut
+   off at the edges, the code boxes clear, the school colours right.
+3. **Reports**: print the master list and check CONFIDENTIAL shows on every page with page
+   numbers.
+4. **Windows install**: install on a school PC from the release page, including the "More
+   info, Run anyway" step; check a per-machine silent install (`/S /allusers`) if IT will use it.
+5. **Shared folder**: open the file from the real shared folder on two computers at once;
+   the second shows who is editing.
+6. **Managed settings**: put a `managed.json` on one PC (IT guide) and check the locked
+   settings show "Set by your IT team".
+7. **Text size**: set 200% and use every screen.
+8. **Real export**: import a real Compass export on a school computer (never commit it).

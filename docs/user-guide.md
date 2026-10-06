@@ -117,6 +117,12 @@ changed this file**, or a yellow box says **Found 1 copy of this file**.
 2. Choose the version to keep: **Keep my version** or **Keep the other version** (for a
    copy: **Keep the current file** or **Use the copy instead**).
 
+**Or keep both sets of changes**: under **Or keep the other version and add my changes**,
+your changes since the last save are listed with tick boxes. Untick any you do not want, then
+click **Use the other version and add the ticked changes**. Each ticked change is made again
+on the other version. A change that no longer fits, for example because someone else gave
+that locker away, is skipped, and a message names it.
+
 Nothing is lost either way. The version you do not keep is saved in the **Locker Manager
 backups** folder beside the file.
 
@@ -351,6 +357,11 @@ Press **Ctrl+Z** (Cmd+Z on a Mac) to undo the last change, and **Ctrl+Shift+Z** 
 The History screen also has **Undo** and **Redo** buttons, and lists every change: who made
 it, on which computer, and when. Up to 50 changes can be undone while the file is open.
 
+**Put one student or locker back**: on the History screen, find the change and click **Put
+back to before this…** under the student's or locker's name. The app finds that record in the
+backup from just before the change and shows what would change. Click **Put it back**. Only
+that record's own details change; lockers given out, codes and history stay as they are.
+
 ## Print locker labels
 
 1. Click **Print** in the left-hand menu.
@@ -412,6 +423,10 @@ In **Settings**, **Labels**, **Label layout** shows the first locker, enlarged.
   this, so a slightly misaligned printer never cuts anything off.
 - **Logo**: one colour suits black-and-white printers. Colour uses your full logo.
 - **Start again from the standard layout** undoes all of your changes to the layout.
+
+**QR code** (optional): add one from **Add…**. It holds only a short code for the locker,
+never a name or a lock code. Scanning it on a computer with Locker Manager and the school's
+file open goes straight to that locker, which helps maintenance staff.
 
 ## Print letters
 

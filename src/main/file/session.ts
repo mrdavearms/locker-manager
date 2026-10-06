@@ -72,6 +72,20 @@ export interface SessionDeps {
 
 export type OpenResult = { ok: true } | { ok: false; message: string }
 
+/** A change that can be made again on another version of the file (SPEC.md 6.4 merge). */
+export interface Replayable {
+  method: string
+  params: unknown
+}
+
+interface JournalEntry {
+  action: string
+  at: string
+  replay: Replayable | null
+}
+
+export type ReplayFn = (db: LockerDb, ctx: OperatorContext, change: Replayable) => void
+
 interface Open {
   path: string
   db: LockerDb
@@ -97,6 +111,9 @@ interface Open {
   /** Snapshots before each change, newest last (SPEC.md 4.12). */
   undo: { bytes: Uint8Array; action: string }[]
   redo: { bytes: Uint8Array; action: string }[]
+  /** Changes made since the last save, in order: what a merge can add to another version. */
+  journal: JournalEntry[]
+  redoJournal: JournalEntry[]
 }
 
 const UNDO_STEPS = 50
@@ -150,7 +167,8 @@ export class DataFileSession {
             mine: conflict.mine,
             theirs: conflict.theirs,
             onlyMine: conflict.onlyMine,
-            onlyTheirs: conflict.onlyTheirs
+            onlyTheirs: conflict.onlyTheirs,
+            myChanges: conflict.myChanges
           }
         : null,
       conflictCopies: c.conflictCopies,
@@ -286,6 +304,8 @@ export class DataFileSession {
       problems: [],
       conflict: null,
       conflictCopies: [],
+      journal: [],
+      redoJournal: [],
       locationWarning: null,
       openedAt: now,
       revision: 0,
@@ -382,7 +402,8 @@ export class DataFileSession {
    */
   write<T>(
     entry: AuditEntry | ((result: T) => AuditEntry),
-    fn: (db: LockerDb, ctx: OperatorContext) => T
+    fn: (db: LockerDb, ctx: OperatorContext) => T,
+    replay: Replayable | null = null
   ): T {
     const c = this.cur
     if (!c) throw new Error('No file is open.')
@@ -400,6 +421,8 @@ export class DataFileSession {
     })
     this.pushUndo(c, { bytes: before, action })
     c.redo = []
+    c.journal.push({ action, at: ctx.now().toISOString(), replay })
+    c.redoJournal = []
     this.markChanged()
     this.emit()
     return result
@@ -462,6 +485,13 @@ export class DataFileSession {
       })
     })
     to.push({ bytes: current, action: step.action })
+    if (kind === 'undo') {
+      const j = c.journal.pop()
+      if (j) c.redoJournal.push(j)
+    } else {
+      const j = c.redoJournal.pop()
+      if (j) c.journal.push(j)
+    }
     c.db.close()
     c.db = next
     this.markChanged()
@@ -550,6 +580,7 @@ export class DataFileSession {
     }
     c.saving = true
     const counterAtStart = c.changeCounter
+    const journalAtStart = c.journal.length
     this.emit()
     let partialBackupWarning: string | null = null
     try {
@@ -571,6 +602,7 @@ export class DataFileSession {
         c.size = out.size
         c.lastSavedAt = this.d.now().toISOString()
         if (c.changeCounter === counterAtStart) c.dirty = false
+        c.journal.splice(0, journalAtStart)
         this.clearProblem('save_failed')
         const backupMessage = out.backupError ?? partialBackupWarning
         if (backupMessage) this.problem('backup_failed', `Saved, but ${lowerFirst(backupMessage)}`)
@@ -623,6 +655,12 @@ export class DataFileSession {
       theirs: theirs ? summarise(theirs) : null,
       onlyMine: theirs ? historyOnlyIn(c.db, theirs) : [],
       onlyTheirs: theirs ? historyOnlyIn(theirs, c.db) : [],
+      myChanges: c.journal.map((j, index) => ({
+        index,
+        action: j.action,
+        at: j.at,
+        canAdd: j.replay !== null
+      })),
       diskBytes,
       diskHash: diskBytes ? sha256(diskBytes) : null
     }
@@ -669,6 +707,64 @@ export class DataFileSession {
     return { ok: true }
   }
 
+  /**
+   * Keeps the other version and adds the chosen changes made here since the last
+   * save, one by one, each in its own transaction. A change that no longer fits the
+   * other version (for example the locker is now taken) is skipped and reported.
+   * This computer's whole version is kept as a named backup first.
+   */
+  async mergeConflict(
+    picks: readonly number[],
+    replay: ReplayFn
+  ): Promise<
+    | { ok: true; added: number; skipped: { action: string; message: string }[] }
+    | { ok: false; message: string }
+  > {
+    const c = this.cur
+    if (!c?.conflict || c.conflict.reason !== 'changed_on_disk' || !c.conflict.diskBytes)
+      return { ok: false, message: 'There is no other version to add changes to.' }
+    const diskBytes = c.conflict.diskBytes
+    const chosen = [...new Set(picks)]
+      .sort((a, b) => a - b)
+      .map((i) => c.journal[i])
+      .filter((j): j is JournalEntry => j !== undefined && j.replay !== null)
+    await this.backupBytes(c.db.export(), 'my unsaved changes')
+    await this.replaceInMemory(diskBytes)
+    c.conflict = null
+    const ctx = this.ctx()
+    let added = 0
+    const skipped: { action: string; message: string }[] = []
+    for (const j of chosen) {
+      try {
+        c.db.transaction(() => {
+          replay(c.db, ctx, j.replay!)
+          appendAudit(c.db, ctx, {
+            action: j.action,
+            entity: 'file',
+            reason: 'Added from this computer’s version after a conflict'
+          })
+        })
+        added++
+      } catch (error) {
+        skipped.push({
+          action: j.action,
+          message: error instanceof Error ? error.message : String(error)
+        })
+      }
+    }
+    c.journal = []
+    c.redoJournal = []
+    appendAudit(c.db, ctx, {
+      action: 'conflict.merged',
+      entity: 'file',
+      after: { added, skipped: skipped.length }
+    })
+    this.markChanged()
+    await this.flush()
+    this.emit()
+    return { ok: true, added, skipped }
+  }
+
   private async replaceInMemory(bytes: Uint8Array): Promise<void> {
     const c = this.cur
     if (!c) return
@@ -680,6 +776,8 @@ export class DataFileSession {
     // A version from disk or a backup: earlier undo steps no longer apply to it.
     c.undo = []
     c.redo = []
+    c.journal = []
+    c.redoJournal = []
     c.hash = sha256(bytes)
     c.size = bytes.byteLength
     c.dirty = false
@@ -707,6 +805,7 @@ export class DataFileSession {
       theirs: summarise(theirs),
       onlyMine: historyOnlyIn(c.db, theirs),
       onlyTheirs: historyOnlyIn(theirs, c.db),
+      myChanges: [],
       diskBytes: r.bytes,
       diskHash: r.hash
     }
@@ -945,6 +1044,15 @@ export class DataFileSession {
     if (b.name.includes('/') || b.name.includes('\\') || b.name.startsWith('.'))
       throw new Error('Bad backup name.')
     return join(b.source === 'shared' ? sharedBackupDir(c.path) : this.localBackupDir(), b.name)
+  }
+
+  /** Opens a backup as a database for reading. The caller closes it. */
+  async loadBackup(b: { source: BackupView['source']; name: string }): Promise<LockerDb | null> {
+    const r = await readDataFile(this.d.fs, this.backupPath(b))
+    if (!r.ok) return null
+    const db = await LockerDb.fromBytes(r.bytes).catch(() => null)
+    if (db && schemaState(db).kind === 'older') migrate(db)
+    return db
   }
 
   async previewBackup(b: {

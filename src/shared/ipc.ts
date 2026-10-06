@@ -102,6 +102,7 @@ export const FilePathSchema = z.object({
 export const NewFileSchema = z.object({ schoolName: z.string().trim().min(1).max(120) })
 
 export const ResolveConflictSchema = z.object({ choice: z.enum(['keep_mine', 'keep_theirs']) })
+export const MergeConflictSchema = z.object({ picks: z.array(z.number().int().min(0)).max(10_000) })
 
 export const CopyNameSchema = z.object({
   name: z

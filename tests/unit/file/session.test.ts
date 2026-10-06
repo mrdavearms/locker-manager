@@ -370,6 +370,56 @@ describe('conflicts (SPEC.md 6.4)', () => {
     expect(backups.some((b) => b.includes('my unsaved changes'))).toBe(true)
   })
 
+  it('merge: keeps theirs and adds my chosen changes one by one, skipping any that no longer fit', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    await dave.session.open(path)
+    const other = await LockerDb.fromBytes(new Uint8Array(readFileSync(path)))
+    other.run("UPDATE school SET name = 'SYNTHETIC From Elsewhere'")
+    writeFileSync(path, other.export())
+    other.close()
+    // Three changes here: one with no way to repeat it, one that can be made again,
+    // one that will not fit the other version.
+    rename(dave, 'SYNTHETIC From Dave')
+    dave.session.write(
+      { action: 'school.updated', entity: 'school' },
+      (db) => db.run("UPDATE school SET address = 'SYNTHETIC 1 Main St'"),
+      { method: 'address', params: 'SYNTHETIC 1 Main St' }
+    )
+    dave.session.write({ action: 'locker.updated', entity: 'locker' }, () => null, {
+      method: 'fails',
+      params: null
+    })
+    await dave.session.flush()
+    const changes = openState(dave).conflict!.myChanges
+    expect(changes.map((c) => [c.action, c.canAdd])).toEqual([
+      ['school.renamed', false],
+      ['school.updated', true],
+      ['locker.updated', true]
+    ])
+    const r = await dave.session.mergeConflict([0, 1, 2], (db, _ctx, change) => {
+      if (change.method === 'fails') throw new Error('That locker is already full.')
+      db.run('UPDATE school SET address = $a', { $a: String(change.params) })
+    })
+    expect(r).toEqual({
+      ok: true,
+      added: 1,
+      skipped: [{ action: 'locker.updated', message: 'That locker is already full.' }]
+    })
+    const after = openState(dave)
+    expect(after.conflict).toBeNull()
+    expect(after.summary.schoolName).toBe('SYNTHETIC From Elsewhere')
+    expect(after.dirty).toBe(false)
+    const disk = await LockerDb.fromBytes(new Uint8Array(readFileSync(path)))
+    expect(disk.get<{ address: string }>('SELECT address FROM school')!.address).toBe(
+      'SYNTHETIC 1 Main St'
+    )
+    disk.close()
+    const backups = readdirSync(join(dir, BACKUP_FOLDER_NAME, 'Locker data'))
+    expect(backups.some((b) => b.includes('my unsaved changes'))).toBe(true)
+  })
+
   it('a vanished file is noticed and can be written back', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)

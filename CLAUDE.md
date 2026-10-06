@@ -332,3 +332,12 @@ in light and dark (tests/e2e/accessibility.spec.ts, reduced motion so colours ar
 The left menu becomes a top row in narrow windows and at large text sizes. Releasing as
 v0.8.0. Next: 1.0 after Dave's hand checks (real label sheet on a laser printer, letters on
 paper, a Windows PC install, signing when bought).
+
+**Promised items closed after M8** (7 Oct 2026). Per-change conflict merge (Dave chose it for
+M4; it was missed until now): the session keeps a journal of unsaved changes with each rpc
+method and its input (`session.write(..., replay)`), and `mergeConflict` loads the other
+version and replays the ticked changes through `replayChange` in `src/main/rpc/registry.ts`,
+skipping any that throw. History "Put back to before this…" (`src/main/restoreRecord.ts`)
+reads the student or locker from the first backup after the change that does not yet hold
+its history line. Label QR links open the locker (`src/main/links.ts`). Landing page draft
+in `site/index.html`, not published (GitHub Pages needs Dave's yes).

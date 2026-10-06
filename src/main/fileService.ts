@@ -12,6 +12,7 @@ import {
   channels,
   CopyNameSchema,
   FilePathSchema,
+  MergeConflictSchema,
   NewFileSchema,
   OperatorSetSchema,
   RenameSchoolSchema,
@@ -38,6 +39,8 @@ import { nodeFs } from './file/fsPort'
 import { DataFileSession } from './file/session'
 import { machineName, Preferences, suggestedOperatorName } from './prefs/preferences'
 import { savedMappings, setSavedMappingsReader } from './rpc/studentHandlers'
+import { replayChange } from './rpc/registry'
+import { previewRecordRestore, restoreRecord } from './restoreRecord'
 
 // Connects the Electron-free DataFileSession to dialogs, the window and IPC.
 // No student data is ever logged (SPEC.md 8.1): only actions and outcomes.
@@ -423,6 +426,32 @@ export function registerFileHandlers(): void {
     const { choice } = ResolveConflictSchema.parse(raw)
     log.info('conflict resolved', choice)
     return session.resolveConflict(choice)
+  })
+
+  // "Restore this record to how it was" from the History screen (SPEC.md 4.12).
+  const RecordRestore = z.object({ entryId: z.string().min(1).max(64) })
+  ipcMain.handle(channels.recordRestorePreview, async (_e, raw: unknown) => {
+    try {
+      return {
+        ok: true,
+        value: await previewRecordRestore(session, RecordRestore.parse(raw).entryId)
+      }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+  ipcMain.handle(channels.recordRestore, async (_e, raw: unknown) => {
+    try {
+      return { ok: true, value: await restoreRecord(session, RecordRestore.parse(raw).entryId) }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle(channels.fileMergeConflict, async (_e, raw: unknown) => {
+    const { picks } = MergeConflictSchema.parse(raw)
+    log.info('conflict merge requested', { picks: picks.length })
+    return session.mergeConflict(picks, replayChange)
   })
   ipcMain.handle(channels.fileCompareCopy, async (_e, raw: unknown): Promise<ActionResult> => {
     const { name } = CopyNameSchema.parse(raw)
