@@ -1,0 +1,49 @@
+# Dependencies and build output
+node_modules/
+out/
+dist/
+release/
+.vite/
+*.tsbuildinfo
+
+# Test output
+coverage/
+test-results/
+playwright-report/
+tests/golden/**/actual/
+tests/golden/**/diff/
+
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.cer
+*.mobileprovision
+
+# Student data: never commit. Synthetic fixtures live ONLY in tests/fixtures/ and
+# resources/demo/ and carry a SYNTHETIC marker (see scripts/check-no-student-data.*).
+*.lockers
+*.lockers.lock
+*.lockers.tmp-*
+*.csv
+*.xlsx
+*.xls
+*.ods
+!tests/fixtures/**/*.csv
+!tests/fixtures/**/*.xlsx
+!tests/fixtures/**/*.xls
+!tests/fixtures/**/*.ods
+!tests/fixtures/**/*.lockers
+!resources/demo/**/*.csv
+!resources/demo/**/*.xlsx
+Locker Manager backups/
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
