@@ -1,0 +1,74 @@
+# Packaging for Windows and macOS. Signing switches on by itself when the
+# release workflow finds the secrets (docs/signing.md); nothing here changes.
+appId: au.com.dandsarmstrong.lockermanager
+productName: Locker Manager
+copyright: Copyright © 2026 Dave Armstrong. MIT licence.
+executableName: Locker Manager
+
+directories:
+  buildResources: resources/build
+  output: release
+
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+asar: true
+
+# Draft first; the release workflow verifies every asset, then publishes.
+publish:
+  provider: github
+  owner: mrdavearms
+  repo: locker-manager
+  releaseType: draft
+
+fileAssociations:
+  - ext: lockers
+    name: Locker Manager data file
+    description: Locker Manager data file
+    role: Editor
+protocols:
+  - name: Locker Manager
+    schemes: [lockermanager]
+
+mac:
+  category: public.app-category.productivity
+  # One download that runs on Intel and Apple silicon (SPEC.md 9.1).
+  target:
+    - target: dmg
+      arch: [universal]
+    - target: zip
+      arch: [universal]
+  artifactName: Locker-Manager-${version}-${arch}.${ext}
+  hardenedRuntime: true
+  entitlements: resources/build/entitlements.mac.plist
+  entitlementsInherit: resources/build/entitlements.mac.plist
+  # mac.identity is set on the command line by the release workflow:
+  #   "-"  (ad-hoc) when there is no certificate, so Apple silicon does not call the app damaged;
+  #   unset when CSC_LINK is present, so electron-builder finds the Developer ID certificate.
+  # mac.notarize=true is likewise added only when the Apple secrets exist.
+
+dmg:
+  artifactName: Locker-Manager-${version}-${arch}.${ext}
+  contents:
+    - { x: 130, y: 220 }
+    - { x: 410, y: 220, type: link, path: /Applications }
+
+win:
+  # One installer that carries both x64 and arm64 (SPEC.md 9.1).
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+  artifactName: Locker-Manager-Setup-${version}.${ext}
+  # Azure Artifact Signing (win.azureSignOptions) or a certificate (WIN_CSC_LINK)
+  # are supplied by the release workflow only when the secrets exist.
+
+nsis:
+  oneClick: false
+  # Per-user by default (no admin rights needed); IT can run /S /allusers (SPEC.md 9.5).
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  shortcutName: Locker Manager
+  deleteAppDataOnUninstall: false
+  differentialPackage: true
