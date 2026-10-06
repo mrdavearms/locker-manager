@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Accessibility, Ban, Hash, KeyRound, Lock, Users, X } from 'lucide-react'
 import type { LockerView } from '@shared/locations'
+import { KeyPanel } from '@renderer/lockers/KeyPanel'
 import { LOCK_TYPE_INFO } from '@shared/locks'
 import { Button } from '@renderer/components/Button'
 import { Field, TextInput } from '@renderer/components/Field'
@@ -133,6 +134,7 @@ function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): Re
           <CodeReveal lockerId={l.id} />
         </div>
       )}
+      {l.lockType && LOCK_TYPE_INFO[l.lockType].keyed && <KeyPanel l={l} />}
       <div className="mt-6 space-y-3">
         <label className="flex items-center justify-between gap-3 text-sm">
           <span className="flex items-center gap-2">

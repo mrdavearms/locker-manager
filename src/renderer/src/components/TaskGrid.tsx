@@ -10,9 +10,8 @@ import {
   UserPlus
 } from 'lucide-react'
 
-// The home-screen tasks from SPEC.md section 10, in that order. Each lights up in
-// the milestone that builds it; until then it is shown, disabled, so staff can
-// see where the app is going.
+// The home-screen tasks from SPEC.md section 10, in that order. Tasks that change
+// the file are shown greyed out while it is open read-only.
 const tasks = [
   { icon: Search, title: 'Find a student', hint: 'Locker, group and code' },
   { icon: UserPlus, title: 'New student', hint: 'Give a locker and a code' },
@@ -27,7 +26,7 @@ const tasks = [
 
 export type TaskId = (typeof tasks)[number]['title']
 
-/** Tasks with a handler are live; the rest show "Soon". */
+/** Tasks with a handler are live; the rest (changes, while read-only) show "Read-only". */
 export function TaskGrid({
   handlers = {}
 }: {
@@ -39,7 +38,7 @@ export function TaskGrid({
         <h2 id="tasks-heading" className="text-xl font-semibold">
           What do you want to do?
         </h2>
-        <p className="text-sm text-ink-muted">Grey tasks arrive in the next updates.</p>
+        <p className="text-sm text-ink-muted">Grey tasks need the file open for editing.</p>
       </div>
       <ul className="stagger mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tasks.map(({ icon: Icon, title, hint }) => {
@@ -74,7 +73,7 @@ export function TaskGrid({
                 </span>
                 {!run && (
                   <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-semibold text-ink-muted">
-                    Soon
+                    Read-only
                   </span>
                 )}
               </button>

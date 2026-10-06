@@ -16,6 +16,7 @@ export type Screen =
   | 'settings-labels'
   | 'settings-letters'
   | 'setup'
+  | 'rollover'
 
 /** The left-hand menu while a file is open. Every item has a text label. */
 export function NavRail({

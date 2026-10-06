@@ -86,6 +86,8 @@ const api = {
   exportAll: (includeCodes: boolean): Promise<Saved> =>
     ipcRenderer.invoke(channels.fileExportAll, { includeCodes }),
   fileFromExport: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileFromExport),
+  namedBackup: (label: string): Promise<ActionResult & { warning?: string }> =>
+    ipcRenderer.invoke(channels.fileNamedBackup, { label }),
   redo: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileRedo),
   showInFolder: (): Promise<void> => ipcRenderer.invoke(channels.fileShowInFolder),
   takeOver: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileTakeOver),

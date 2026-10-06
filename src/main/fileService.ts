@@ -204,6 +204,21 @@ export function registerFileHandlers(): void {
     return afterOpen(await session.createNew(path, db))
   })
 
+  // A named backup before a big change (the year rollover).
+  ipcMain.handle(
+    channels.fileNamedBackup,
+    async (_e, raw: unknown): Promise<ActionResult & { warning?: string }> => {
+      const { label } = z.object({ label: z.string().trim().min(1).max(60) }).parse(raw)
+      try {
+        const warning = await session.keepNamedBackup(label)
+        session.write({ action: 'file.named_backup', entity: 'file', after: { label } }, () => null)
+        return warning ? { ok: true, warning } : { ok: true }
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : String(error) }
+      }
+    }
+  )
+
   // The whole file as a portable Excel workbook (SPEC.md 5.5).
   ipcMain.handle(
     channels.fileExportAll,

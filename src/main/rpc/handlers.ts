@@ -25,6 +25,7 @@ import { getSetting, setSetting } from '../repos/settings'
 import type { Handlers } from './registry'
 import { labelHandlers } from './labelHandlers'
 import { letterHandlers } from './letterHandlers'
+import { rolloverHandlers } from './rolloverHandlers'
 import { lockerHandlers } from './lockerHandlers'
 import { studentHandlers } from './studentHandlers'
 
@@ -56,6 +57,7 @@ export const handlers: Handlers = {
   ...lockerHandlers,
   ...labelHandlers,
   ...letterHandlers,
+  ...rolloverHandlers,
   'school.get': { kind: 'read', run: (db) => getSchoolProfile(db) },
   'school.update': {
     kind: 'write',

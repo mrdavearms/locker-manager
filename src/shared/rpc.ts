@@ -34,6 +34,8 @@ import {
 } from './letters'
 import { LOCK_TYPES, LockDefaultsSchema, type LockDefaults } from './locks'
 import { ReportRequestSchema, type ReportPreview } from './reports'
+import type { RolloverStatus, SelfResetGroup } from './rollover'
+import { KEY_EVENTS, type KeyInfo } from './keys'
 import { TerminologySchema, type Terminology } from './terminology'
 
 // The one contract for data requests between the window and the main process
@@ -280,7 +282,23 @@ export const rpcParams = {
     template: LetterTemplateSchema.optional()
   }),
   'students.setLanguage': z.object({ studentId: id, code: LANGUAGE_CODE.nullable() }),
-  'reports.preview': z.object({ request: ReportRequestSchema })
+  'reports.preview': z.object({ request: ReportRequestSchema }),
+  'rollover.status': z.object({}),
+  'rollover.start': z.object({}),
+  'rollover.selfResetGroups': z.object({}),
+  'rollover.recordOnZero': z.object({ lockIds: z.array(id).max(10_000) }),
+  'rollover.archive': z.object({ typed: z.string().max(60) }),
+  'rollover.promote': z.object({ lastYearLevel: z.string().regex(/^\d{1,2}$/) }),
+  'rollover.finish': z.object({}),
+  'keys.get': z.object({ lockerId: id }),
+  'keys.setNumber': z.object({ lockId: id, keyNumber: z.string().max(40).nullable() }),
+  'keys.event': z.object({
+    lockId: id,
+    event: z.enum(KEY_EVENTS),
+    studentId: id.nullable(),
+    notes: z.string().max(300).nullable(),
+    amountCents: z.number().int().min(0).max(1_000_000).nullable()
+  })
 } as const
 
 export interface SetupStatus {
@@ -380,6 +398,16 @@ export interface RpcResults {
   'letters.preview': LetterPreview
   'students.setLanguage': null
   'reports.preview': ReportPreview
+  'rollover.status': RolloverStatus
+  'rollover.start': RolloverStatus
+  'rollover.selfResetGroups': SelfResetGroup[]
+  'rollover.recordOnZero': { recorded: number }
+  'rollover.archive': { ended: number; needReset: number; toYear: string }
+  'rollover.promote': { promoted: number; left: number }
+  'rollover.finish': null
+  'keys.get': KeyInfo | null
+  'keys.setNumber': KeyInfo | null
+  'keys.event': null
 }
 
 export type RpcMethod = keyof typeof rpcParams

@@ -123,6 +123,10 @@ and removed last. **Backups contain lock codes** (from M4 onwards): the backup f
 beside the data file and has the same permissions, so restrict the shared folder to staff
 who should see codes.
 
+Before the year rollover archives a year, the app saves and keeps a named backup called
+"Before starting <year>" in both backup folders. If neither can be written, the archive
+does not happen.
+
 Restoring is done in the app (Backups button) by the person editing. The current version is
 kept as a named backup first.
 

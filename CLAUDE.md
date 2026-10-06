@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 7 October 2026 (M6 built, releasing as v0.6.0)._
+_Last updated: 7 October 2026 (M7 built, releasing as v0.7.0)._
 
 ## What this is
 
@@ -301,5 +301,15 @@ page count check, reveal log). Reports: `src/shared/reports.ts`, `src/main/repor
 (eight reports), `src/main/render/report.ts` (tables, CONFIDENTIAL watermark, page-number
 footer), `src/main/reports/export.ts` (CSV with BOM and formula guard, XLSX). Whole-file
 export and rebuild: `src/main/portable/workbook.ts`. Screens: Letters, Reports, Settings
-Letters (designer), student panel letter and language. Releasing as v0.6.0. Next: M7 year
-rollover and key register.
+Letters (designer), student panel letter and language. v0.6.0 released.
+
+**M7: year rollover and keys.** Built 7 Oct 2026. `src/main/repos/rollover.ts`: progress in
+setting `rollover.progress` (so it survives closing the file and works for a second
+person), self-reset record (`recordOnZero`: settable locks to `reset_no_code`, code
+cleared, history closed), archive (typed `START <year>`, ends current assignments with
+`year_rollover`, locks still on a known code to `needs_new_code`, old year archived, new
+year active, an unused year code set made before the rollover moves to the new year),
+promote (year level + 1, last year level marked left). The window keeps a named backup
+first through `file:namedBackup` (`session.keepNamedBackup`). Key register:
+`src/main/repos/keys.ts`, panel in the Lockers screen for keyed locks. Releasing as v0.7.0.
+Next: M8 polish and 1.0.

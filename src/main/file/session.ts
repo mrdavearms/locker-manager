@@ -497,6 +497,20 @@ export class DataFileSession {
     if (this.cur?.dirty && this.cur.mode === 'edit' && !this.cur.conflict) await this.save()
   }
 
+  /**
+   * Saves now, then keeps a named backup of the file as it stands, before a big change
+   * such as the year rollover (SPEC.md 4.10). Returns a warning if only one copy was kept.
+   */
+  async keepNamedBackup(label: string): Promise<string | null> {
+    const c = this.cur
+    if (!c) throw new Error('No file is open.')
+    if (c.mode !== 'edit' || c.conflict) throw new Error('This file is open read-only.')
+    await this.flush()
+    const warning = await this.backupBytes(c.db.export(), label)
+    this.emit()
+    return warning
+  }
+
   private async backupBytes(bytes: Uint8Array, label?: string): Promise<string | null> {
     const c = this.cur
     if (!c) return null

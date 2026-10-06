@@ -514,3 +514,44 @@ CONFIDENTIAL and every code is recorded.
 click **Make a new file from it…**. Choose the workbook, then where to save the new file.
 The workbook is never changed. If the export had no codes, every lock is marked as needing a
 new code.
+
+## Start next year
+
+Moving to next year is the riskiest job of the year, so the app walks you through it. Your
+progress is kept in the file, so you can stop and carry on later, or someone else can.
+
+On Home, click **Start next year**, then **Begin**. Use **Next** and **Back** to move
+between steps.
+
+1. **Before the last day**: save the end-of-year reset checklist and print it. On their last
+   day, students empty their locker and turn every dial to 0 0 0 0 in Homeroom, and the
+   teacher ticks each one. This takes minutes; resetting every lock with the master key
+   takes a full day.
+2. **Record locks students reset**: for each Homeroom, untick any lock that was not reset,
+   then click the button. Those locks now have no code.
+3. **Check everything**: read the list. Nothing changes yet.
+4. **Archive this year**: type the words shown (for example `START 2027`), then click
+   **Archive**. Every student's locker is given back, this year becomes read-only history,
+   and next year starts. A backup called "Before starting 2027" is kept first. Locks still
+   on a student's code go on **Locks to reset**.
+5. **Move students up (optional)**: most schools skip this and import instead. If your
+   school keeps the same students, choose the last year level and click **Move everyone up**.
+6. **Import next year's students**: the usual import.
+7. **Codes for next year**: click **Make the code set** if there is not one already.
+8. **Give out lockers**: the usual allocation.
+9. **Print labels and letters**.
+10. **Reset the remaining locks** with the master key, then click **Finish**.
+
+**If something goes wrong**: press Ctrl+Z straight after archiving, or restore the backup
+called "Before starting 2027" from **Backups** in the bar at the bottom.
+
+## Keys
+
+For lockers with keyed locks, click the locker on the Lockers screen.
+
+- Type the **Key number** and click **Save**.
+- To record a key given out, returned, lost, replaced or charged for, choose what happened,
+  add a note if you like, and click **Record**. It is recorded against the student who has
+  the locker.
+- The panel shows how many keys are out. The **Key register** report lists every keyed lock
+  and every key not yet returned.

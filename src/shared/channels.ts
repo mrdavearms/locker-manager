@@ -41,6 +41,7 @@ export const channels = {
   renderReportPrint: 'render:reportPrint',
   renderReportExport: 'render:reportExport',
   fileExportAll: 'file:exportAll',
+  fileNamedBackup: 'file:namedBackup',
   fileFromExport: 'file:fromExport',
   fileRedo: 'file:redo',
   // main -> renderer events
