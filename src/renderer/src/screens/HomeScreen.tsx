@@ -4,7 +4,9 @@ import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { DemoBadge } from '@renderer/components/DemoBadge'
 import { TaskGrid } from '@renderer/components/TaskGrid'
+import type { Screen } from '@renderer/components/NavRail'
 import { formatWhen, plural } from '@renderer/lib/format'
+import { useRpc } from '@renderer/lib/rpc'
 import type { OpenFileState } from '@renderer/lib/useFileState'
 
 interface Props {
@@ -144,7 +146,32 @@ function SchoolName({ state, onError }: Props): React.JSX.Element {
   )
 }
 
-export function HomeScreen({ state, onError }: Props): React.JSX.Element {
+function SetupCard({ onNavigate }: { onNavigate: (s: Screen) => void }): React.JSX.Element | null {
+  const { data } = useRpc('setup.status', {})
+  if (!data || data.completed) return null
+  return (
+    <Banner
+      tone="info"
+      title="Finish setting up your school"
+      testId="setup-card"
+      actions={
+        <Button onClick={() => onNavigate('setup')} data-testid="open-setup">
+          Carry on with set-up
+        </Button>
+      }
+    >
+      {data.lockers === 0
+        ? 'Add your school details, the words your school uses, and your lockers.'
+        : `${data.lockers} lockers so far. Check the details, then finish.`}
+    </Banner>
+  )
+}
+
+export function HomeScreen({
+  state,
+  onError,
+  onNavigate
+}: Props & { onNavigate: (s: Screen) => void }): React.JSX.Element {
   const c = state.summary.counts
   const stats = [
     { label: 'Lockers', value: c.lockers },
@@ -188,6 +215,7 @@ export function HomeScreen({ state, onError }: Props): React.JSX.Element {
 
       <div className="space-y-3">
         <ReadOnlyBanner state={state} onError={onError} />
+        {!state.summary.demo && state.mode === 'edit' && <SetupCard onNavigate={onNavigate} />}
         {state.summary.demo && (
           <Banner tone="info" title="You are in the demo school">
             Every student here is made up. Practise freely: the demo starts fresh each time you open

@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 6 October 2026 (M1 built, releasing as v0.1.0)._
+_Last updated: 6 October 2026 (M2 built, releasing as v0.2.0)._
 
 ## What this is
 
@@ -177,6 +177,22 @@ From `~/Antigravity/redaction tool/CLAUDE.md` and `~/Antigravity/jacks iep gener
 - `tests/fixtures/schema/vN-SYNTHETIC.lockers`: one file per released schema version. The
   fixture test writes the newest one if missing; commit it with any new migration.
 
+## Data requests (since M2)
+
+All data reads and writes from the window go through ONE channel, `rpc`:
+- `src/shared/rpc.ts`: every method with its Zod input schema (`rpcParams`) and result type
+  (`RpcResults`). Adding a feature = add the method here first.
+- `src/main/rpc/handlers.ts`: one entry per method: `read` (runs on the open file),
+  `write` (runs inside `session.write`: read-only and conflict checks, transaction, history
+  entry from `audit(params, result)`, debounced save) or `pure` (no file needed). TypeScript
+  refuses to build if a method has no handler.
+- Renderer: `useRpc(method, params)` fetches and refetches when the file's `revision`
+  changes; `call(method, params)` throws a plain message; `useAction()` shows it.
+- Repositories in `src/main/repos/*.ts` are plain functions on `LockerDb`, unit-tested
+  without Electron. They take an `OperatorContext` for timestamps.
+- The window's words come from `useTerms()` (terminology); never hard-code "Homeroom",
+  "Locker" and so on in UI text.
+
 ## Gotchas found in M1
 
 - React's `react-hooks/set-state-in-effect` lint rule forbids resetting form state in an
@@ -187,13 +203,24 @@ From `~/Antigravity/redaction tool/CLAUDE.md` and `~/Antigravity/jacks iep gener
 - A save whose final `stat` fails after a successful rename must still count as saved; the
   property test found this.
 - `--user-data-dir` is honoured by Electron for `app.getPath('userData')`; no test hook needed.
+- Prettier reflows long lines, so scripted find-and-replace edits against source often miss.
+  Use the Edit tool on freshly read text.
+- Windows reports an installed app's version with four parts (0.1.0.0).
+- Never pipe `curl` into `grep -q` in a workflow: grep stops early, curl reports a write
+  failure, and pipefail fails the step even though the text was found.
 
 ## Current milestone
 
 **M1: data file and safety.** Built 6 Oct 2026: the `.lockers` file, migrations, atomic
 save, edit lock, read-only mode, takeover, conflict and sync-copy screens (whole-version
 choice), backups with preview and restore, the demo school, and the automatic update proof
-in release.yml. Releasing as v0.1.0. Open question for Dave: a backup on EVERY save (as
-SPEC.md 6.5 says) means hundreds a day in heavy use; the 500 MB cap then deletes the oldest
-history first. Recommended: at most one backup per 10 minutes plus one at open. Next: M2
-(set-up wizard, school profile, terminology, areas, banks, lockers, lock types).
+in release.yml. Releasing as v0.1.0. Backups stay on every save (SPEC.md 6.5);
+over the size cap, recent bursts are thinned to one per 10 minutes before older history is
+touched. v0.1.0 released; update proof passed on Windows (0.0.2 installed 0.1.0 by itself)
+and Mac (download page offered).
+
+**M2: set-up and locations.** Built 6 Oct 2026: set-up wizard, school profile with logo and
+automatic mono version (with the white-on-transparent warning), terminology presets,
+areas, banks, bulk locker builder with preview, the Lockers screen, out of service,
+reserve, accessible, shared lockers, the deliberate Renumber tool, lock kinds per bank.
+Releasing as v0.2.0. Next: M3 import.

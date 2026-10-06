@@ -84,6 +84,8 @@ export type FileState =
       conflictCopies: string[]
       locationWarning: string | null
       openedAt: string
+      /** Goes up on every change or reload, so views know to fetch again. */
+      revision: number
     }
 
 export interface BackupView {

@@ -28,6 +28,7 @@ export const channels = {
   backupsPreview: 'backups:preview',
   backupsRestore: 'backups:restore',
   schoolRename: 'school:rename',
+  rpc: 'rpc',
   // main -> renderer events
   updateStatus: 'event:update:status',
   openAbout: 'event:ui:openAbout',

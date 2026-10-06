@@ -32,6 +32,9 @@ test('create a school file, change it, see it saved and backed up, close it', as
   await l.page.getByLabel('School name').fill('SYNTHETIC Riverside College')
   await l.page.getByRole('button', { name: 'Choose where to save…' }).click()
 
+  // A new file opens the set-up; go Home.
+  await expect(l.page.getByText('Set up your school')).toBeVisible()
+  await l.page.getByTestId('nav-home').click()
   await expect(l.page.getByTestId('school-name')).toHaveText('SYNTHETIC Riverside College')
   await expect(l.page.getByTestId('mode-pill')).toHaveText('Editing')
   expect(existsSync(`${path}.lock`)).toBe(true)

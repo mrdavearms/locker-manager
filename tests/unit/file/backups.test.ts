@@ -93,10 +93,24 @@ describe('planPrune (SPEC.md 6.5)', () => {
   it('over the cap, thins a busy day before touching older history', () => {
     // A save every 2 minutes for the last 8 hours, plus one backup a day for 60 days.
     const busy: BackupEntry[] = []
-    for (let i = 0; i < 240; i++) busy.push({ name: `busy${i}`, at: new Date(now.getTime() - i * 2 * 60 * 1000 - 1000), label: null, size: 100 })
+    for (let i = 0; i < 240; i++)
+      busy.push({
+        name: `busy${i}`,
+        at: new Date(now.getTime() - i * 2 * 60 * 1000 - 1000),
+        label: null,
+        size: 100
+      })
     const history: BackupEntry[] = []
-    for (let d = 8; d < 68; d++) history.push({ name: `day${d}`, at: new Date(now.getTime() - d * DAY), label: null, size: 100 })
-    const doomed = new Set(planPrune([...busy, ...history], now, { ...DEFAULT_POLICY, maxBytes: 100 * 140 }))
+    for (let d = 8; d < 68; d++)
+      history.push({
+        name: `day${d}`,
+        at: new Date(now.getTime() - d * DAY),
+        label: null,
+        size: 100
+      })
+    const doomed = new Set(
+      planPrune([...busy, ...history], now, { ...DEFAULT_POLICY, maxBytes: 100 * 140 })
+    )
     expect(history.filter((e) => doomed.has(e.name))).toEqual([])
     const keptBusy = busy.filter((e) => !doomed.has(e.name))
     expect(keptBusy.length).toBeLessThan(busy.length)

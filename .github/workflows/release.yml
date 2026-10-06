@@ -202,4 +202,3 @@ jobs:
           if [[ "$VERSION" == 0.* || "$VERSION" == *-* ]]; then PRE="--prerelease"; else PRE="--prerelease=false --latest"; fi
           gh release edit "$TAG" --repo "$REPO" --title "Locker Manager ${VERSION}" --notes-file /tmp/notes-final.md --draft=false $PRE
           echo "Published https://github.com/${REPO}/releases/tag/${TAG}"
-

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { channels } from '../shared/channels'
+import type { RpcMethod, RpcParams, RpcResponse } from '../shared/rpc'
 import type { BackupPreview, BackupView, FileState } from '../shared/fileState'
 import type {
   ActionResult,
@@ -73,7 +74,11 @@ const api = {
 
   // school
   renameSchool: (name: string): Promise<ActionResult> =>
-    ipcRenderer.invoke(channels.schoolRename, { name })
+    ipcRenderer.invoke(channels.schoolRename, { name }),
+
+  /** Every data request (shared/rpc.ts). Inputs are checked with Zod in the main process. */
+  rpc: <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResponse<M>> =>
+    ipcRenderer.invoke(channels.rpc, method, params)
 }
 
 export type Api = typeof api

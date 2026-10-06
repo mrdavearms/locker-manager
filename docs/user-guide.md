@@ -3,7 +3,7 @@
 This guide is for school office staff and year level leaders. Each section is one task.
 Sections are added as the app gains features.
 
-_Last updated: 6 October 2026 (version 0.1.0: the school's data file)._
+_Last updated: 6 October 2026 (version 0.2.0: setting up the school and its lockers)._
 
 ## Install Locker Manager on Windows
 
@@ -137,3 +137,77 @@ Only the person editing the file can restore.
 
 Click **Close file** at the bottom right, or just close the window. Your changes are saved
 and other staff can then edit.
+
+## Set up your school (first time only)
+
+When you start a new school file, Locker Manager opens **Set up your school**. Each step
+saves as you go, so you can stop at any time. Home shows **Finish setting up your school**
+until you are done.
+
+1. **Your school**: the name, a short name for labels, colours, and the logo.
+2. **Words you use**: pick the closest set (for example **Victorian government school**),
+   then change any word. If your school says "Form" rather than "Homeroom", change it here
+   and every screen, label and letter follows.
+3. **Lockers**: add your areas, banks and lockers (see the next section).
+4. **Locks**: check the kind of lock for each bank.
+5. **Done**: click **Finish set-up**.
+
+You can change any of this later in **Settings**.
+
+## Add your school's logo
+
+1. Go to **Settings**, then **School**.
+2. Under **Logo**, click **Add logo…** and choose a PNG, JPEG or SVG picture.
+3. Look at both pictures. The right-hand one is what prints on black-and-white labels.
+
+If a yellow box says **Check the label version of your logo**, your logo has white lettering
+that would vanish on white labels. The app has made a dark version: check it looks right.
+If it does not, click **Use my own one-colour logo…** and choose a black-and-white version.
+
+## Add lockers
+
+Lockers belong to a **bank** (a row or wall), and banks belong to an **area** (a group with
+a purpose, such as "Year 7 side").
+
+1. Go to **Settings**, then the **Areas and lockers** tab.
+2. Click **Add area**, type a name such as "Year 7 side", and click **Save**.
+3. Beside the area, click **Add bank**, type a name such as "North wall", and click **Save**.
+4. Beside the bank, click **Add lockers**.
+5. Type the first and last numbers, and how many lockers are stacked in each column
+   (for example 3: top, middle and bottom).
+6. Check the picture: it shows exactly where each number will sit. Numbers that are already
+   used show in red.
+7. Click **Add 114 lockers** (the number matches your range).
+
+## See your lockers
+
+Click **Lockers** on the left. Each bank appears as it stands in the corridor. Colours show
+which lockers are in use, spare, reserved or out of service. Click a locker to see who holds
+it and its lock.
+
+## Mark a locker out of service, reserve it, or change it
+
+1. Click **Lockers** on the left, then click the locker.
+2. Choose what to do:
+   - **Out of service…**: type why (for example "door hinge broken"). It will not be given
+     to anyone until you click **Back in service**.
+   - **Reserve**: keeps it out of allocation, for example for staff or sports gear.
+   - **Accessible**: tick it for a low, wide, or easy-to-reach locker. Students who need one
+     get these first.
+   - **Students who share it**: 2 for a shared locker.
+
+## Renumber a locker
+
+Locker numbers cannot be typed over, because that once left a school with one locker missing
+and another listed twice. Use this only when the number plate on the door really changes.
+To give a student a different locker, use **Move** instead (arriving in a later update).
+
+1. Click **Lockers** on the left, then click the locker.
+2. Click **Renumber…**, type the new number and why, and click **Renumber**.
+
+## Change the kind of lock
+
+1. Go to **Settings**, then **Locks**.
+2. **Usual lock** is used for new lockers.
+3. To change a whole bank, click **Change the lock for this bank**, choose the kind of lock,
+   and click **Apply**. Any codes those locks had are cleared, because they no longer apply.

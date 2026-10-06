@@ -93,6 +93,7 @@ interface Open {
   conflictCopies: string[]
   locationWarning: string | null
   openedAt: string
+  revision: number
 }
 
 const DAY = 24 * 60 * 60 * 1000
@@ -148,7 +149,8 @@ export class DataFileSession {
         : null,
       conflictCopies: c.conflictCopies,
       locationWarning: c.locationWarning,
-      openedAt: c.openedAt
+      openedAt: c.openedAt,
+      revision: c.revision
     }
   }
 
@@ -273,7 +275,8 @@ export class DataFileSession {
       conflict: null,
       conflictCopies: [],
       locationWarning: null,
-      openedAt: now
+      openedAt: now,
+      revision: 0
     }
     const c = this.cur
 
@@ -359,8 +362,14 @@ export class DataFileSession {
 
   // --------------------------------------------------------------- change
 
-  /** Runs one change in a transaction with its history entry, then schedules a save. */
-  write<T>(entry: AuditEntry, fn: (db: LockerDb, ctx: OperatorContext) => T): T {
+  /**
+   * Runs one change in a transaction with its history entry, then schedules a
+   * save. The entry may be built from the change's result (for example a new id).
+   */
+  write<T>(
+    entry: AuditEntry | ((result: T) => AuditEntry),
+    fn: (db: LockerDb, ctx: OperatorContext) => T
+  ): T {
     const c = this.cur
     if (!c) throw new Error('No file is open.')
     if (c.mode !== 'edit') throw new Error('This file is open read-only.')
@@ -368,7 +377,7 @@ export class DataFileSession {
     const ctx = this.ctx()
     const result = c.db.transaction(() => {
       const r = fn(c.db, ctx)
-      appendAudit(c.db, ctx, entry)
+      appendAudit(c.db, ctx, typeof entry === 'function' ? entry(r) : entry)
       return r
     })
     this.markChanged()
@@ -384,6 +393,7 @@ export class DataFileSession {
   private markChanged(): void {
     const c = this.cur
     if (!c) return
+    c.revision++
     c.dirty = true
     c.changeCounter++
     if (this.saveTimer) this.timers.clearTimeout(this.saveTimer)
@@ -568,6 +578,7 @@ export class DataFileSession {
     if (schemaState(next).kind === 'older') migrate(next)
     c.db.close()
     c.db = next
+    c.revision++
     c.hash = sha256(bytes)
     c.size = bytes.byteLength
     c.dirty = false

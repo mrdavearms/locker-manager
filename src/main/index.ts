@@ -3,6 +3,8 @@ import log from 'electron-log/main'
 import { brand } from '@shared/brand'
 import { fileSession, initFileService, openFromOs, registerFileHandlers } from './fileService'
 import { registerIpcHandlers } from './ipc/handlers'
+import { handlers as rpcHandlers } from './rpc/handlers'
+import { registerRpc } from './rpc/registry'
 import { buildMenu } from './menu'
 import { detectDeveloperIdSignature } from './signing'
 import { updateMode } from './update/policy'
@@ -64,6 +66,7 @@ if (!app.requestSingleInstanceLock()) {
     await initFileService()
     registerIpcHandlers(signed)
     registerFileHandlers()
+    registerRpc(fileSession, rpcHandlers)
     setupUpdater(mode)
     buildMenu()
     const win = createMainWindow()
