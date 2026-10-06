@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   resolve: { alias: { '@shared': resolve('src/shared') } },
   test: {
-    include: ['tests/unit/**/*.test.ts', 'src/**/*.test.ts'],
+    include: ['tests/unit/**/*.test.ts', 'tests/crash/**/*.test.ts', 'src/**/*.test.ts'],
     environment: 'node',
     coverage: { provider: 'v8', include: ['src/main/**', 'src/shared/**'] }
   }

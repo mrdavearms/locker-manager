@@ -113,6 +113,22 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
 9. **Playwright launches the project folder** (`electron.launch({ args: ['.'] })`), not the
    built file, so Electron reads package.json and `app.getVersion()` is ours.
 
+10. **M1 scope decisions** (Dave, 6 Oct 2026). The conflict screen in M1 lets the operator
+    keep one whole version (the other is always kept as a dated backup); change-by-change
+    merging arrives in M4. Every release runs an automatic update proof on GitHub's
+    Windows and Mac machines (job `prove-update` in release.yml).
+11. **Migration 001 is the whole SPEC.md section 3 data model**, so the migration machinery
+    is exercised from the first release. Later milestones add numbered migrations; never
+    edit a migration that has shipped in a release.
+12. **If a backup cannot be written, the save still goes ahead** and the operator sees a
+    warning. Refusing to save would leave the only copy of their changes in memory, which
+    is the bigger risk; the original file is untouched until the final rename either way.
+13. **sql.js traps** (verified 6 Oct 2026, sql.js 1.14.2, SQLite 3.49.1): `db.export()`
+    switches `foreign_keys` OFF and invalidates every prepared statement. `src/main/db/db.ts`
+    re-applies the pragmas after each export; never keep a prepared statement across a save.
+    JSON functions are available. `initSqlJs()` with no options finds its own WASM file,
+    including inside the packaged app's asar, so sql.js must stay in `dependencies`.
+
 ## Known, accepted
 
 - `npm audit` reports sprintf-js (moderate, denial of service) through electron-builder's
