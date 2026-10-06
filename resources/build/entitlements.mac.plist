@@ -2,12 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
-    <!-- Electron needs these under the hardened runtime. No native modules, so no library-validation exception. -->
+    <!-- Electron needs these under the hardened runtime. -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <!-- Required while builds are ad-hoc signed: without it the app will not launch
+         ("Electron Framework ... different Team IDs"), verified 6 Oct 2026. Harmless
+         once a Developer ID certificate signs everything with one Team ID. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
   </dict>
 </plist>
