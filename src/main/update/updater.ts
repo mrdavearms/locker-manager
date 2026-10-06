@@ -130,13 +130,24 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
   }
 }
 
-export function installUpdateNow(): InstallResult {
+/**
+ * Installs a downloaded update. Never while a save, print or import is running;
+ * unsaved changes are saved and the data file closed (releasing the edit lock)
+ * before the app quits (SPEC.md 9.3).
+ */
+export async function installUpdateNow(beforeInstall: () => Promise<void>): Promise<InstallResult> {
   if (status.state !== 'ready') {
     return { started: false, reason: 'No update has been downloaded yet.' }
   }
-  const blocked = installBlockedReason(getBusyState())
+  const blocked = installBlockedReason({ ...getBusyState(), unsavedChanges: false })
   if (blocked) return { started: false, reason: blocked }
-  // Later milestones: save and close the data file and release the edit lock here.
+  await beforeInstall()
+  if (getBusyState().unsavedChanges) {
+    return {
+      started: false,
+      reason: 'Your changes could not be saved, so the update has not started.'
+    }
+  }
   setImmediate(() => autoUpdater.quitAndInstall(true, true))
   return { started: true }
 }

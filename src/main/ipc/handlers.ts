@@ -3,6 +3,7 @@ import log from 'electron-log/main'
 import { brand } from '@shared/brand'
 import { isAllowedExternalUrl } from '@shared/externalUrls'
 import { AppInfoSchema, channels, OpenExternalSchema, type AppInfo } from '@shared/ipc'
+import { fileSession } from '../fileService'
 import {
   checkForUpdates,
   getUpdateStatus,
@@ -32,7 +33,7 @@ export function registerIpcHandlers(signed: boolean): void {
   ipcMain.handle(channels.updateCheck, async () => {
     await checkForUpdates(true)
   })
-  ipcMain.handle(channels.updateInstall, () => installUpdateNow())
+  ipcMain.handle(channels.updateInstall, () => installUpdateNow(() => fileSession().close()))
   ipcMain.handle(channels.updateOpenDownloadPage, async () => {
     await openDownloadPage()
   })

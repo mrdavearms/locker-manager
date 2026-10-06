@@ -80,3 +80,58 @@ export const InstallResultSchema = z.object({
   reason: z.string().optional()
 })
 export type InstallResult = z.infer<typeof InstallResultSchema>
+
+// ------------------------------------------------------------ data file (M1)
+
+export const OperatorSetSchema = z.object({ name: z.string().trim().min(1).max(80) })
+
+export const OperatorInfoSchema = z.object({
+  name: z.string().nullable(),
+  suggested: z.string(),
+  machine: z.string()
+})
+export type OperatorInfo = z.infer<typeof OperatorInfoSchema>
+
+export const FilePathSchema = z.object({
+  path: z
+    .string()
+    .min(1)
+    .refine((p) => /\.lockers$/i.test(p), 'Not a Locker Manager data file.')
+})
+
+export const NewFileSchema = z.object({ schoolName: z.string().trim().min(1).max(120) })
+
+export const ResolveConflictSchema = z.object({ choice: z.enum(['keep_mine', 'keep_theirs']) })
+
+export const CopyNameSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .refine((n) => !/[\\/]/.test(n) && /\.lockers$/i.test(n), 'Bad file name.')
+})
+
+export const ResolveCopySchema = CopyNameSchema.extend({
+  choice: z.enum(['keep_current', 'use_copy', 'ignore'])
+})
+
+export const BackupRefSchema = z.object({
+  source: z.enum(['shared', 'this_computer']),
+  name: z
+    .string()
+    .min(1)
+    .refine((n) => !/[\\/]/.test(n) && !n.startsWith('.'), 'Bad backup name.')
+})
+
+export const RenameSchoolSchema = z.object({ name: z.string().trim().min(1).max(120) })
+
+export interface RecentFile {
+  path: string
+  fileName: string
+  folder: string
+  schoolName: string | null
+  openedAt: string
+  exists: boolean
+}
+
+/** Every file action answers with this: done, cancelled by the operator, or a plain message. */
+export type ActionResult = { ok: true } | { ok: false; cancelled?: boolean; message: string }

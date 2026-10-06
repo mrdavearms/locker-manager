@@ -323,6 +323,8 @@ export class DataFileSession {
     }
 
     await this.scanSiblings()
+    const newest = (await this.listAllBackups())[0]
+    if (newest) c.lastBackupAt = newest.at
     const w = locationWarning(path, this.d.env)
     c.locationWarning = w ? locationWarningMessage(w, path) : null
     this.startTicking()

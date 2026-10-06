@@ -1,54 +1,42 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import {
-  _electron as electron,
-  expect,
-  test,
-  type ElectronApplication,
-  type Page
-} from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { launchApp, type Launched } from './launch'
 
 // Drives the BUILT app in out/ (run `npm run build` first).
 const pkg = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as { version: string }
 
-let app: ElectronApplication
-let page: Page
+let l: Launched
 
 test.beforeAll(async () => {
-  // Launch the project folder (not the built file) so Electron reads package.json
-  // and app.getVersion() is ours rather than Electron's own.
-  app = await electron.launch({
-    args: [resolve('.')],
-    env: { ...process.env, CI: '1' }
-  })
-  page = await app.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
+  l = await launchApp()
 })
 
 test.afterAll(async () => {
-  await app.close()
+  await l.close()
 })
 
-test('the window opens with the app name', async () => {
-  await expect(page).toHaveTitle('Locker Manager')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Locker Manager')
+test('the window opens on the Welcome screen', async () => {
+  await expect(l.page).toHaveTitle('Locker Manager')
+  await expect(l.page.getByRole('heading', { level: 1 })).toContainText('Every locker, every code')
+  await expect(l.page.getByTestId('open-file')).toBeVisible()
 })
 
-test('the Home screen shows the version from package.json', async () => {
-  await expect(page.getByTestId('version-line')).toContainText(`Version ${pkg.version}`)
+test('the version from package.json is shown', async () => {
+  await expect(l.page.getByTestId('version-line')).toContainText(`Version ${pkg.version}`)
 })
 
 test('About shows the version and the licence', async () => {
-  await page.getByTestId('open-about').click()
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.getByTestId('about-version')).toHaveText(pkg.version)
-  await expect(page.getByRole('dialog')).toContainText('MIT')
-  await page.keyboard.press('Escape')
-  await expect(page.getByRole('dialog')).toBeHidden()
+  await l.page.getByTestId('open-about').click()
+  await expect(l.page.getByRole('dialog')).toBeVisible()
+  await expect(l.page.getByTestId('about-version')).toHaveText(pkg.version)
+  await expect(l.page.getByRole('dialog')).toContainText('MIT')
+  await l.page.keyboard.press('Escape')
+  await expect(l.page.getByRole('dialog')).toBeHidden()
 })
 
 test('the renderer has no Node access', async () => {
-  const leaked = await page.evaluate(() => {
+  const leaked = await l.page.evaluate(() => {
     const g = globalThis as unknown as Record<string, unknown>
     return typeof g['require'] !== 'undefined' || typeof g['process'] !== 'undefined'
   })
@@ -56,10 +44,10 @@ test('the renderer has no Node access', async () => {
 })
 
 test('a manual update check in a development build reports plainly', async () => {
-  await page.getByTestId('open-about').click()
-  await page.getByRole('button', { name: 'Check for updates' }).click()
-  await page.keyboard.press('Escape')
-  await expect(page.getByTestId('update-banner')).toContainText(
+  await l.page.getByTestId('open-about').click()
+  await l.page.getByRole('button', { name: 'Check for updates' }).click()
+  await l.page.keyboard.press('Escape')
+  await expect(l.page.getByTestId('update-banner')).toContainText(
     'not available in a development build'
   )
 })

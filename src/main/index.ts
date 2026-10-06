@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import log from 'electron-log/main'
 import { brand } from '@shared/brand'
+import { fileSession, initFileService, openFromOs, registerFileHandlers } from './fileService'
 import { registerIpcHandlers } from './ipc/handlers'
 import { buildMenu } from './menu'
 import { detectDeveloperIdSignature } from './signing'
@@ -20,23 +21,29 @@ app.setName(brand.name)
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  // Files double-clicked before the app is ready wait here.
+  const pendingFiles: string[] = process.argv.slice(1).filter((a) => /\.lockers$/i.test(a))
+  let ready = false
+
+  app.on('second-instance', (_event, argv) => {
     const win = BrowserWindow.getAllWindows()[0]
     if (win) {
       if (win.isMinimized()) win.restore()
       win.focus()
     }
+    const file = argv.slice(1).find((a) => /\.lockers$/i.test(a))
+    if (file) void openFromOs(file)
   })
 
   if (app.isPackaged) {
     app.setAsDefaultProtocolClient(brand.protocol)
   }
 
-  // macOS passes files and lockermanager:// links through these events. M1 will
-  // open the file; for now the event is only logged (never the path contents).
-  app.on('open-file', (event) => {
+  // macOS passes double-clicked files through this event, sometimes before ready.
+  app.on('open-file', (event, path) => {
     event.preventDefault()
-    log.info('open-file received (not handled before M1)')
+    if (ready) void openFromOs(path)
+    else pendingFiles.push(path)
   })
   app.on('open-url', (event) => {
     event.preventDefault()
@@ -54,17 +61,44 @@ if (!app.requestSingleInstanceLock()) {
     )
 
     installContentSecurityPolicy()
+    await initFileService()
     registerIpcHandlers(signed)
+    registerFileHandlers()
     setupUpdater(mode)
     buildMenu()
-    createMainWindow()
+    const win = createMainWindow()
+    ready = true
+    win.webContents.once('did-finish-load', () => {
+      const file = pendingFiles.pop()
+      if (file) void openFromOs(file)
+    })
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
     })
   })
 
+  // Closing the window closes the file: saved, and the edit lock released, so a
+  // Mac app left running without a window never blocks anyone else.
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit()
+    void fileSession()
+      .close()
+      .finally(() => {
+        if (process.platform !== 'darwin') app.quit()
+      })
+  })
+
+  // Never quit with unsaved changes or a held lock (SPEC.md 6.2, 9.3).
+  let closedForQuit = false
+  app.on('before-quit', (event) => {
+    if (closedForQuit || !fileSession().isOpen) return
+    event.preventDefault()
+    void fileSession()
+      .close()
+      .catch((error: unknown) => log.error('close on quit failed', error))
+      .finally(() => {
+        closedForQuit = true
+        app.quit()
+      })
   })
 }

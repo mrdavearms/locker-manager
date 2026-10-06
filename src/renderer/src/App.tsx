@@ -1,34 +1,69 @@
-import { useEffect, useState } from 'react'
-import { Info, LockKeyhole } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Info, UserRound } from 'lucide-react'
+import type { OperatorInfo } from '@shared/ipc'
 import { AboutDialog } from './components/AboutDialog'
+import { BackupsDialog } from './components/BackupsDialog'
 import { Button } from './components/Button'
-import { TaskGrid } from './components/TaskGrid'
+import { ConflictDialog } from './components/ConflictDialog'
+import { DemoBadge } from './components/DemoBadge'
+import { LockerMark } from './components/LockerMark'
+import { Modal } from './components/Modal'
+import { NewFileDialog } from './components/NewFileDialog'
+import { OperatorDialog } from './components/OperatorDialog'
+import { StatusBar } from './components/StatusBar'
 import { UpdateBanner } from './components/UpdateBanner'
 import { useAppInfo } from './lib/useAppInfo'
+import { useFileState } from './lib/useFileState'
 import { useUpdateStatus } from './lib/useUpdateStatus'
+import { HomeScreen } from './screens/HomeScreen'
+import { WelcomeScreen } from './screens/WelcomeScreen'
 
 export function App(): React.JSX.Element {
   const info = useAppInfo()
-  const status = useUpdateStatus()
+  const update = useUpdateStatus()
+  const file = useFileState()
+  const [operator, setOperator] = useState<OperatorInfo | null>(null)
+  const [operatorOpen, setOperatorOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [newOpen, setNewOpen] = useState(false)
+  const [backupsOpen, setBackupsOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
+  const loadOperator = useCallback(() => {
+    void window.api.getOperator().then((o) => {
+      setOperator(o)
+      if (o.name === null) setOperatorOpen(true)
+    })
+  }, [])
+  useEffect(loadOperator, [loadOperator])
   useEffect(() => window.api.onOpenAbout(() => setAboutOpen(true)), [])
 
+  const open = file?.status === 'open' ? file : null
+
   return (
-    <div className="flex min-h-full flex-col">
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center gap-4 px-6 py-4">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-brand text-white dark:text-canvas">
-            <LockKeyhole size={22} aria-hidden />
-          </span>
+    <div className="grain flex min-h-full flex-col">
+      <header className="border-b border-line bg-surface/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-3">
+          <LockerMark className="size-9" animate />
           <div className="flex-1">
-            <h1 className="text-lg font-semibold leading-tight">
+            <p className="font-display text-lg font-semibold leading-tight">
               {info?.name ?? 'Locker Manager'}
-            </h1>
-            <p className="text-sm text-ink-muted">
-              Student lockers, lock codes, labels and letters, all in one place.
             </p>
+            {open && <p className="text-xs text-ink-muted">{open.summary.schoolName}</p>}
           </div>
+          {open?.summary.demo && <DemoBadge />}
+          {operator && (
+            <button
+              data-testid="operator-chip"
+              onClick={() => setOperatorOpen(true)}
+              className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm hover:bg-surface-muted"
+              title="Change your name"
+            >
+              <UserRound size={16} className="text-brand" aria-hidden />
+              <span className="font-semibold">{operator.name ?? operator.suggested}</span>
+              <span className="text-ink-muted">on {operator.machine}</span>
+            </button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -40,34 +75,74 @@ export function App(): React.JSX.Element {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 space-y-8 px-6 py-8">
-        <UpdateBanner status={status} />
-
-        <section className="card p-6" aria-labelledby="welcome-heading">
-          <h2 id="welcome-heading" className="text-2xl font-semibold tracking-tight">
-            Welcome
-          </h2>
-          <p className="mt-2 max-w-2xl text-ink-muted">
-            This is the first, empty version of Locker Manager. It exists to prove that the app
-            installs, runs and updates itself on Windows and Mac. The locker features arrive release
-            by release.
+      <main className="flex-1">
+        {update.state !== 'idle' && (
+          <div className="mx-auto max-w-6xl px-6 pt-6">
+            <UpdateBanner status={update} />
+          </div>
+        )}
+        {file === null ? null : open ? (
+          <HomeScreen state={open} onError={setError} />
+        ) : (
+          <WelcomeScreen onNew={() => setNewOpen(true)} onError={setError} />
+        )}
+        {info && (
+          <p className="pb-6 text-center text-xs text-ink-muted" data-testid="version-line">
+            Version {info.version}
+            {info.signed ? '' : ' · unsigned build'} · Free and open source · Your data never leaves
+            your school
           </p>
-          {info && (
-            <p className="mt-3 text-sm text-ink-muted" data-testid="version-line">
-              Version {info.version}
-              {info.signed ? '' : ' · unsigned build'}
-            </p>
-          )}
-        </section>
-
-        <TaskGrid />
+        )}
       </main>
 
-      <footer className="border-t border-line py-4 text-center text-xs text-ink-muted">
-        Free and open source · MIT licence · Your data never leaves your school
-      </footer>
+      {open && (
+        <StatusBar
+          state={open}
+          onBackups={() => setBackupsOpen(true)}
+          onClose={() => void window.api.closeFile()}
+        />
+      )}
 
+      {open?.conflict && <ConflictDialog conflict={open.conflict} canEdit={open.mode === 'edit'} />}
+      <BackupsDialog
+        open={backupsOpen}
+        onOpenChange={setBackupsOpen}
+        canEdit={open?.mode === 'edit'}
+      />
+      <NewFileDialog
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        onCreate={async (name) => {
+          const r = await window.api.newFile(name)
+          if (r.ok) {
+            setNewOpen(false)
+            return null
+          }
+          return r.cancelled ? null : r.message
+        }}
+      />
+      <OperatorDialog
+        open={operatorOpen}
+        info={operator}
+        required={operator?.name === null}
+        onDone={() => {
+          setOperatorOpen(false)
+          loadOperator()
+        }}
+      />
       <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} info={info} />
+      <Modal
+        open={error !== null}
+        onOpenChange={(o) => !o && setError(null)}
+        title="That did not work"
+        description="Nothing has been changed."
+        testId="error-dialog"
+      >
+        <p data-testid="error-message">{error}</p>
+        <div className="mt-6 flex justify-end">
+          <Button onClick={() => setError(null)}>OK</Button>
+        </div>
+      </Modal>
     </div>
   )
 }

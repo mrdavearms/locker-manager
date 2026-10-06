@@ -10,9 +10,9 @@ import {
   UserPlus
 } from 'lucide-react'
 
-// The home-screen tasks from SPEC.md section 10, in that order. Each one lights
-// up in the milestone that builds it; until then it is shown but disabled so
-// staff can see where the app is going.
+// The home-screen tasks from SPEC.md section 10, in that order. Each lights up in
+// the milestone that builds it; until then it is shown, disabled, so staff can
+// see where the app is going.
 const tasks = [
   { icon: Search, title: 'Find a student', hint: 'Locker, group and code' },
   { icon: UserPlus, title: 'New student', hint: 'Give a locker and a code' },
@@ -28,13 +28,13 @@ const tasks = [
 export function TaskGrid(): React.JSX.Element {
   return (
     <section aria-labelledby="tasks-heading">
-      <h2 id="tasks-heading" className="text-lg font-semibold">
-        What do you want to do?
-      </h2>
-      <p className="mt-1 text-sm text-ink-muted">
-        These tasks arrive over the next releases. Updates install themselves.
-      </p>
-      <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 id="tasks-heading" className="text-xl font-semibold">
+          What do you want to do?
+        </h2>
+        <p className="text-sm text-ink-muted">These arrive in the next updates.</p>
+      </div>
+      <ul className="stagger mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tasks.map(({ icon: Icon, title, hint }) => (
           <li key={title}>
             <button
@@ -42,14 +42,17 @@ export function TaskGrid(): React.JSX.Element {
               disabled
               aria-disabled="true"
               title="Coming in a later version"
-              className="card flex w-full items-center gap-4 p-4 text-left opacity-70"
+              className="card flex w-full items-center gap-4 p-4 text-left opacity-75"
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
-                <Icon size={22} />
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-ink-muted">
+                <Icon size={22} aria-hidden />
               </span>
-              <span>
-                <span className="block font-medium">{title}</span>
+              <span className="flex-1">
+                <span className="block font-semibold">{title}</span>
                 <span className="block text-sm text-ink-muted">{hint}</span>
+              </span>
+              <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-semibold text-ink-muted">
+                Soon
               </span>
             </button>
           </li>
