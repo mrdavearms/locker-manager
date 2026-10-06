@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 6 October 2026 (M0 built, before the first tag)._
+_Last updated: 6 October 2026 (M0 released: v0.0.1 and v0.0.2)._
 
 ## What this is
 
@@ -143,8 +143,10 @@ From `~/Antigravity/redaction tool/CLAUDE.md` and `~/Antigravity/jacks iep gener
 
 ## Current milestone
 
-**M0: skeleton and pipeline.** Approved by Dave 6 Oct 2026. Built: electron-vite skeleton,
-updater, About, pre-commit guard, CI and release workflows, docs/signing.md,
-docs/release-checklist.md. Next: push, confirm CI green on Windows and Mac, tag v0.0.1,
-install it on Dave's Windows PC and this Mac, tag v0.0.2, and prove the update on both.
-Then M1 (data file and safety, SPEC.md section 6).
+**M0: skeleton and pipeline.** Built and released 6 Oct 2026: v0.0.1 and v0.0.2 are
+published pre-releases with every updater file. Proven on the Mac: an installed v0.0.1
+(ad-hoc signed, unsigned) found v0.0.2 thirty seconds after launch and showed "Version
+0.0.2 is available" with "Open the download page". Still to be seen by Dave: v0.0.1 on
+his Windows PC updating itself to v0.0.2 (installer at
+https://github.com/mrdavearms/locker-manager/releases/tag/v0.0.1). Next: M1, the data
+file and its safety rules (SPEC.md section 6).
