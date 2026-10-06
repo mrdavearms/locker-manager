@@ -1,0 +1,204 @@
+name: Release
+
+# Builds the Windows and Mac installers and publishes a GitHub Release.
+#
+# Trigger: push a version tag that matches package.json, for example
+#   git tag v0.0.2 && git push origin v0.0.2
+# Full steps: docs/release-checklist.md.
+#
+# Signing switches on by itself when these repository secrets exist
+# (docs/signing.md); with none of them, builds are unsigned (Mac: ad-hoc).
+#   Mac:     CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+#   Windows: AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_ENDPOINT,
+#            AZURE_CODE_SIGNING_NAME, AZURE_CERT_PROFILE_NAME, AZURE_PUBLISHER_NAME
+#            (or WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD for a certificate file)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-version:
+    name: Tag matches package.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # electron-builder names and publishes from package.json; the tag names the
+      # release. If they differ, installers land on the wrong release and every
+      # installed copy is told it is up to date forever. Fail in seconds.
+      - name: Compare versions
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "package.json=$PKG tag=$TAG"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "::error::package.json version ($PKG) does not match tag ($TAG). See docs/release-checklist.md."
+            exit 1
+          fi
+
+  create-draft:
+    name: Create the draft release once
+    needs: verify-version
+    runs-on: ubuntu-latest
+    steps:
+      # Both builders upload with --publish always, and electron-builder creates a
+      # release itself when it finds none. Run in parallel they can each create
+      # one, and the empty duplicate wins the download URLs. Create it here, once.
+      - name: Create draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; reusing it."
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
+              --title "Locker Manager ${GITHUB_REF_NAME#v}" \
+              --notes "Installers are still building. This page fills in automatically."
+          fi
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: create-draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: macOS (universal)
+          - os: windows-latest
+            name: Windows (x64 + arm64)
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type-check and unit tests on the tagged commit
+        run: npm run typecheck && npm test
+      - run: npm run build
+
+      - name: Build and upload (macOS)
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Unset any secret that is not configured, so electron-builder never
+          # sees an empty string and tries to use it.
+          for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!v}" ]; then unset "$v"; fi
+          done
+          EXTRA=()
+          if [ -z "${CSC_LINK:-}" ]; then
+            echo "No Developer ID certificate: ad-hoc signing (Apple silicon would otherwise call the app damaged)."
+            EXTRA+=("-c.mac.identity=-")
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          else
+            echo "Developer ID certificate found: signing, and notarising if the Apple secrets are set."
+            if [ -n "${APPLE_ID:-}" ]; then EXTRA+=("-c.mac.notarize=true"); fi
+          fi
+          npx electron-builder --mac --publish always "${EXTRA[@]}"
+
+      - name: Build and upload (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+          AZURE_CODE_SIGNING_NAME: ${{ secrets.AZURE_CODE_SIGNING_NAME }}
+          AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+          AZURE_PUBLISHER_NAME: ${{ secrets.AZURE_PUBLISHER_NAME }}
+        run: |
+          foreach ($v in 'WIN_CSC_LINK','WIN_CSC_KEY_PASSWORD','AZURE_TENANT_ID','AZURE_CLIENT_ID','AZURE_CLIENT_SECRET','AZURE_ENDPOINT','AZURE_CODE_SIGNING_NAME','AZURE_CERT_PROFILE_NAME','AZURE_PUBLISHER_NAME') {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($v))) { Remove-Item "Env:$v" -ErrorAction SilentlyContinue }
+          }
+          $extra = @()
+          if ($env:AZURE_CLIENT_SECRET -and $env:AZURE_ENDPOINT -and $env:AZURE_CODE_SIGNING_NAME -and $env:AZURE_CERT_PROFILE_NAME -and $env:AZURE_PUBLISHER_NAME) {
+            Write-Host "Azure Artifact Signing secrets found: signing the installer."
+            $extra += "-c.win.azureSignOptions.endpoint=$env:AZURE_ENDPOINT"
+            $extra += "-c.win.azureSignOptions.codeSigningAccountName=$env:AZURE_CODE_SIGNING_NAME"
+            $extra += "-c.win.azureSignOptions.certificateProfileName=$env:AZURE_CERT_PROFILE_NAME"
+            $extra += "-c.win.azureSignOptions.publisherName=$env:AZURE_PUBLISHER_NAME"
+          } elseif ($env:WIN_CSC_LINK) {
+            Write-Host "Certificate file found (WIN_CSC_LINK): signing the installer."
+          } else {
+            Write-Host "No Windows signing secrets: the installer is unsigned (SmartScreen shows a warning on first run)."
+          }
+          npx electron-builder --win --publish always @extra
+
+  publish:
+    name: Verify assets and publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # A missing latest-mac.yml breaks Mac updates silently; a wrong version in
+      # latest.yml strands every installed copy. Nothing goes live until this passes.
+      - name: Every expected file is on the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/verify-release-assets.mjs "$GITHUB_REF_NAME"
+
+      - name: Write release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          VERSION="${TAG#v}"
+          PREV=$(git tag --sort=-v:refname | grep '^v' | grep -v "^${TAG}$" | head -n1 || true)
+          RANGE=""
+          if [ -n "$PREV" ]; then RANGE="${PREV}..${TAG}"; fi
+          strip() { sed -E 's/^[a-z]+(\([^)]*\))?!?: //'; }
+          section() { # $1 heading, $2 grep pattern
+            local lines
+            lines=$(git log $RANGE --no-merges --pretty=format:'%s' | grep -iE "$2" | grep -viE 'CLAUDE\.md|\.claude|release\):' | strip || true)
+            if [ -n "$lines" ]; then
+              printf '### %s\n\n' "$1"
+              printf '%s\n' "$lines" | sed 's/^/- /'
+              printf '\n'
+            fi
+          }
+          {
+            section "New" '^(feat|add)'
+            section "Fixed" '^fix'
+            section "Documentation" '^docs'
+            section "Build and packaging" '^(build|chore|ci)'
+          } > /tmp/changelog.md
+          if [ ! -s /tmp/changelog.md ]; then printf -- '- Minor improvements.\n' > /tmp/changelog.md; fi
+
+          HIGHLIGHTS="docs/release-highlights/v${VERSION}.md"
+          if [ -f "$HIGHLIGHTS" ]; then
+            { cat "$HIGHLIGHTS"; printf '\n<details><summary>Every change</summary>\n\n'; cat /tmp/changelog.md; printf '\n</details>\n'; } > /tmp/whatsnew.md
+          else
+            cp /tmp/changelog.md /tmp/whatsnew.md
+          fi
+
+          sed -e "s|{{VERSION}}|${VERSION}|g" -e "s|{{REPO}}|${REPO}|g" .github/release-notes-template.md > /tmp/notes.md
+          awk -v f=/tmp/whatsnew.md '/\{\{WHATS_NEW\}\}/ { while ((getline line < f) > 0) print line; next } { print }' /tmp/notes.md > /tmp/notes-final.md
+
+          # Milestone builds (0.x) and beta suffixes are GitHub pre-releases.
+          if [[ "$VERSION" == 0.* || "$VERSION" == *-* ]]; then PRE="--prerelease"; else PRE="--prerelease=false --latest"; fi
+          gh release edit "$TAG" --repo "$REPO" --title "Locker Manager ${VERSION}" --notes-file /tmp/notes-final.md --draft=false $PRE
+          echo "Published https://github.com/${REPO}/releases/tag/${TAG}"

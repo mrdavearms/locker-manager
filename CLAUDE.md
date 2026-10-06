@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 6 October 2026 (repository created, before M0)._
+_Last updated: 6 October 2026 (M0 built, before the first tag)._
 
 ## What this is
 
@@ -20,9 +20,6 @@ school in a shared folder, no server, no accounts, no internet except for update
 
 ## Commands
 
-The M0 scaffold has not been built yet. These are the commands M0 will create; update
-this list the moment they exist.
-
 | Task | Command |
 |---|---|
 | Install | `npm ci` |
@@ -32,7 +29,9 @@ this list the moment they exist.
 | Unit tests (Vitest) | `npm test` |
 | End-to-end tests (Playwright for Electron) | `npm run test:e2e` |
 | Build renderer, main and preload | `npm run build` |
-| Package installers locally (unsigned) | `npm run dist:mac`, `npm run dist:win` |
+| Package installers locally (unsigned) | `npm run dist:mac`, `npm run dist:win`, or `npm run dist:dir` (unpacked app only, fastest) |
+| Check the repo for student data or secrets | `npm run check:no-student-data` (also runs on every commit) |
+| Check a GitHub Release has every updater file | `npm run verify:release-assets -- v0.0.2` |
 | Release | bump `version` in `package.json` and `package-lock.json`, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z` |
 
 ## Folder layout
@@ -49,6 +48,10 @@ tests/          unit/ (Vitest), e2e/ (Playwright), fixtures/ (SYNTHETIC only), g
 docs/           user-guide.md, it-guide.md, signing.md, release-checklist.md
 .github/        workflows/ci.yml, workflows/release.yml
 ```
+
+Development run: `npm run dev` starts Vite with hot reload and opens the app; the updater
+is disabled in a development build and says so. End-to-end tests drive the BUILT app, so
+`npm run build` must come before `npm run test:e2e`.
 
 ## Conventions
 
@@ -96,7 +99,19 @@ docs/           user-guide.md, it-guide.md, signing.md, release-checklist.md
 6. **Windows code signing**: Azure Artifact Signing (the new name for Azure Trusted
    Signing) lists Australia as a supported country for organisation validation as of
    October 2026. Earlier notes in the redaction tool repo saying it was unavailable here
-   are out of date.
+   are out of date. Validation is of an organisation, not a person (docs/signing.md).
+7. **Main process and preload are CommonJS** (`out/main/index.cjs`, `out/preload/index.cjs`)
+   even though package.json says `"type": "module"`. electron-updater and electron-log are
+   CommonJS packages whose named exports fail from an ES-module main process, and a
+   sandboxed preload must be CommonJS with no runtime imports. `src/shared/channels.ts`
+   holds the IPC channel names with no dependencies for that reason; `src/shared/ipc.ts`
+   adds the Zod schemas and is imported by main and (types only) by the renderer.
+8. **One Windows installer for x64 and arm64** (electron-builder's multi-arch NSIS), named
+   `Locker-Manager-Setup-<version>.exe`; one universal Mac DMG and ZIP named
+   `Locker-Manager-<version>-universal.<ext>`. Names are set explicitly in
+   electron-builder.yml so the release checker and the notes template can rely on them.
+9. **Playwright launches the project folder** (`electron.launch({ args: ['.'] })`), not the
+   built file, so Electron reads package.json and `app.getVersion()` is ours.
 
 ## Lessons carried over from Dave's other desktop apps
 
@@ -120,5 +135,8 @@ From `~/Antigravity/redaction tool/CLAUDE.md` and `~/Antigravity/jacks iep gener
 
 ## Current milestone
 
-**M0: skeleton and pipeline.** Plan proposed 6 Oct 2026, awaiting Dave's OK. Nothing
-built yet beyond LICENSE, .gitignore, SPEC.md, README.md and this file.
+**M0: skeleton and pipeline.** Approved by Dave 6 Oct 2026. Built: electron-vite skeleton,
+updater, About, pre-commit guard, CI and release workflows, docs/signing.md,
+docs/release-checklist.md. Next: push, confirm CI green on Windows and Mac, tag v0.0.1,
+install it on Dave's Windows PC and this Mac, tag v0.0.2, and prove the update on both.
+Then M1 (data file and safety, SPEC.md section 6).

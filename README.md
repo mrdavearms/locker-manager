@@ -4,7 +4,15 @@ A free, open-source desktop app for schools to manage student lockers, lock code
 labels and welcome letters. Windows and macOS. No server, no accounts, no internet
 connection needed except for updates.
 
-**Status: in development, before the first pre-release.** Nothing to download yet.
+**Status: in development.** The current pre-release is an empty app that exists to
+prove installing and updating work. Locker features arrive milestone by milestone.
+
+## Download
+
+Get the newest installer from the **[Releases page](https://github.com/mrdavearms/locker-manager/releases)**:
+`Locker-Manager-Setup-<version>.exe` for Windows, `Locker-Manager-<version>-universal.dmg`
+for Mac. Every release page carries the exact first-time steps for the one-off security
+warning on each platform. Once installed, the app updates itself.
 
 ## What it will do
 
