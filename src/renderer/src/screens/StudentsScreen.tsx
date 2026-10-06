@@ -8,6 +8,7 @@ import { useAction, useCanEdit, useTerms } from '@renderer/lib/appContext'
 import { cn } from '@renderer/lib/cn'
 import { formatWhen } from '@renderer/lib/format'
 import { call, useRpc } from '@renderer/lib/rpc'
+import { StudentLockerCard, type LockerIntent } from '@renderer/lockers/LockerActions'
 
 const NAME_CHECK_TEXT: Record<string, string> = {
   mac: 'Mac name: MacDonald or Macdonald?',
@@ -15,7 +16,17 @@ const NAME_CHECK_TEXT: Record<string, string> = {
   two_word: 'Two-word surname: check spelling and capitals'
 }
 
-function StudentPanel({ s, onClose }: { s: StudentView; onClose: () => void }): React.JSX.Element {
+function StudentPanel({
+  s,
+  onClose,
+  intent,
+  onIntentDone
+}: {
+  s: StudentView
+  onClose: () => void
+  intent: LockerIntent
+  onIntentDone: () => void
+}): React.JSX.Element {
   const terms = useTerms()
   const canEdit = useCanEdit()
   const act = useAction()
@@ -136,6 +147,8 @@ function StudentPanel({ s, onClose }: { s: StudentView; onClose: () => void }): 
           </p>
         )}
       </div>
+
+      <StudentLockerCard s={s} intent={intent} onIntentDone={onIntentDone} />
 
       <label className="mt-5 flex items-center justify-between gap-3 text-sm">
         <span className="flex items-center gap-2">
@@ -370,18 +383,49 @@ function ExclusionsCard(): React.JSX.Element {
   )
 }
 
-export function StudentsScreen({ onImport }: { onImport: () => void }): React.JSX.Element {
+/** Fetched by id, so a student found by quick find shows whatever the list filter. */
+function SelectedStudent({
+  id,
+  onClose,
+  intent,
+  onIntentDone
+}: {
+  id: string
+  onClose: () => void
+  intent: LockerIntent
+  onIntentDone: () => void
+}): React.JSX.Element | null {
+  const { data: s } = useRpc('student.get', { id })
+  if (!s) return null
+  return (
+    <StudentPanel
+      key={`${s.id}-${s.firstName}-${s.lastName}-${s.preferredName ?? ''}`}
+      s={s}
+      onClose={onClose}
+      intent={intent}
+      onIntentDone={onIntentDone}
+    />
+  )
+}
+
+export function StudentsScreen({
+  onImport,
+  focus
+}: {
+  onImport: () => void
+  focus?: { studentId: string; intent: LockerIntent } | null
+}): React.JSX.Element {
   const terms = useTerms()
   const canEdit = useCanEdit()
   const [filter, setFilter] = useState<StudentFilter>('current')
   const [search, setSearch] = useState('')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(focus?.studentId ?? null)
+  const [intent, setIntent] = useState<LockerIntent>(focus?.intent ?? null)
   const { data: counts } = useRpc('students.counts', {})
   const { data: students } = useRpc('students.list', {
     filter,
     ...(search.trim() ? { search } : {})
   })
-  const selected = students?.find((s) => s.id === selectedId) ?? null
 
   const filters: {
     id: StudentFilter
@@ -548,10 +592,11 @@ export function StudentsScreen({ onImport }: { onImport: () => void }): React.JS
             </table>
           )}
         </div>
-        {selected && (
-          <StudentPanel
-            key={`${selected.id}-${selected.firstName}-${selected.lastName}-${selected.preferredName ?? ''}`}
-            s={selected}
+        {selectedId && (
+          <SelectedStudent
+            id={selectedId}
+            intent={intent}
+            onIntentDone={() => setIntent(null)}
             onClose={() => setSelectedId(null)}
           />
         )}

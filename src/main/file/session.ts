@@ -94,7 +94,13 @@ interface Open {
   locationWarning: string | null
   openedAt: string
   revision: number
+  /** Snapshots before each change, newest last (SPEC.md 4.12). */
+  undo: { bytes: Uint8Array; action: string }[]
+  redo: { bytes: Uint8Array; action: string }[]
 }
+
+const UNDO_STEPS = 50
+const UNDO_BYTES = 200 * 1024 * 1024
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -150,7 +156,13 @@ export class DataFileSession {
       conflictCopies: c.conflictCopies,
       locationWarning: c.locationWarning,
       openedAt: c.openedAt,
-      revision: c.revision
+      revision: c.revision,
+      undo: {
+        canUndo: c.mode === 'edit' && !c.conflict && c.undo.length > 0,
+        undoAction: c.undo[c.undo.length - 1]?.action ?? null,
+        canRedo: c.mode === 'edit' && !c.conflict && c.redo.length > 0,
+        redoAction: c.redo[c.redo.length - 1]?.action ?? null
+      }
     }
   }
 
@@ -276,7 +288,9 @@ export class DataFileSession {
       conflictCopies: [],
       locationWarning: null,
       openedAt: now,
-      revision: 0
+      revision: 0,
+      undo: [],
+      redo: []
     }
     const c = this.cur
 
@@ -375,14 +389,84 @@ export class DataFileSession {
     if (c.mode !== 'edit') throw new Error('This file is open read-only.')
     if (c.conflict) throw new Error('Sort out the conflict before making changes.')
     const ctx = this.ctx()
+    const before = c.db.export()
+    let action = ''
     const result = c.db.transaction(() => {
       const r = fn(c.db, ctx)
-      appendAudit(c.db, ctx, typeof entry === 'function' ? entry(r) : entry)
+      const e = typeof entry === 'function' ? entry(r) : entry
+      action = e.action
+      appendAudit(c.db, ctx, e)
       return r
     })
+    this.pushUndo(c, { bytes: before, action })
+    c.redo = []
     this.markChanged()
     this.emit()
     return result
+  }
+
+  private pushUndo(c: Open, step: { bytes: Uint8Array; action: string }): void {
+    c.undo.push(step)
+    let total = c.undo.reduce((n, u) => n + u.bytes.byteLength, 0)
+    while (c.undo.length > UNDO_STEPS || (total > UNDO_BYTES && c.undo.length > 1)) {
+      total -= c.undo.shift()!.bytes.byteLength
+    }
+  }
+
+  /**
+   * Puts back the file as it was before the last change. History is append-only,
+   * so every history line written since that snapshot is copied into it, then
+   * the undo itself is recorded.
+   */
+  async undo(): Promise<OpenResult> {
+    return this.stepBack('undo')
+  }
+
+  async redo(): Promise<OpenResult> {
+    return this.stepBack('redo')
+  }
+
+  private async stepBack(kind: 'undo' | 'redo'): Promise<OpenResult> {
+    const c = this.cur
+    if (!c) return { ok: false, message: 'No file is open.' }
+    if (c.mode !== 'edit' || c.conflict)
+      return { ok: false, message: 'Nothing can be undone right now.' }
+    const from = kind === 'undo' ? c.undo : c.redo
+    const to = kind === 'undo' ? c.redo : c.undo
+    const step = from.pop()
+    if (!step)
+      return {
+        ok: false,
+        message: kind === 'undo' ? 'There is nothing to undo.' : 'There is nothing to redo.'
+      }
+    const current = c.db.export()
+    const next = await LockerDb.fromBytes(step.bytes)
+    next.transaction(() => {
+      for (const table of ['audit_log', 'code_reveal_log']) {
+        const have = new Set(next.all<{ id: string }>(`SELECT id FROM ${table}`).map((r) => r.id))
+        const cols = next.all<{ name: string }>(`PRAGMA table_info(${table})`).map((r) => r.name)
+        for (const row of c.db.all<Record<string, string | number | null>>(
+          `SELECT * FROM ${table}`
+        )) {
+          if (have.has(String(row.id))) continue
+          next.run(
+            `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((col) => `$${col}`).join(', ')})`,
+            Object.fromEntries(cols.map((col) => [`$${col}`, row[col] ?? null]))
+          )
+        }
+      }
+      appendAudit(next, this.ctx(), {
+        action: kind === 'undo' ? 'undo' : 'redo',
+        entity: 'file',
+        reason: step.action
+      })
+    })
+    to.push({ bytes: current, action: step.action })
+    c.db.close()
+    c.db = next
+    this.markChanged()
+    this.emit()
+    return { ok: true }
   }
 
   read<T>(fn: (db: LockerDb) => T): T {
@@ -579,6 +663,9 @@ export class DataFileSession {
     c.db.close()
     c.db = next
     c.revision++
+    // A version from disk or a backup: earlier undo steps no longer apply to it.
+    c.undo = []
+    c.redo = []
     c.hash = sha256(bytes)
     c.size = bytes.byteLength
     c.dirty = false

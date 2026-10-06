@@ -3,7 +3,7 @@
 This guide is for school office staff and year level leaders. Each section is one task.
 Sections are added as the app gains features.
 
-_Last updated: 6 October 2026 (version 0.3.0: importing students)._
+_Last updated: 6 October 2026 (version 0.4.0: codes and allocation)._
 
 ## Install Locker Manager on Windows
 
@@ -272,3 +272,81 @@ two-word surnames.
 
 New school files already exclude Homeroom ZZZ ("not in a homeroom"). To exclude one student,
 click them and choose **Never give a locker…**.
+
+## Find a student or locker
+
+Press **Ctrl+K** (on a Mac, **Cmd+K**), or click **Find** at the top. Type part of a name, a
+student ID, a locker number, a lock serial or a key number. Use the arrow keys and **Enter**,
+or click a result.
+
+## See a student's code
+
+1. Find the student (Ctrl+K).
+2. In their panel, under **Locker**, click **Show code**.
+
+The code shows for 30 seconds and then hides itself. Every time a code is shown, the app
+records who saw it and when.
+
+## Allocate lockers for the whole year
+
+Do this after importing students.
+
+1. Click **Lockers** on the left, then **Allocate lockers…**.
+2. **Who goes where**: each line sends some students to an area. The app starts with one
+   line per area, using the year levels set on that area (for example Year 7 to the Year 7
+   side). Change or add lines if you need to.
+3. **Order**: the usual choice is **Homeroom, then surname**, with **HUB** placed last.
+4. Click **Make a draft**. Check the summary: if any students did not fit, they are listed.
+5. Look at the draft. To change two students' places, click one locker, then the other.
+6. Leave **Issue a code to each locker now** ticked, and click **Give out … lockers**.
+
+Students on the **Who never gets a locker** list are skipped. If you change your mind straight
+away, **Undo** (Ctrl+Z, or the History screen) puts everything back.
+
+## Lock codes and their rules
+
+Settings, **Lock codes**. The defaults never issue codes that are easy to guess or that lock
+makers warn against: all the same number, three of one number, straight runs (1234),
+repeated or doubled pairs (1212, 1122), years (1900 to 2099), one number away from 0 0 0 0,
+and codes starting with 0. The box underneath shows how many codes the rules allow and ten
+examples.
+
+**Code sets**: before a new year, click **Make the code set**. Every locker gets a code that
+is never the same as its old one, plus spare codes for changes during the year.
+
+## A new student arrives
+
+1. On Home, click **New student**, and find the student (import them first if they are not
+   there yet).
+2. The app suggests the first spare locker in their area. Click **Give this locker**.
+3. The code shows straight away. Their letter comes in the next update.
+
+## A student has left
+
+1. On Home, click **Student has left**, and find the student.
+2. Click **Confirm they have left**.
+
+Their locker becomes a spare. Because they know its code, the lock goes on **Locks to reset**.
+
+## Move or swap students
+
+Find the student, then in their panel click **Move…** (choose the new locker) or **Swap…**
+(find the other student). Whole student records move, never just names. The codes change,
+because each student knows their old locker's code, and the locks go on **Locks to reset**.
+
+## A code has been shared, or forgotten
+
+- **Forgotten**: find the student and click **Show code**.
+- **Someone else knows it**: find the student, click **New code…**, and say why. The lock goes
+  on **Locks to reset**.
+
+## Locks to reset
+
+Home and the Lockers screen list every lock that needs a physical reset. Reset each lock to
+0 0 0 0 with the master key, then click **Reset done**.
+
+## Undo a mistake
+
+Press **Ctrl+Z** (Cmd+Z on a Mac) to undo the last change, and **Ctrl+Shift+Z** to redo it.
+The History screen also has **Undo** and **Redo** buttons, and lists every change: who made
+it, on which computer, and when. Up to 50 changes can be undone while the file is open.

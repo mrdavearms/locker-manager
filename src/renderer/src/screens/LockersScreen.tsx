@@ -7,6 +7,8 @@ import { Field, TextInput } from '@renderer/components/Field'
 import { Modal } from '@renderer/components/Modal'
 import { useAction, useCanEdit, useTerms } from '@renderer/lib/appContext'
 import { call, useRpc } from '@renderer/lib/rpc'
+import { CodeReveal } from '@renderer/components/CodeReveal'
+import { ResetList } from '@renderer/lockers/LockerActions'
 import { cn } from '@renderer/lib/cn'
 
 const CODE_STATUS_TEXT: Record<string, string> = {
@@ -124,6 +126,13 @@ function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): Re
         )}
       </dl>
 
+      {(l.codeStatus === 'set' ||
+        l.codeStatus === 'awaiting_physical_reset' ||
+        l.codeStatus === 'needs_new_code') && (
+        <div className="mt-4">
+          <CodeReveal lockerId={l.id} />
+        </div>
+      )}
       <div className="mt-6 space-y-3">
         <label className="flex items-center justify-between gap-3 text-sm">
           <span className="flex items-center gap-2">
@@ -341,11 +350,20 @@ function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): Re
   )
 }
 
-export function LockersScreen({ onSetUp }: { onSetUp: () => void }): React.JSX.Element {
+export function LockersScreen({
+  onSetUp,
+  onAllocate,
+  focusLockerId
+}: {
+  onSetUp: () => void
+  onAllocate: () => void
+  focusLockerId: string | null
+}): React.JSX.Element {
   const terms = useTerms()
   const { data: areas } = useRpc('locations.list', {})
   const { data: lockers } = useRpc('lockers.list', {})
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(focusLockerId)
+  const canEdit = useCanEdit()
   const byBank = useMemo(() => {
     const m = new Map<string, LockerView[]>()
     for (const l of lockers ?? []) m.set(l.bankId, [...(m.get(l.bankId) ?? []), l])
@@ -365,6 +383,14 @@ export function LockersScreen({ onSetUp }: { onSetUp: () => void }): React.JSX.E
             {total} {terms.locker.many.toLowerCase()} · {used} in use · {total - used - out} spare ·{' '}
             {out} out of service or reserved
           </p>
+          <Button
+            className="mt-3"
+            disabled={!canEdit || total === 0}
+            onClick={onAllocate}
+            data-testid="open-allocate"
+          >
+            Allocate {terms.locker.many.toLowerCase()}…
+          </Button>
         </div>
         <div className="flex flex-wrap items-center gap-4 text-xs text-ink-muted" aria-label="Key">
           <span className="flex items-center gap-1.5">
@@ -381,6 +407,8 @@ export function LockersScreen({ onSetUp }: { onSetUp: () => void }): React.JSX.E
           </span>
         </div>
       </header>
+
+      <ResetList />
 
       {areas?.length === 0 && (
         <div className="card p-8 text-center">

@@ -29,6 +29,8 @@ export const channels = {
   backupsRestore: 'backups:restore',
   schoolRename: 'school:rename',
   rpc: 'rpc',
+  fileUndo: 'file:undo',
+  fileRedo: 'file:redo',
   // main -> renderer events
   updateStatus: 'event:update:status',
   openAbout: 'event:ui:openAbout',

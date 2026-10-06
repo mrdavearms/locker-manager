@@ -5,6 +5,7 @@ import { Button } from '@renderer/components/Button'
 import { DemoBadge } from '@renderer/components/DemoBadge'
 import { TaskGrid } from '@renderer/components/TaskGrid'
 import type { Screen } from '@renderer/components/NavRail'
+import { ResetList, type LockerIntent } from '@renderer/lockers/LockerActions'
 import { formatWhen, plural } from '@renderer/lib/format'
 import { useRpc } from '@renderer/lib/rpc'
 import type { OpenFileState } from '@renderer/lib/useFileState'
@@ -170,8 +171,12 @@ function SetupCard({ onNavigate }: { onNavigate: (s: Screen) => void }): React.J
 export function HomeScreen({
   state,
   onError,
-  onNavigate
-}: Props & { onNavigate: (s: Screen) => void }): React.JSX.Element {
+  onNavigate,
+  onFind
+}: Props & {
+  onNavigate: (s: Screen) => void
+  onFind: (intent: LockerIntent) => void
+}): React.JSX.Element {
   const c = state.summary.counts
   const stats = [
     { label: 'Lockers', value: c.lockers },
@@ -273,10 +278,20 @@ export function HomeScreen({
 
       <TaskGrid
         handlers={{
-          'Find a student': () => onNavigate('students'),
-          ...(state.mode === 'edit' ? { 'Import students': () => onNavigate('import') } : {})
+          'Find a student': () => onFind(null),
+          ...(state.mode === 'edit'
+            ? {
+                'New student': () => onFind('assign'),
+                'Student has left': () => onFind('leave'),
+                'New code': () => onFind('recode'),
+                'Move or swap': () => onFind('move'),
+                'Import students': () => onNavigate('import')
+              }
+            : {})
         }}
       />
+
+      <ResetList />
     </div>
   )
 }

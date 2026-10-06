@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 6 October 2026 (M3 built, releasing as v0.3.0)._
+_Last updated: 6 October 2026 (M4 built, releasing as v0.4.0)._
 
 ## What this is
 
@@ -239,4 +239,17 @@ known); name case with Mac, particle and two-word flags; group display mapping; 
 from column, group code or file; validation; comparison; apply; possible leavers limited to
 the year levels imported; exclusions (ZZZ by default in new files); Students screen with
 name checks and corrections that survive imports. Migration 002 adds
-`student.not_in_import_since` and `student.name_check`. Releasing as v0.3.0. Next: M4.
+`student.not_in_import_since` and `student.name_check`. v0.3.0 released.
+
+**M4: codes and allocation.** Built 6 Oct 2026. Codes: rules (src/main/codes/rules.ts),
+secure or seeded generation, AES-256-GCM at rest with the key in meta `code_key_v1`
+(src/main/codes/cipher.ts), code sets for next year (one per locker, never last year's) and a
+spare pool, reveal logged in `code_reveal_log`. Lock code states: `reset_no_code` (on 0000) ->
+issue -> `set`; holder changes -> `needs_new_code`; recode or swap -> `awaiting_physical_reset`;
+"Reset done" -> `set` or `reset_no_code`. Allocation engine (src/main/allocate/engine.ts) is
+pure; the golden test runs it on the demo school and its reference output is the snapshot in
+tests/unit/__snapshots__/allocation.test.ts.snap (checked by eye 6 Oct 2026). Manual tools:
+assign (suggests first spare in the student's area), release, move, swap. Undo and redo:
+session snapshots before each write (50 steps, 200 MB cap); history lines written since a
+snapshot are copied into it, so history stays append-only. History screen, Ctrl+K quick find,
+Ctrl+Z undo. Releasing as v0.4.0. Next: M5 labels.

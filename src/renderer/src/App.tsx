@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Info, UserRound } from 'lucide-react'
+import { Info, Search, UserRound } from 'lucide-react'
+import type { QuickResult } from '@shared/history'
 import type { OperatorInfo } from '@shared/ipc'
 import { AboutDialog } from './components/AboutDialog'
 import { BackupsDialog } from './components/BackupsDialog'
@@ -8,22 +9,51 @@ import { ConflictDialog } from './components/ConflictDialog'
 import { DemoBadge } from './components/DemoBadge'
 import { LockerMark } from './components/LockerMark'
 import { Modal } from './components/Modal'
+import { NavRail, type Screen } from './components/NavRail'
 import { NewFileDialog } from './components/NewFileDialog'
 import { OperatorDialog } from './components/OperatorDialog'
+import { QuickFind } from './components/QuickFind'
 import { StatusBar } from './components/StatusBar'
 import { UpdateBanner } from './components/UpdateBanner'
+import { ImportWizard } from './import/ImportWizard'
+import { AppContextProvider } from './lib/appContext'
 import { useAppInfo } from './lib/useAppInfo'
 import { useFileState } from './lib/useFileState'
 import { useUpdateStatus } from './lib/useUpdateStatus'
-import { NavRail, type Screen } from './components/NavRail'
-import { AppContextProvider } from './lib/appContext'
-import { ImportWizard } from './import/ImportWizard'
+import { AllocateScreen } from './lockers/AllocateScreen'
+import type { LockerIntent } from './lockers/LockerActions'
+import { HistoryScreen } from './screens/HistoryScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { LockersScreen } from './screens/LockersScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { SetupWizard } from './screens/SetupWizard'
 import { StudentsScreen } from './screens/StudentsScreen'
 import { WelcomeScreen } from './screens/WelcomeScreen'
+
+interface Finder {
+  title: string
+  intent: LockerIntent
+}
+
+const FIND_TITLES: Record<NonNullable<LockerIntent> | 'find', string> = {
+  find: 'Find a student or locker',
+  assign: 'Who is the new student?',
+  leave: 'Who has left?',
+  recode: 'Whose code needs changing?',
+  move: 'Who is moving?',
+  swap: 'Who is swapping?'
+}
+
+function isTyping(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  return (
+    !!el &&
+    (el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA' ||
+      el.tagName === 'SELECT' ||
+      el.isContentEditable)
+  )
+}
 
 export function App(): React.JSX.Element {
   const info = useAppInfo()
@@ -35,10 +65,16 @@ export function App(): React.JSX.Element {
   const [newOpen, setNewOpen] = useState(false)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [finder, setFinder] = useState<Finder | null>(null)
   // The screen belongs to the open file: a different (or no) file starts on Home.
-  const [nav, setNav] = useState<{ path: string | null; screen: Screen }>({
+  const [nav, setNav] = useState<{
+    path: string | null
+    screen: Screen
+    focus: { studentId?: string; lockerId?: string; intent: LockerIntent; n: number } | null
+  }>({
     path: null,
-    screen: 'home'
+    screen: 'home',
+    focus: null
   })
 
   const loadOperator = useCallback(() => {
@@ -53,10 +89,53 @@ export function App(): React.JSX.Element {
   const open = file?.status === 'open' ? file : null
   const openPath = open?.path ?? null
   const screen: Screen = nav.path === openPath ? nav.screen : 'home'
+  const focus = nav.path === openPath ? nav.focus : null
   const setScreen = useCallback(
-    (next: Screen) => setNav({ path: openPath, screen: next }),
+    (next: Screen) => setNav({ path: openPath, screen: next, focus: null }),
     [openPath]
   )
+
+  // Ctrl+K to find; Ctrl+Z and Ctrl+Shift+Z to undo and redo, except while typing
+  // (where they undo the typing). Cmd on a Mac.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (!openPath || !(e.ctrlKey || e.metaKey)) return
+      const k = e.key.toLowerCase()
+      if (k === 'k') {
+        e.preventDefault()
+        setFinder({ title: FIND_TITLES.find, intent: null })
+      } else if (k === 'z' && !isTyping(e.target)) {
+        e.preventDefault()
+        void (e.shiftKey ? window.api.redo() : window.api.undo()).then(
+          (r) => !r.ok && setError(r.message)
+        )
+      } else if (k === 'y' && !isTyping(e.target)) {
+        e.preventDefault()
+        void window.api.redo().then((r) => !r.ok && setError(r.message))
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [openPath])
+
+  const onFound = (r: QuickResult): void => {
+    const intent = finder?.intent ?? null
+    setFinder(null)
+    // A locker found with no task in mind opens the locker; otherwise its holder.
+    const wantsStudent = r.kind === 'student' || intent !== null
+    if (r.studentId && wantsStudent)
+      setNav({
+        path: openPath,
+        screen: 'students',
+        focus: { studentId: r.studentId, intent, n: Date.now() }
+      })
+    else if (r.lockerId)
+      setNav({
+        path: openPath,
+        screen: 'lockers',
+        focus: { lockerId: r.lockerId, intent: null, n: Date.now() }
+      })
+  }
 
   return (
     <div className="grain flex min-h-full flex-col">
@@ -69,6 +148,18 @@ export function App(): React.JSX.Element {
             </p>
             {open && <p className="text-xs text-ink-muted">{open.summary.schoolName}</p>}
           </div>
+          {open && (
+            <button
+              onClick={() => setFinder({ title: FIND_TITLES.find, intent: null })}
+              className="hidden items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink-muted hover:bg-surface-muted md:inline-flex"
+              data-testid="open-find"
+            >
+              <Search size={15} aria-hidden /> Find
+              <kbd className="rounded bg-surface-muted px-1.5 text-xs">
+                {navigator.platform.toLowerCase().includes('mac') ? '⌘K' : 'Ctrl K'}
+              </kbd>
+            </button>
+          )}
           {open?.summary.demo && <DemoBadge />}
           {operator && (
             <button
@@ -79,7 +170,7 @@ export function App(): React.JSX.Element {
             >
               <UserRound size={16} className="text-brand" aria-hidden />
               <span className="font-semibold">{operator.name ?? operator.suggested}</span>
-              <span className="text-ink-muted">on {operator.machine}</span>
+              <span className="hidden text-ink-muted lg:inline">on {operator.machine}</span>
             </button>
           )}
           <Button
@@ -109,17 +200,37 @@ export function App(): React.JSX.Element {
               )}
               {file === null ? null : open ? (
                 screen === 'students' ? (
-                  <StudentsScreen onImport={() => setScreen('import')} />
+                  <StudentsScreen
+                    key={focus?.n ?? 'students'}
+                    onImport={() => setScreen('import')}
+                    focus={
+                      focus?.studentId ? { studentId: focus.studentId, intent: focus.intent } : null
+                    }
+                  />
                 ) : screen === 'import' ? (
                   <ImportWizard onClose={() => setScreen('students')} />
                 ) : screen === 'lockers' ? (
-                  <LockersScreen onSetUp={() => setScreen('setup')} />
+                  <LockersScreen
+                    key={focus?.n ?? 'lockers'}
+                    onSetUp={() => setScreen('setup')}
+                    onAllocate={() => setScreen('allocate')}
+                    focusLockerId={focus?.lockerId ?? null}
+                  />
+                ) : screen === 'allocate' ? (
+                  <AllocateScreen onDone={() => setScreen('lockers')} />
+                ) : screen === 'history' ? (
+                  <HistoryScreen state={open} />
                 ) : screen === 'settings' ? (
                   <SettingsScreen />
                 ) : screen === 'setup' ? (
                   <SetupWizard onFinish={() => setScreen('home')} />
                 ) : (
-                  <HomeScreen state={open} onError={setError} onNavigate={setScreen} />
+                  <HomeScreen
+                    state={open}
+                    onError={setError}
+                    onNavigate={setScreen}
+                    onFind={(intent) => setFinder({ title: FIND_TITLES[intent ?? 'find'], intent })}
+                  />
                 )
               ) : (
                 <WelcomeScreen onNew={() => setNewOpen(true)} onError={setError} />
@@ -134,6 +245,9 @@ export function App(): React.JSX.Element {
             </div>
           </main>
         </div>
+        {open && finder && (
+          <QuickFind open title={finder.title} onClose={() => setFinder(null)} onPick={onFound} />
+        )}
       </AppContextProvider>
 
       {open && (
@@ -158,7 +272,7 @@ export function App(): React.JSX.Element {
           if (r.ok) {
             setNewOpen(false)
             const state = await window.api.getFileState()
-            if (state.status === 'open') setNav({ path: state.path, screen: 'setup' })
+            if (state.status === 'open') setNav({ path: state.path, screen: 'setup', focus: null })
             return null
           }
           return r.cancelled ? null : r.message

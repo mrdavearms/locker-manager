@@ -52,6 +52,8 @@ const api = {
     ipcRenderer.invoke(channels.fileNew, { schoolName }),
   openDemo: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileOpenDemo),
   closeFile: (): Promise<void> => ipcRenderer.invoke(channels.fileClose),
+  undo: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileUndo),
+  redo: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileRedo),
   showInFolder: (): Promise<void> => ipcRenderer.invoke(channels.fileShowInFolder),
   takeOver: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileTakeOver),
   startEditing: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileStartEditing),

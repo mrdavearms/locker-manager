@@ -510,3 +510,42 @@ describe('restoring a backup (SPEC.md 4.12)', () => {
     ).rejects.toThrow(/Bad backup name/)
   })
 })
+
+describe('undo and redo (SPEC.md 4.12)', () => {
+  it('undoes and redoes changes, keeping every history line, up to 50 steps', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    await dave.session.open(path)
+    rename(dave, 'SYNTHETIC One')
+    rename(dave, 'SYNTHETIC Two')
+    expect(openState(dave).undo).toMatchObject({
+      canUndo: true,
+      undoAction: 'school.renamed',
+      canRedo: false
+    })
+    expect(await dave.session.undo()).toEqual({ ok: true })
+    expect(openState(dave).summary.schoolName).toBe('SYNTHETIC One')
+    expect(openState(dave).undo.canRedo).toBe(true)
+    await dave.session.undo()
+    expect(openState(dave).summary.schoolName).toBe('SYNTHETIC High School')
+    expect(await dave.session.undo()).toMatchObject({ ok: false, message: /nothing to undo/ })
+    await dave.session.redo()
+    expect(openState(dave).summary.schoolName).toBe('SYNTHETIC One')
+    // History is append-only: renames, undos and redo are all still there.
+    const actions = dave.session.read((db) =>
+      db.all<{ action: string }>('SELECT action FROM audit_log ORDER BY rowid').map((r) => r.action)
+    )
+    expect(actions.filter((a) => a === 'school.renamed')).toHaveLength(2)
+    expect(actions.filter((a) => a === 'undo')).toHaveLength(2)
+    expect(actions.filter((a) => a === 'redo')).toHaveLength(1)
+    // A new change clears redo.
+    rename(dave, 'SYNTHETIC Three')
+    expect(openState(dave).undo.canRedo).toBe(false)
+    for (let i = 0; i < 60; i++) rename(dave, `SYNTHETIC ${i}`)
+    let undone = 0
+    while ((await dave.session.undo()).ok) undone++
+    expect(undone).toBe(50)
+    await dave.session.flush()
+  })
+})

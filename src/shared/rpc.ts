@@ -3,6 +3,15 @@ import type { FilePreview, ImportAnalysis, ImportOptions, ImportResult } from '.
 import { IMPORT_FIELDS } from './importTypes'
 import type { AreaView, LockerView, SchoolProfile } from './locations'
 import type { ExclusionView, GroupView, StudentCounts, StudentView } from './students'
+import { AllocationPlanSchema, type AllocationPlan, type DraftView } from './allocation'
+import {
+  CodeRulesSchema,
+  type CodeRules,
+  type CodeRulesSummary,
+  type CodeSetView,
+  type ResetTask
+} from './codes'
+import type { HistoryEntryView, QuickResult } from './history'
 import { LOCK_TYPES, LockDefaultsSchema, type LockDefaults } from './locks'
 import { TerminologySchema, type Terminology } from './terminology'
 
@@ -169,7 +178,50 @@ export const rpcParams = {
     code: z.string().min(1).max(40),
     display: z.string().max(40).nullable()
   }),
-  'group.setSortLast': z.object({ code: z.string().min(1).max(40), sortLast: z.boolean() })
+  'group.setSortLast': z.object({ code: z.string().min(1).max(40), sortLast: z.boolean() }),
+  'codes.rules.get': z.object({}),
+  'codes.rules.set': z.object({ rules: CodeRulesSchema }),
+  'codes.rules.preview': z.object({ rules: CodeRulesSchema }),
+  'codes.sets.list': z.object({}),
+  'codes.sets.generate': z.object({
+    name: z.string().trim().min(1).max(80),
+    seed: z.string().max(64).nullable()
+  }),
+  'codes.resetTasks': z.object({}),
+  'codes.resetDone': z.object({ lockId: id }),
+  'codes.reveal': z.object({ lockerId: id }),
+  'codes.recode': z.object({ lockerId: id, reason: z.string().trim().min(3).max(200) }),
+  'codes.setFixed': z.object({
+    lockerId: id,
+    code: z.string().trim().min(1).max(20),
+    serial: z.string().max(60).nullable()
+  }),
+  'allocation.plan.get': z.object({}),
+  'allocation.plan.set': z.object({ plan: AllocationPlanSchema }),
+  'allocation.draft': z.object({ plan: AllocationPlanSchema }),
+  'allocation.commit': z.object({
+    assignments: z.array(z.object({ studentId: id, lockerId: id })).max(10_000),
+    issueCodes: z.boolean()
+  }),
+  'locker.suggest': z.object({ studentId: id }),
+  'student.assign': z.object({ studentId: id, lockerId: id }),
+  'student.release': z.object({
+    studentId: id,
+    left: z.boolean(),
+    reason: z.string().max(200).optional()
+  }),
+  'student.move': z.object({ studentId: id, lockerId: id, reason: z.string().max(200).optional() }),
+  'student.swap': z.object({
+    studentId: id,
+    otherStudentId: id,
+    reason: z.string().max(200).optional()
+  }),
+  'history.list': z.object({
+    search: z.string().max(100).optional(),
+    limit: z.number().int().min(1).max(1000),
+    before: z.string().max(40).optional()
+  }),
+  'search.quick': z.object({ q: z.string().max(100) })
 } as const
 
 export interface SetupStatus {
@@ -228,6 +280,27 @@ export interface RpcResults {
   'groups.list': GroupView[]
   'group.setDisplay': null
   'group.setSortLast': null
+  'codes.rules.get': CodeRules
+  'codes.rules.set': CodeRules
+  'codes.rules.preview': CodeRulesSummary
+  'codes.sets.list': CodeSetView[]
+  'codes.sets.generate': { codes: number; spares: number; validCount: number; overHalf: boolean }
+  'codes.resetTasks': ResetTask[]
+  'codes.resetDone': null
+  'codes.reveal': { code: string | null }
+  'codes.recode': { code: string | null }
+  'codes.setFixed': null
+  'allocation.plan.get': AllocationPlan
+  'allocation.plan.set': AllocationPlan
+  'allocation.draft': DraftView
+  'allocation.commit': { assigned: number; codes: number }
+  'locker.suggest': { lockerId: string; number: string } | null
+  'student.assign': { code: string | null; lockerNumber: string }
+  'student.release': null
+  'student.move': { code: string | null; lockerNumber: string }
+  'student.swap': null
+  'history.list': HistoryEntryView[]
+  'search.quick': QuickResult[]
 }
 
 export type RpcMethod = keyof typeof rpcParams

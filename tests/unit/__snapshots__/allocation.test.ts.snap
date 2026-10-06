@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden allocation: a synthetic school shaped like WHS (SPEC.md section 12) > fills Year 7 into 1 to 114 and Year 8 into 115 to 228, Homerooms A to E then HUB, A to Z by surname, ZZZ never 1`] = `
+[
+  "1 07A Anderson, Ava",
+  "2 07A Brown, Mia",
+  "3 07A Brown, Tilly",
+  "107 HUB Ramaswamy, Hamish",
+  "108 HUB Taylor, Jaxon",
+  "109 HUB Tran, Mohammed",
+  "115 08A Ahmed, Mohammed",
+  "116 08A Clarke, Grace",
+  "117 08A Da Silva, Riley",
+  "224 HUB O'Sullivan, Cooper",
+  "225 HUB Smith-Jones, Luca",
+  "226 HUB White, Amelia",
+]
+`;

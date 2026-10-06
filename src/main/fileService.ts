@@ -208,6 +208,9 @@ export function registerFileHandlers(): void {
     if (s.status === 'open') shell.showItemInFolder(s.path)
   })
 
+  ipcMain.handle(channels.fileUndo, async (): Promise<ActionResult> => session.undo())
+  ipcMain.handle(channels.fileRedo, async (): Promise<ActionResult> => session.redo())
+
   ipcMain.handle(channels.fileTakeOver, async (): Promise<ActionResult> => {
     log.info('take over editing requested')
     return session.takeOver()

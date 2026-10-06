@@ -86,6 +86,12 @@ export type FileState =
       openedAt: string
       /** Goes up on every change or reload, so views know to fetch again. */
       revision: number
+      undo: {
+        canUndo: boolean
+        undoAction: string | null
+        canRedo: boolean
+        redoAction: string | null
+      }
     }
 
 export interface BackupView {

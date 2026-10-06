@@ -125,7 +125,7 @@ export function listStudents(
   const map = groupMap(db)
   return db
     .all<Row>(
-      `${SELECT} AND ${where.join(' AND ')} ORDER BY s.year_level, s.group_code, s.last_name, s.first_name LIMIT 5000`,
+      `${SELECT} AND ${where.join(' AND ')} ORDER BY CAST(s.year_level AS INTEGER), s.year_level, s.group_code, s.last_name COLLATE NOCASE, s.first_name COLLATE NOCASE LIMIT 5000`,
       params
     )
     .map((r) => toView(r, map))
