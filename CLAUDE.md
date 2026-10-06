@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 6 October 2026 (M0 released: v0.0.1 and v0.0.2)._
+_Last updated: 6 October 2026 (M1 built, releasing as v0.1.0)._
 
 ## What this is
 
@@ -157,12 +157,43 @@ From `~/Antigravity/redaction tool/CLAUDE.md` and `~/Antigravity/jacks iep gener
 - Squirrel.Mac rejects an update whose signature does not match the running app, so an
   unsigned Mac build can only detect updates and open the download page (SPEC.md 9.2).
 
+## Where things live (M1)
+
+- `src/main/db/`: sql.js wrapper (`db.ts`), migrations (`migrations/NNN_*.sql`, imported
+  with `?raw`), audit and meta helpers (`context.ts`), new file (`newFile.ts`), summaries
+  and history differences (`summary.ts`).
+- `src/main/file/`: all of SPEC.md section 6, Electron-free. `session.ts` owns the open file
+  (open, debounced save, heartbeat, read-only polling, conflicts, copies, backups, restore);
+  `atomicSave.ts`, `lockFile.ts`, `backups.ts`, `siblings.ts`, `readDataFile.ts` are the
+  pieces. Every file-system call goes through `FsPort` so tests inject faults.
+- `src/main/fileService.ts`: the only Electron glue for the data file (dialogs, IPC, demo).
+- `src/main/prefs/preferences.ts`: per-computer settings (operator, recent files).
+- `src/main/demo/demoSchool.ts`: the synthetic WHS-shaped school, deterministic by seed. It
+  is also the fixture for the M4 golden allocation test.
+- `tests/unit/file/faultyFs.ts`: fault injection; `tests/crash/`: the real kill-during-save
+  test (bundles a child with esbuild); `tests/e2e/launch.ts`: launches the built app with
+  its own `--user-data-dir`, which also gives each copy its own single-instance lock, and
+  answers native dialogs through `app.evaluate`.
+- `tests/fixtures/schema/vN-SYNTHETIC.lockers`: one file per released schema version. The
+  fixture test writes the newest one if missing; commit it with any new migration.
+
+## Gotchas found in M1
+
+- React's `react-hooks/set-state-in-effect` lint rule forbids resetting form state in an
+  effect when a dialog opens. Put the form in a child component inside the Radix dialog
+  content instead; it mounts fresh each time the dialog opens.
+- In dark mode `--color-brand` lightens for contrast, so large panels use `--color-panel`
+  (deep teal in both modes). Use `bg-panel text-on-panel` for hero bands.
+- A save whose final `stat` fails after a successful rename must still count as saved; the
+  property test found this.
+- `--user-data-dir` is honoured by Electron for `app.getPath('userData')`; no test hook needed.
+
 ## Current milestone
 
-**M0: skeleton and pipeline.** Built and released 6 Oct 2026: v0.0.1 and v0.0.2 are
-published pre-releases with every updater file. Proven on the Mac: an installed v0.0.1
-(ad-hoc signed, unsigned) found v0.0.2 thirty seconds after launch and showed "Version
-0.0.2 is available" with "Open the download page". Still to be seen by Dave: v0.0.1 on
-his Windows PC updating itself to v0.0.2 (installer at
-https://github.com/mrdavearms/locker-manager/releases/tag/v0.0.1). Next: M1, the data
-file and its safety rules (SPEC.md section 6).
+**M1: data file and safety.** Built 6 Oct 2026: the `.lockers` file, migrations, atomic
+save, edit lock, read-only mode, takeover, conflict and sync-copy screens (whole-version
+choice), backups with preview and restore, the demo school, and the automatic update proof
+in release.yml. Releasing as v0.1.0. Open question for Dave: a backup on EVERY save (as
+SPEC.md 6.5 says) means hundreds a day in heavy use; the 500 MB cap then deletes the oldest
+history first. Recommended: at most one backup per 10 minutes plus one at open. Next: M2
+(set-up wizard, school profile, terminology, areas, banks, lockers, lock types).

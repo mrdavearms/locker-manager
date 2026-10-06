@@ -34,7 +34,7 @@ jobs:
       - run: npm run build
 
   e2e:
-    name: End-to-end on ${{ matrix.os }}
+    name: Tests on ${{ matrix.os }}
     needs: checks
     strategy:
       fail-fast: false
@@ -48,8 +48,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # File renaming, locking and crash behaviour differ by platform, so the
+      # data-file tests run here as well as on Linux.
+      - name: Unit, file-safety and crash tests
+        run: npm test
       - run: npm run build
-      - name: Playwright smoke tests against the built app
+      - name: End-to-end tests against the built app
         run: npm run test:e2e
       - name: Keep the Playwright report when a test fails
         if: failure()
