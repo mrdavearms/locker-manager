@@ -1,6 +1,6 @@
 {
   "name": "locker-manager",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Free, open-source desktop app for schools: student lockers, lock codes, labels and welcome letters.",
   "private": true,
   "license": "MIT",
