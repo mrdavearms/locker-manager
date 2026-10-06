@@ -34,7 +34,7 @@ test('allocate the demo school, show a code, a student leaves, undo', async () =
   await l.page.getByTestId('quick-find-input').fill('Anderson')
   await l.page.getByRole('option').first().click()
   await l.page.getByTestId('confirm-left').click()
-  await expect(l.page.getByText('No locker')).toBeVisible()
+  await expect(l.page.getByText('No locker.', { exact: true })).toBeVisible()
   await l.page.getByTestId('nav-home').click()
   await expect(l.page.getByTestId('reset-list')).toContainText('Locks to reset (1)')
 
