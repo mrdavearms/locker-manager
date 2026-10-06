@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { Button } from './Button'
 import { useAction, useCanEdit } from '@renderer/lib/appContext'
-import { call } from '@renderer/lib/rpc'
-
-const HIDE_AFTER_S = 30
+import { call, useRpc } from '@renderer/lib/rpc'
+import { useCodeGate } from './PinGate'
 
 /** The code as dial boxes. */
 export function CodeBoxes({ code }: { code: string }): React.JSX.Element {
@@ -25,11 +24,14 @@ export function CodeBoxes({ code }: { code: string }): React.JSX.Element {
 
 /**
  * Codes are hidden until asked for, every reveal is logged, and they hide again
- * after 30 seconds (SPEC.md 2.8 and 4.11).
+ * after the school's chosen time, 30 seconds unless changed (SPEC.md 2.8, 4.11, 7).
  */
 export function CodeReveal({ lockerId }: { lockerId: string }): React.JSX.Element {
   const act = useAction()
   const canEdit = useCanEdit()
+  const gate = useCodeGate()
+  const { data: privacy } = useRpc('privacy.get', {})
+  const hideAfter = privacy?.autoHideSeconds ?? 30
   const [code, setCode] = useState<string | null>(null)
   const [left, setLeft] = useState(0)
   useEffect(() => {
@@ -65,10 +67,11 @@ export function CodeReveal({ lockerId }: { lockerId: string }): React.JSX.Elemen
       }
       onClick={() =>
         void act(async () => {
+          if (!(await gate())) return
           const r = await call('codes.reveal', { lockerId })
           if (r.code === null) throw new Error('This lock has no code yet.')
           setCode(r.code)
-          setLeft(HIDE_AFTER_S)
+          setLeft(hideAfter)
         })
       }
       data-testid="show-code"

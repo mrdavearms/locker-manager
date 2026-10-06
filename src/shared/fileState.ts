@@ -4,6 +4,8 @@ export interface FileSummaryView {
   fileId: string | null
   schoolName: string
   demo: boolean
+  /** A practice copy of a school's file (SPEC.md 10): it never saves back. */
+  practice: boolean
   schemaVersion: number
   counts: {
     students: number

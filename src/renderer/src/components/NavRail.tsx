@@ -15,6 +15,9 @@ export type Screen =
   | 'settings'
   | 'settings-labels'
   | 'settings-letters'
+  | 'settings-codes'
+  | 'settings-privacy'
+  | 'settings-computer'
   | 'setup'
   | 'rollover'
 
@@ -40,9 +43,10 @@ export function NavRail({
   return (
     <nav
       aria-label="Main"
-      className="sticky top-0 hidden w-48 shrink-0 self-start px-3 py-6 md:block"
+      className="sticky top-0 z-10 shrink-0 border-b border-line bg-canvas/95 px-3 py-2 backdrop-blur md:w-48 md:self-start md:border-0 md:bg-transparent md:py-6 md:backdrop-blur-none"
     >
-      <ul className="space-y-1">
+      {/* A row across the top in a narrow window (or at large text sizes); a column otherwise. */}
+      <ul className="flex gap-1 overflow-x-auto md:block md:space-y-1">
         {items.map(({ id, label, icon: Icon }) => (
           <li key={id}>
             <button
@@ -51,14 +55,13 @@ export function NavRail({
                 screen === id ||
                 (screen === 'import' && id === 'students') ||
                 (screen === 'allocate' && id === 'lockers') ||
-                ((screen === 'settings-labels' || screen === 'settings-letters') &&
-                  id === 'settings')
+                (screen.startsWith('settings-') && id === 'settings')
                   ? 'page'
                   : undefined
               }
               onClick={() => onNavigate(id)}
               className={cn(
-                'flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left font-semibold transition-colors',
+                'flex items-center gap-3 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-left font-semibold transition-colors md:w-full',
                 screen === id
                   ? 'bg-panel text-on-panel shadow-[var(--shadow-card)]'
                   : 'text-ink-muted hover:bg-surface-muted hover:text-ink'

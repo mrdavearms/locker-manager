@@ -54,6 +54,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@fontsource-variable/big-shoulders-stencil": "^5.3.0",
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",

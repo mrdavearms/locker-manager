@@ -1,4 +1,6 @@
 import { addKeyEvent, keyInfo, setKeyNumber } from '../repos/keys'
+import { listProblems } from '../repos/problems'
+import { lockCodes, privacyView, setAutoHide, setPin, unlockCodes } from '../privacy'
 import {
   archiveYear,
   finishRollover,
@@ -21,6 +23,12 @@ type Keys =
   | 'keys.get'
   | 'keys.setNumber'
   | 'keys.event'
+  | 'privacy.get'
+  | 'privacy.unlock'
+  | 'privacy.lock'
+  | 'privacy.setPin'
+  | 'privacy.setAutoHide'
+  | 'problems.list'
 
 export const rolloverHandlers: Pick<Handlers, Keys> = {
   'rollover.status': { kind: 'read', run: (db) => rolloverStatus(db) },
@@ -93,5 +101,29 @@ export const rolloverHandlers: Pick<Handlers, Keys> = {
       addKeyEvent(db, ctx, p)
       return null
     }
+  },
+  'problems.list': { kind: 'read', run: (db) => listProblems(db) },
+  'privacy.get': { kind: 'read', run: (db) => privacyView(db) },
+  // Unlocking changes nothing in the file, only this computer's memory.
+  'privacy.unlock': { kind: 'read', run: (db, p) => unlockCodes(db, p.pin) },
+  'privacy.lock': {
+    kind: 'read',
+    run: (db) => {
+      lockCodes()
+      return privacyView(db)
+    }
+  },
+  'privacy.setPin': {
+    kind: 'write',
+    audit: (p) => ({
+      action: p.pin ? 'privacy.pin_set' : 'privacy.pin_removed',
+      entity: 'settings'
+    }),
+    run: (db, ctx, p) => setPin(db, ctx, p.pin, p.currentPin)
+  },
+  'privacy.setAutoHide': {
+    kind: 'write',
+    audit: (p) => ({ action: 'privacy.auto_hide_set', entity: 'settings', after: p }),
+    run: (db, ctx, p) => setAutoHide(db, ctx, p.seconds)
   }
 }

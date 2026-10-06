@@ -163,11 +163,77 @@ kept as a named backup first.
   touched.
 - Pictures for letters are stored inside the data file (PNG, JPEG or SVG, up to 3 MB each).
 
+## Managed settings
+
+School IT can fix some settings for every user on a computer with one JSON file in a folder
+ordinary users cannot change:
+
+| Platform | Path |
+|---|---|
+| Windows | `%ProgramData%\Locker Manager\managed.json` |
+| macOS | `/Library/Application Support/Locker Manager/managed.json` |
+
+Every key is optional. A key that is present is locked in the app, marked "Set by your IT
+team".
+
+```json
+{
+  "autoUpdate": false,
+  "updateChannel": "stable",
+  "defaultDataFile": "\\\\server\\share\\Lockers\\Locker data.lockers",
+  "demoEnabled": false,
+  "requirePinForCodes": true
+}
+```
+
+| Key | Effect |
+|---|---|
+| `autoUpdate` | `false` stops automatic update checks and installs. A user can still check by hand and is sent to the download page. |
+| `updateChannel` | `stable` or `beta`. |
+| `defaultDataFile` | Shows "Your school's file, set by your IT team" with an Open button on the Welcome screen. |
+| `demoEnabled` | `false` hides the demo school. |
+| `requirePinForCodes` | `true` means codes cannot be shown, printed or exported until a PIN is set for the file and entered. The PIN cannot then be removed. |
+
+A file that is not valid JSON, or has an unknown key or a wrong value, is ignored as a
+whole, and Settings, This computer, says why. The file is read when the app starts.
+
+## Settings on each computer
+
+Appearance (light or dark, text size up to 200%, high contrast) and update choices are kept
+per user in `preferences.json` (see Other files on each computer). Nothing about them is in
+the data file.
+
+## Privacy settings in the data file
+
+- **PIN for codes**: stored as a salted scrypt hash, never the PIN. After five wrong tries the
+  app waits 30 seconds. A correct PIN lasts 10 minutes, in memory only, on that computer.
+- **Hide codes after**: 10 seconds to 2 minutes, 30 seconds by default.
+- Codes in the file are encrypted with AES-256-GCM using a key kept in the same file. This
+  stops casual reading of the file in a database tool. It does not protect against someone
+  with the file and the skill to read the key. A passphrase option is a possible later
+  addition (SPEC.md 8.6).
+
+## Practice copies and settings files
+
+- A practice copy is written to the app folder (`Practice\` beside `preferences.json`) and
+  replaced each time practice starts. It holds the same data as the school's file,
+  including codes, so treat that folder like the data file.
+- A `.lockersettings` file is JSON. It holds terminology, code rules, lock defaults, label
+  stock measurements and layout, printer nudges, the letter and its pictures, and import
+  column choices. It never holds students, lockers, codes, the PIN or history.
+
+## Start-up recovery
+
+If a version fails to reach a working window twice in a row, the app shows a plain recovery
+page (no scripts) with links to try again, download the previous version, and open the local
+backups folder. The count is kept in `preferences.json` (`failedStarts`).
+
 ## Other files on each computer
 
 | What | Windows | macOS |
 |---|---|---|
 | Preferences (operator name, recent files) | `%AppData%\Locker Manager\preferences.json` | `~/Library/Application Support/Locker Manager/preferences.json` |
+| Practice copy (replaced each time practice starts) | `%AppData%\Locker Manager\Practice\` | `~/Library/Application Support/Locker Manager/Practice/` |
 | Demo school (rebuilt every time it is opened) | `%AppData%\Locker Manager\Demo\` | `~/Library/Application Support/Locker Manager/Demo/` |
 
 ## Logs

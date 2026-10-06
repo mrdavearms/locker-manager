@@ -8,6 +8,7 @@ import { useAction, useCanEdit, useRevision, useTerms } from '@renderer/lib/appC
 import { plural } from '@renderer/lib/format'
 import { useRpc } from '@renderer/lib/rpc'
 import { SheetPreview } from '@renderer/print/SheetPreview'
+import { useCodeGate } from '@renderer/components/PinGate'
 
 type Mode = Exclude<LetterSelection['mode'], 'student'>
 
@@ -15,6 +16,7 @@ type Mode = Exclude<LetterSelection['mode'], 'student'>
 export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX.Element {
   const terms = useTerms()
   const act = useAction()
+  const gate = useCodeGate()
   const canEdit = useCanEdit()
   const revision = useRevision()
   const { data: groups } = useRpc('groups.list', {})
@@ -230,7 +232,7 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
               data-testid="letters-save-pdf"
               onClick={() =>
                 void act(async () => {
-                  if (!job) return
+                  if (!job || !(await gate())) return
                   setBusy(true)
                   try {
                     const r = await window.api.lettersPdf(job)
@@ -250,7 +252,7 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
               disabled={!ready || !canEdit}
               onClick={() =>
                 void act(async () => {
-                  if (!job) return
+                  if (!job || !(await gate())) return
                   const r = await window.api.lettersPrint(job)
                   if (!r.ok && !r.cancelled) throw new Error(r.message)
                 })

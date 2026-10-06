@@ -1,9 +1,9 @@
 # Locker Manager: user guide
 
 This guide is for school office staff and year level leaders. Each section is one task.
-Sections are added as the app gains features.
+The same guide is inside the app: click **Guide** at the top.
 
-_Last updated: 6 October 2026 (version 0.4.0: codes and allocation)._
+_Last updated: 7 October 2026 (version 0.8.0)._
 
 ## Install Locker Manager on Windows
 
@@ -555,3 +555,66 @@ For lockers with keyed locks, click the locker on the Lockers screen.
   the locker.
 - The panel shows how many keys are out. The **Key register** report lists every keyed lock
   and every key not yet returned.
+
+## Needs attention
+
+Home lists everything that needs looking at: students without a locker, possible leavers,
+names to check, locks waiting for a reset, letters not yet printed, spare codes running
+low, and locks that share a code. Click the button beside each one to go where it is fixed.
+When the list is empty, Home says **Nothing needs attention**.
+
+## Protect codes with a PIN
+
+1. Go to **Settings**, then **Privacy**.
+2. Type a PIN of 4 to 8 digits twice, then click **Set the PIN**.
+
+From then on, anyone who shows, prints or exports a code is asked for the PIN first, on
+every computer. After the PIN, codes can be shown for 10 minutes on that computer.
+
+To change or remove the PIN, type the current PIN first. Keep the PIN somewhere safe, for
+example with the master key: if it is forgotten, codes cannot be shown.
+
+The PIN keeps codes away from casual eyes. It is not strong protection against someone who
+copies the data file and sets out to break into it.
+
+**How long codes stay on screen**: in **Privacy**, choose **Hide codes after** (30 seconds
+unless changed).
+
+## Text size, dark mode and high contrast
+
+Go to **Settings**, then **This computer**. These choices are for this computer only.
+
+- **Light or dark**: follow the computer, or always light, or always dark.
+- **Text size**: up to 200%. At large sizes the menu moves to the top of the window.
+- **Contrast**: **High** makes text and lines darker (or brighter in dark mode).
+
+**Updates** are on the same tab: whether updates install by themselves, and whether to get
+test versions. Settings marked **Set by your IT team** cannot be changed here.
+
+## Practise on a copy
+
+To train someone, or to try something without risk:
+
+1. Open your school's file.
+2. On Home, click **Practise on a copy**.
+
+A **PRACTICE** sign shows at the top. The copy lives on this computer only, and nothing done
+in it reaches your school's file. Click **Close file** to finish. Starting practice again
+makes a fresh copy.
+
+## Share your set-up with another school
+
+In **Settings**, **School**, under **Share your set-up**:
+
+- **Save a settings file…** saves your words, code rules, lock settings, label sheets and
+  layout, printer nudges, letter and pictures. It has no students, lockers, codes, PIN or
+  history.
+- **Use a settings file…** puts another school's set-up into your file. Its pictures are
+  added; your students, lockers and codes are not touched. Press Ctrl+Z straight away to
+  undo it.
+
+## If Locker Manager will not start
+
+If a new version stops before it opens twice in a row, Locker Manager shows a page instead
+of trying again. Your school's file is safe. The page has links to try again, to download
+the previous version, and to open this computer's backups folder. Tell your IT team.

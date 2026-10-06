@@ -6,6 +6,7 @@ import { CodeBoxes, CodeReveal } from '@renderer/components/CodeReveal'
 import { Field, Select, TextInput } from '@renderer/components/Field'
 import { Modal } from '@renderer/components/Modal'
 import { QuickFind } from '@renderer/components/QuickFind'
+import { useCodeGate } from '@renderer/components/PinGate'
 import { useAction, useCanEdit, useTerms } from '@renderer/lib/appContext'
 import { call, useRpc } from '@renderer/lib/rpc'
 
@@ -34,15 +35,18 @@ function IssuedDialog({
       {code ? (
         <>
           <p className="text-sm text-ink-muted">
-            The code for the student to set. It is also on their letter (from the next update, Print
-            letters).
+            The code for the student to set. It is also on their letter: print it from Letters, or
+            with Save their letter below.
           </p>
           <div className="mt-3">
             <CodeBoxes code={code} />
           </div>
         </>
       ) : (
-        <p className="text-sm text-ink-muted">This lock has no code (keyed or no lock).</p>
+        <p className="text-sm text-ink-muted">
+          No code to show here. Keyed locks and lockers without a lock have none. If your school
+          protects codes with a PIN, use Show code.
+        </p>
       )}
       <div className="mt-6 flex justify-end">
         <Button onClick={onClose}>Done</Button>
@@ -433,6 +437,7 @@ export function ResetList(): React.JSX.Element | null {
 function StudentLetter({ s }: { s: StudentView }): React.JSX.Element {
   const canEdit = useCanEdit()
   const act = useAction()
+  const gate = useCodeGate()
   const { data: template } = useRpc('letters.template.get', {})
   const [saved, setSaved] = useState<string | null>(null)
   const languages = template?.languages ?? []
@@ -450,6 +455,7 @@ function StudentLetter({ s }: { s: StudentView }): React.JSX.Element {
         }
         onClick={() =>
           void act(async () => {
+            if (!(await gate())) return
             const r = await window.api.lettersPdf({
               selection: { mode: 'student', studentId: s.id },
               language: { kind: 'each' }

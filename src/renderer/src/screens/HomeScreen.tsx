@@ -4,6 +4,7 @@ import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { DemoBadge } from '@renderer/components/DemoBadge'
 import { TaskGrid } from '@renderer/components/TaskGrid'
+import { ProblemsPanel } from '@renderer/components/ProblemsPanel'
 import type { Screen } from '@renderer/components/NavRail'
 import { ResetList, type LockerIntent } from '@renderer/lockers/LockerActions'
 import { formatWhen, plural } from '@renderer/lib/format'
@@ -130,7 +131,7 @@ function SchoolName({ state, onError }: Props): React.JSX.Element {
       <h1 data-testid="school-name" className="text-[2.2rem] font-semibold leading-tight">
         {state.summary.schoolName}
       </h1>
-      {state.summary.demo && <DemoBadge />}
+      {state.summary.demo && <DemoBadge onPanel />}
       {canEdit && (
         <button
           data-testid="rename-school"
@@ -227,6 +228,12 @@ export function HomeScreen({
             it.
           </Banner>
         )}
+        {state.summary.practice && (
+          <Banner tone="info" title="You are in a practice copy" testId="practice-banner">
+            This is a copy of your school’s file on this computer only. Try anything: nothing you do
+            here reaches the real file. Click Close file at the bottom to go back.
+          </Banner>
+        )}
         {state.locationWarning && (
           <Banner tone="warn" title="This might not be the shared file" testId="location-banner">
             {state.locationWarning}
@@ -294,7 +301,30 @@ export function HomeScreen({
         }}
       />
 
+      <ProblemsPanel onNavigate={onNavigate} />
+
       <ResetList />
+
+      {!state.summary.demo && !state.summary.practice && (
+        <section className="card flex flex-wrap items-center gap-4 p-5">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold">Practise without risk</h2>
+            <p className="text-sm text-ink-muted">
+              Make a copy of this file on this computer to train someone or try something out.
+              Nothing done in the copy reaches the real file.
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            data-testid="start-practice"
+            onClick={() =>
+              void window.api.practice().then((r) => !r.ok && !r.cancelled && onError(r.message))
+            }
+          >
+            Practise on a copy
+          </Button>
+        </section>
+      )}
     </div>
   )
 }

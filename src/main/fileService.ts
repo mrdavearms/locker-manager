@@ -23,10 +23,15 @@ import {
 } from '@shared/ipc'
 import { setBusy } from './busy'
 import { createNewDatabase } from './db/newFile'
+import { LockerDb } from './db/db'
+import { appendAudit, newId, setMeta } from './db/context'
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { revealCode } from './repos/codes'
 import { exportWorkbook, importWorkbook } from './portable/workbook'
+import { exportSettings, importSettings, parseSettingsFile } from './portable/settingsFile'
+import { readManaged } from './managed'
+import { codesLocked, noteOpenFile } from './privacy'
 import { saveOutput, stampDate } from './renderService'
 import { createDemoDatabase } from './demo/demoSchool'
 import { nodeFs } from './file/fsPort'
@@ -50,8 +55,9 @@ function operatorName(): string {
 let recordedRecent = ''
 
 function broadcast(state: FileState): void {
+  noteOpenFile(state.status === 'open' ? state.path : null)
   // Keep the recent-files list showing the school's current name.
-  if (state.status === 'open' && !state.summary.demo) {
+  if (state.status === 'open' && !state.summary.demo && !state.summary.practice) {
     const key = `${state.path}|${state.summary.schoolName}`
     if (key !== recordedRecent) {
       recordedRecent = key
@@ -86,6 +92,10 @@ export async function initFileService(): Promise<void> {
     ignoredCopies: (p) => prefs.get().ignoredCopies[p] ?? [],
     onChange: broadcast
   })
+}
+
+export function preferences(): Preferences {
+  return prefs
 }
 
 export function fileSession(): DataFileSession {
@@ -191,6 +201,8 @@ export function registerFileHandlers(): void {
   })
 
   ipcMain.handle(channels.fileOpenDemo, async (): Promise<ActionResult> => {
+    if (readManaged().managed.demoEnabled === false)
+      return { ok: false, message: 'Your IT team has turned off the demo school on this computer.' }
     // The demo always starts fresh, in this computer's own app folder.
     await session.close()
     const folder = join(app.getPath('userData'), 'Demo')
@@ -203,6 +215,72 @@ export function registerFileHandlers(): void {
     )
     return afterOpen(await session.createNew(path, db))
   })
+
+  // Practice mode (SPEC.md 10): a copy of the open file in this computer's app folder.
+  // Nothing done there reaches the school's file. Starting again replaces the copy.
+  ipcMain.handle(channels.filePractice, async (): Promise<ActionResult> => {
+    const st = session.state
+    if (st.status !== 'open') return { ok: false, message: 'Open your school’s file first.' }
+    if (st.summary.demo || st.summary.practice)
+      return { ok: false, message: 'This is already a practice or demo file.' }
+    const school = st.summary.schoolName
+    const bytes = session.read((db) => db.export())
+    const db = await LockerDb.fromBytes(bytes)
+    const ctx = { operator: operatorName(), machine: machineName(), now: () => new Date() }
+    db.transaction(() => {
+      setMeta(db, 'practice', '1')
+      setMeta(db, 'file_id', newId())
+      appendAudit(db, ctx, { action: 'practice.started', entity: 'file' })
+    })
+    const folder = join(app.getPath('userData'), 'Practice')
+    await rm(folder, { recursive: true, force: true })
+    await nodeFs.mkdirp(folder)
+    const safe = school.replace(/[\\/:*?"<>|]/g, ' ').trim() || 'School'
+    log.info('practice copy started')
+    return afterOpen(await session.createNew(join(folder, `${safe} (practice).lockers`), db))
+  })
+
+  // The school's set-up as a .lockersettings file, with no student data (SPEC.md 7).
+  ipcMain.handle(channels.settingsExport, async (): Promise<ActionResult & { path?: string }> => {
+    const st = session.state
+    if (st.status !== 'open') return { ok: false, message: 'Open a file first.' }
+    const file = session.read((db) => exportSettings(db, app.getVersion(), new Date()))
+    const path = await saveOutput(
+      `${st.summary.schoolName} set-up.lockersettings`,
+      JSON.stringify(file, null, 2),
+      { name: 'Locker Manager settings', extension: 'lockersettings' }
+    )
+    return path ? { ok: true, path } : { ok: false, cancelled: true, message: '' }
+  })
+
+  ipcMain.handle(
+    channels.settingsImport,
+    async (): Promise<ActionResult & { fromSchool?: string }> => {
+      const win = focusedWindow()
+      const opts = {
+        title: 'Choose a Locker Manager settings file',
+        properties: ['openFile' as const],
+        filters: [{ name: 'Locker Manager settings', extensions: ['lockersettings', 'json'] }]
+      }
+      const pick = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+      const source = pick.filePaths[0]
+      if (pick.canceled || !source) return { ok: false, cancelled: true, message: '' }
+      try {
+        const file = parseSettingsFile(await readFile(source, 'utf8'))
+        const r = session.write(
+          (res: { fromSchool: string; pictures: number }) => ({
+            action: 'settings.imported',
+            entity: 'settings',
+            after: res
+          }),
+          (db, ctx) => importSettings(db, ctx, file)
+        )
+        return { ok: true, fromSchool: r.fromSchool }
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : String(error) }
+      }
+    }
+  )
 
   // A named backup before a big change (the year rollover).
   ipcMain.handle(
@@ -232,6 +310,10 @@ export function registerFileHandlers(): void {
           message:
             'Open the file for editing to export codes: every code exported is recorded. You can export without codes now.'
         }
+      if (includeCodes) {
+        const locked = session.read((db) => codesLocked(db))
+        if (locked) return { ok: false, message: locked }
+      }
       const { bytes, lockerIds, school } = await session.read(async (db) => ({
         bytes: await exportWorkbook(db, {
           operator: operatorName(),

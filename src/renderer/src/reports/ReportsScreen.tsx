@@ -14,6 +14,7 @@ import { useAction, useCanEdit, useRevision, useTerms } from '@renderer/lib/appC
 import { cn } from '@renderer/lib/cn'
 import { plural } from '@renderer/lib/format'
 import { useRpc } from '@renderer/lib/rpc'
+import { useCodeGate } from '@renderer/components/PinGate'
 
 const PX_PER_MM = 96 / 25.4
 
@@ -63,6 +64,7 @@ function ReportFrame({ html, landscape }: { html: string; landscape: boolean }):
 export function ReportsScreen(): React.JSX.Element {
   const terms = useTerms()
   const act = useAction()
+  const gate = useCodeGate()
   const canEdit = useCanEdit()
   const revision = useRevision()
   const { data: groups } = useRpc('groups.list', {})
@@ -109,9 +111,11 @@ export function ReportsScreen(): React.JSX.Element {
       cancelled?: boolean | undefined
       message?: string
       path?: string | undefined
-    }>
+    }>,
+    codes: boolean = withCodes
   ) =>
     void act(async () => {
+      if (codes && !(await gate())) return
       setBusy(true)
       try {
         const r = await fn()
@@ -308,7 +312,7 @@ export function ReportsScreen(): React.JSX.Element {
                 variant="secondary"
                 disabled={busy || (exportCodes && !canEdit)}
                 data-testid="export-all"
-                onClick={() => run(() => window.api.exportAll(exportCodes))}
+                onClick={() => run(() => window.api.exportAll(exportCodes), exportCodes)}
               >
                 <Archive size={17} aria-hidden /> Export the whole file…
               </Button>

@@ -36,6 +36,8 @@ import { LOCK_TYPES, LockDefaultsSchema, type LockDefaults } from './locks'
 import { ReportRequestSchema, type ReportPreview } from './reports'
 import type { RolloverStatus, SelfResetGroup } from './rollover'
 import { KEY_EVENTS, type KeyInfo } from './keys'
+import type { PrivacyView } from './privacy'
+import type { Problem } from './problems'
 import { TerminologySchema, type Terminology } from './terminology'
 
 // The one contract for data requests between the window and the main process
@@ -298,7 +300,19 @@ export const rpcParams = {
     studentId: id.nullable(),
     notes: z.string().max(300).nullable(),
     amountCents: z.number().int().min(0).max(1_000_000).nullable()
-  })
+  }),
+  'privacy.get': z.object({}),
+  'privacy.unlock': z.object({ pin: z.string().max(8) }),
+  'privacy.lock': z.object({}),
+  'privacy.setPin': z.object({
+    pin: z
+      .string()
+      .regex(/^\d{4,8}$/)
+      .nullable(),
+    currentPin: z.string().max(8).nullable()
+  }),
+  'privacy.setAutoHide': z.object({ seconds: z.number().int().min(5).max(600) }),
+  'problems.list': z.object({})
 } as const
 
 export interface SetupStatus {
@@ -408,6 +422,12 @@ export interface RpcResults {
   'keys.get': KeyInfo | null
   'keys.setNumber': KeyInfo | null
   'keys.event': null
+  'privacy.get': PrivacyView
+  'privacy.unlock': PrivacyView
+  'privacy.lock': PrivacyView
+  'privacy.setPin': PrivacyView
+  'privacy.setAutoHide': PrivacyView
+  'problems.list': Problem[]
 }
 
 export type RpcMethod = keyof typeof rpcParams

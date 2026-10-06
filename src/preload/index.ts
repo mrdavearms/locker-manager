@@ -4,6 +4,7 @@ import type { RpcMethod, RpcParams, RpcResponse } from '../shared/rpc'
 import type { LabelSelection } from '../shared/labels'
 import type { LetterLanguage, LetterSelection, LetterTemplate } from '../shared/letters'
 import type { ExportFormat, ReportRequest } from '../shared/reports'
+import type { ComputerSettings, ComputerView } from '../shared/computer'
 import type { BackupPreview, BackupView, FileState } from '../shared/fileState'
 import type {
   ActionResult,
@@ -41,6 +42,11 @@ const api = {
   onUpdateStatus: (listener: (status: UpdateStatus) => void) =>
     subscribe(channels.updateStatus, listener),
   onOpenAbout: (listener: () => void) => subscribe<void>(channels.openAbout, () => listener()),
+  getComputer: (): Promise<ComputerView> => ipcRenderer.invoke(channels.computerGet),
+  setComputer: (patch: Partial<ComputerSettings>): Promise<ComputerView> =>
+    ipcRenderer.invoke(channels.computerSet, patch),
+  onComputerChanged: (listener: (v: ComputerView) => void) =>
+    subscribe(channels.computerChanged, listener),
 
   // who is using this computer
   getOperator: (): Promise<OperatorInfo> => ipcRenderer.invoke(channels.operatorGet),
@@ -86,6 +92,10 @@ const api = {
   exportAll: (includeCodes: boolean): Promise<Saved> =>
     ipcRenderer.invoke(channels.fileExportAll, { includeCodes }),
   fileFromExport: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileFromExport),
+  practice: (): Promise<ActionResult> => ipcRenderer.invoke(channels.filePractice),
+  exportSettings: (): Promise<Saved> => ipcRenderer.invoke(channels.settingsExport),
+  importSettings: (): Promise<ActionResult & { fromSchool?: string }> =>
+    ipcRenderer.invoke(channels.settingsImport),
   namedBackup: (label: string): Promise<ActionResult & { warning?: string }> =>
     ipcRenderer.invoke(channels.fileNamedBackup, { label }),
   redo: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileRedo),

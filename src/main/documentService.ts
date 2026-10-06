@@ -6,6 +6,7 @@ import type { ActionResult } from '@shared/ipc'
 import { LetterLanguageSchema, LetterSelectionSchema, LetterTemplateSchema } from '@shared/letters'
 import { EXPORT_FORMATS, ReportRequestSchema } from '@shared/reports'
 import { fileSession } from './fileService'
+import { codesLocked } from './privacy'
 import { revealCode } from './repos/codes'
 import { recordPrintJob } from './repos/labels'
 import { getSchoolProfile } from './repos/school'
@@ -70,7 +71,11 @@ async function readyLetters(
           ? `No letters are ready: ${p.heldBack.length} held back until their locks are sorted out.`
           : 'There are no letters for that choice. Spare lockers never get a letter.'
     }
-  if (p.items.some((i) => i.code) && !canRecord()) return { ok: false, message: NEEDS_EDIT }
+  if (p.items.some((i) => i.code)) {
+    if (!canRecord()) return { ok: false, message: NEEDS_EDIT }
+    const locked = s.read((db) => codesLocked(db))
+    if (locked) return { ok: false, message: locked }
+  }
   const over = await overflowingLetters(p.html)
   if (over.length > 0) return { ok: false, message: overflowMessage(p, over) }
   return { ok: true, p }
@@ -95,7 +100,11 @@ function readyReport(
     report: buildReport(db, job.request),
     school: getSchoolProfile(db).name
   }))
-  if (report.revealedLockers.length > 0 && !canRecord()) return { ok: false, message: NEEDS_EDIT }
+  if (report.revealedLockers.length > 0) {
+    if (!canRecord()) return { ok: false, message: NEEDS_EDIT }
+    const locked = fileSession().read((db) => codesLocked(db))
+    if (locked) return { ok: false, message: locked }
+  }
   return { ok: true, report, school }
 }
 

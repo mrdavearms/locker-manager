@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 7 October 2026 (M7 built, releasing as v0.7.0)._
+_Last updated: 7 October 2026 (M8 built, releasing as v0.8.0; 1.0 waits for Dave's hand checks)._
 
 ## What this is
 
@@ -134,6 +134,12 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     locks or one kind, with words per language. This keeps every letter to one page and
     makes the WHS layout the default. Words use a tiny format: blank line, `- `, `1. `,
     `**bold**`, `{merge_field}`.
+16. **PIN, not passphrase, for 1.0** (SPEC.md 17 item 5). An optional PIN (scrypt hash in
+    setting `privacy`) gates showing, printing and exporting codes; unlock lasts 10 minutes in
+    main-process memory and resets when another file opens. A passphrase that wraps the code
+    key is left for later: losing it loses every code, which is the bigger risk for schools.
+17. **Codes returned by assign, move and new code are logged as reveals** (`shownCode` in
+    `src/main/privacy.ts`). Before M8 they reached the screen without a reveal log entry.
 15. **Anything with codes prints or exports only in edit mode** (Dave, 7 Oct 2026). Every
     code that leaves the app is written to `code_reveal_log`, which needs a write. The rule
     is stated next to every print button that can carry codes, in the user guide and in
@@ -311,5 +317,18 @@ cleared, history closed), archive (typed `START <year>`, ends current assignment
 year active, an unused year code set made before the rollover moves to the new year),
 promote (year level + 1, last year level marked left). The window keeps a named backup
 first through `file:namedBackup` (`session.keepNamedBackup`). Key register:
-`src/main/repos/keys.ts`, panel in the Lockers screen for keyed locks. Releasing as v0.7.0.
-Next: M8 polish and 1.0.
+`src/main/repos/keys.ts`, panel in the Lockers screen for keyed locks. v0.7.0 released.
+
+**M8: polish.** Built 7 Oct 2026. In-app guide (`src/renderer/src/help/`, docs/user-guide.md
+read with `src/shared/markdown.ts`, "Show me" map by section slug), problems panel
+(`src/main/repos/problems.ts`), practice copy (`file:practice`, meta `practice`), PIN and
+auto-hide (`src/main/privacy.ts`, `PinGate` in the window), settings file
+(`src/main/portable/settingsFile.ts`), this computer's settings (`src/main/computerService.ts`:
+theme through `nativeTheme`, text size through zoom factor, high contrast through
+`data-contrast`, update channel and automatic install), managed settings
+(`src/main/managed.ts`, `LOCKER_MANAGER_MANAGED` overrides the path for tests), start-up
+recovery page (`src/main/recovery.ts`, packaged builds only), accessibility test with axe-core
+in light and dark (tests/e2e/accessibility.spec.ts, reduced motion so colours are final).
+The left menu becomes a top row in narrow windows and at large text sizes. Releasing as
+v0.8.0. Next: 1.0 after Dave's hand checks (real label sheet on a laser printer, letters on
+paper, a Windows PC install, signing when bought).

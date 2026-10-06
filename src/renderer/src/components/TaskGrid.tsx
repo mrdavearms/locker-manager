@@ -38,7 +38,9 @@ export function TaskGrid({
         <h2 id="tasks-heading" className="text-xl font-semibold">
           What do you want to do?
         </h2>
-        <p className="text-sm text-ink-muted">Grey tasks need the file open for editing.</p>
+        {tasks.some((t) => !handlers[t.title]) && (
+          <p className="text-sm text-ink-muted">Grey tasks need the file open for editing.</p>
+        )}
       </div>
       <ul className="stagger mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tasks.map(({ icon: Icon, title, hint }) => {

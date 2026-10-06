@@ -2,7 +2,14 @@ import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
 import log from 'electron-log/main'
 import { brand } from '@shared/brand'
-import { fileSession, initFileService, openFromOs, registerFileHandlers } from './fileService'
+import {
+  fileSession,
+  initFileService,
+  openFromOs,
+  preferences,
+  registerFileHandlers
+} from './fileService'
+import { noteStartAttempt, noteStarted, showRecovery } from './recovery'
 import { registerIpcHandlers } from './ipc/handlers'
 import { handlers as rpcHandlers } from './rpc/handlers'
 import { registerRenderHandlers } from './renderService'
@@ -13,6 +20,7 @@ import { buildMenu } from './menu'
 import { detectDeveloperIdSignature } from './signing'
 import { updateMode } from './update/policy'
 import { setupUpdater } from './update/updater'
+import { initComputer, registerComputerHandlers, updatePrefs } from './computerService'
 import { createMainWindow, installContentSecurityPolicy } from './window'
 
 // Logs go to the app data folder, rotated. Never log names or codes (SPEC.md 8.1).
@@ -79,11 +87,18 @@ if (!app.requestSingleInstanceLock()) {
     registerRpc(fileSession, rpcHandlers)
     registerRenderHandlers()
     registerDocumentHandlers()
-    setupUpdater(mode)
+    initComputer()
+    registerComputerHandlers()
+    setupUpdater(mode, updatePrefs())
     buildMenu()
+    if (await noteStartAttempt(preferences())) {
+      showRecovery(preferences())
+      return
+    }
     const win = createMainWindow()
     ready = true
     win.webContents.once('did-finish-load', () => {
+      void noteStarted(preferences())
       const file = pendingFiles.pop()
       if (file) void openFromOs(file)
     })

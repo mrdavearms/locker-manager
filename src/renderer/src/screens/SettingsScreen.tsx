@@ -2,14 +2,26 @@ import { useState } from 'react'
 import { cn } from '@renderer/lib/cn'
 import { useTerms } from '@renderer/lib/appContext'
 import { CodesForm } from '@renderer/settings/CodesForm'
+import { ComputerForm } from '@renderer/settings/ComputerForm'
 import { LabelsForm } from '@renderer/settings/LabelsForm'
 import { LettersForm } from '@renderer/settings/LettersForm'
 import { LocationsEditor } from '@renderer/settings/LocationsEditor'
 import { LocksForm } from '@renderer/settings/LocksForm'
+import { PrivacyForm } from '@renderer/settings/PrivacyForm'
 import { SchoolForm } from '@renderer/settings/SchoolForm'
+import { ShareSetupCard } from '@renderer/settings/ShareSetupCard'
 import { TermsForm } from '@renderer/settings/TermsForm'
 
-type Tab = 'school' | 'terms' | 'locations' | 'locks' | 'codes' | 'labels' | 'letters'
+type Tab =
+  | 'school'
+  | 'terms'
+  | 'locations'
+  | 'locks'
+  | 'codes'
+  | 'labels'
+  | 'letters'
+  | 'privacy'
+  | 'computer'
 
 /** SPEC.md section 7, grouped into tabs. More tabs arrive with later features. */
 export type SettingsTab = Tab
@@ -24,7 +36,9 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
     { id: 'locks', label: 'Locks' },
     { id: 'codes', label: 'Lock codes' },
     { id: 'labels', label: 'Labels' },
-    { id: 'letters', label: 'Letters' }
+    { id: 'letters', label: 'Letters' },
+    { id: 'privacy', label: 'Privacy' },
+    { id: 'computer', label: 'This computer' }
   ]
   return (
     <div className="w-full space-y-6 px-6 py-8">
@@ -52,13 +66,20 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
         ))}
       </div>
       <div role="tabpanel">
-        {tab === 'school' && <SchoolForm />}
+        {tab === 'school' && (
+          <div className="space-y-6">
+            <SchoolForm />
+            <ShareSetupCard />
+          </div>
+        )}
         {tab === 'terms' && <TermsForm />}
         {tab === 'locations' && <LocationsEditor />}
         {tab === 'locks' && <LocksForm />}
         {tab === 'codes' && <CodesForm />}
         {tab === 'labels' && <LabelsForm />}
         {tab === 'letters' && <LettersForm />}
+        {tab === 'privacy' && <PrivacyForm />}
+        {tab === 'computer' && <ComputerForm />}
       </div>
     </div>
   )

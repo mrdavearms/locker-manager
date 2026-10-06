@@ -26,6 +26,7 @@ import {
 import { listHistory, quickSearch } from '../repos/history'
 import type { LockerDb } from '../db/db'
 import type { Handlers } from './registry'
+import { assertCodesAllowed, shownCode } from '../privacy'
 
 type Keys =
   | 'codes.rules.get'
@@ -104,7 +105,10 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
     kind: 'write',
     // The code itself never goes in the history; code_reveal_log records the reveal.
     audit: (p) => ({ action: 'code.shown', entity: 'locker', entityId: p.lockerId }),
-    run: (db, ctx, p) => ({ code: revealCode(db, ctx, p.lockerId, 'screen') })
+    run: (db, ctx, p) => {
+      assertCodesAllowed(db)
+      return { code: revealCode(db, ctx, p.lockerId, 'screen') }
+    }
   },
   'codes.recode': {
     kind: 'write',
@@ -114,7 +118,14 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
       entityId: p.lockerId,
       reason: p.reason
     }),
-    run: (db, ctx, p) => ({ code: issueCode(db, ctx, requireLock(db, p.lockerId), 'compromised') })
+    run: (db, ctx, p) => ({
+      code: shownCode(
+        db,
+        ctx,
+        p.lockerId,
+        issueCode(db, ctx, requireLock(db, p.lockerId), 'compromised')
+      )
+    })
   },
   'codes.setFixed': {
     kind: 'write',
@@ -154,7 +165,7 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
       after: { lockerId: p.lockerId }
     }),
     run: (db, ctx, p) => ({
-      code: assignStudent(db, ctx, p.studentId, p.lockerId).code,
+      code: shownCode(db, ctx, p.lockerId, assignStudent(db, ctx, p.studentId, p.lockerId).code),
       lockerNumber: lockerNumber(db, p.lockerId)
     })
   },
@@ -181,7 +192,7 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
       reason: p.reason ?? null
     }),
     run: (db, ctx, p) => ({
-      code: moveStudent(db, ctx, p.studentId, p.lockerId).code,
+      code: shownCode(db, ctx, p.lockerId, moveStudent(db, ctx, p.studentId, p.lockerId).code),
       lockerNumber: lockerNumber(db, p.lockerId)
     })
   },

@@ -42,9 +42,15 @@ export const channels = {
   renderReportExport: 'render:reportExport',
   fileExportAll: 'file:exportAll',
   fileNamedBackup: 'file:namedBackup',
+  filePractice: 'file:practice',
+  settingsExport: 'file:settingsExport',
+  settingsImport: 'file:settingsImport',
   fileFromExport: 'file:fromExport',
   fileRedo: 'file:redo',
+  computerGet: 'computer:get',
+  computerSet: 'computer:set',
   // main -> renderer events
+  computerChanged: 'computer:changed',
   updateStatus: 'event:update:status',
   openAbout: 'event:ui:openAbout',
   fileState: 'event:file:state'

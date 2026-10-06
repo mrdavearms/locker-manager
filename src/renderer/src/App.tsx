@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Info, Search, UserRound } from 'lucide-react'
+import { BookOpen, Info, Search, UserRound } from 'lucide-react'
 import type { QuickResult } from '@shared/history'
 import type { OperatorInfo } from '@shared/ipc'
 import { AboutDialog } from './components/AboutDialog'
 import { BackupsDialog } from './components/BackupsDialog'
 import { Button } from './components/Button'
 import { ConflictDialog } from './components/ConflictDialog'
-import { DemoBadge } from './components/DemoBadge'
+import { DemoBadge, PracticeBadge } from './components/DemoBadge'
 import { LockerMark } from './components/LockerMark'
 import { Modal } from './components/Modal'
 import { NavRail, type Screen } from './components/NavRail'
 import { NewFileDialog } from './components/NewFileDialog'
 import { OperatorDialog } from './components/OperatorDialog'
+import { PinGateProvider } from './components/PinGate'
 import { QuickFind } from './components/QuickFind'
 import { StatusBar } from './components/StatusBar'
 import { UpdateBanner } from './components/UpdateBanner'
@@ -20,12 +21,14 @@ import { AppContextProvider } from './lib/appContext'
 import { useAppInfo } from './lib/useAppInfo'
 import { useFileState } from './lib/useFileState'
 import { useUpdateStatus } from './lib/useUpdateStatus'
+import { useComputer } from './lib/useComputer'
 import { AllocateScreen } from './lockers/AllocateScreen'
 import { PrintLabelsScreen } from './print/PrintLabelsScreen'
 import { LettersScreen } from './letters/LettersScreen'
 import { ReportsScreen } from './reports/ReportsScreen'
 import { RolloverScreen } from './rollover/RolloverScreen'
 import type { LockerIntent } from './lockers/LockerActions'
+import { HelpScreen } from './help/HelpScreen'
 import { HistoryScreen } from './screens/HistoryScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { LockersScreen } from './screens/LockersScreen'
@@ -63,9 +66,11 @@ export function App(): React.JSX.Element {
   const info = useAppInfo()
   const update = useUpdateStatus()
   const file = useFileState()
+  const computer = useComputer()
   const [operator, setOperator] = useState<OperatorInfo | null>(null)
   const [operatorOpen, setOperatorOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -165,6 +170,7 @@ export function App(): React.JSX.Element {
             </button>
           )}
           {open?.summary.demo && <DemoBadge />}
+          {open?.summary.practice && <PracticeBadge />}
           {operator && (
             <button
               data-testid="operator-chip"
@@ -177,6 +183,14 @@ export function App(): React.JSX.Element {
               <span className="hidden text-ink-muted lg:inline">on {operator.machine}</span>
             </button>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setHelpOpen(true)}
+            data-testid="open-help"
+          >
+            <BookOpen size={16} aria-hidden /> Guide
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -193,77 +207,99 @@ export function App(): React.JSX.Element {
         canEdit={open?.mode === 'edit' && !open.conflict}
         showError={setError}
       >
-        <div className="flex flex-1">
-          {open && <NavRail screen={screen} onNavigate={setScreen} />}
-          <main className="min-w-0 flex-1">
-            <div className="mx-auto max-w-6xl">
-              {update.state !== 'idle' && (
-                <div className="px-6 pt-6">
-                  <UpdateBanner status={update} />
-                </div>
-              )}
-              {file === null ? null : open ? (
-                screen === 'students' ? (
-                  <StudentsScreen
-                    key={focus?.n ?? 'students'}
-                    onImport={() => setScreen('import')}
-                    focus={
-                      focus?.studentId ? { studentId: focus.studentId, intent: focus.intent } : null
+        <PinGateProvider showError={setError}>
+          <div className="flex flex-1 flex-col md:flex-row">
+            {open && <NavRail screen={screen} onNavigate={setScreen} />}
+            <main className="min-w-0 flex-1">
+              <div className="mx-auto max-w-6xl">
+                {update.state !== 'idle' && (
+                  <div className="px-6 pt-6">
+                    <UpdateBanner status={update} />
+                  </div>
+                )}
+                {helpOpen ? (
+                  <HelpScreen
+                    onClose={() => setHelpOpen(false)}
+                    onShowMe={
+                      open
+                        ? (target) => {
+                            setHelpOpen(false)
+                            setScreen(target)
+                          }
+                        : null
                     }
                   />
-                ) : screen === 'import' ? (
-                  <ImportWizard onClose={() => setScreen('students')} />
-                ) : screen === 'lockers' ? (
-                  <LockersScreen
-                    key={focus?.n ?? 'lockers'}
-                    onSetUp={() => setScreen('setup')}
-                    onAllocate={() => setScreen('allocate')}
-                    focusLockerId={focus?.lockerId ?? null}
-                  />
-                ) : screen === 'allocate' ? (
-                  <AllocateScreen onDone={() => setScreen('lockers')} />
-                ) : screen === 'history' ? (
-                  <HistoryScreen state={open} />
-                ) : screen === 'print' ? (
-                  <PrintLabelsScreen onSettings={() => setScreen('settings-labels')} />
-                ) : screen === 'letters' ? (
-                  <LettersScreen onDesign={() => setScreen('settings-letters')} />
-                ) : screen === 'reports' ? (
-                  <ReportsScreen />
-                ) : screen === 'rollover' ? (
-                  <RolloverScreen onNavigate={setScreen} />
-                ) : screen === 'settings' ? (
-                  <SettingsScreen />
-                ) : screen === 'settings-labels' ? (
-                  <SettingsScreen initialTab="labels" />
-                ) : screen === 'settings-letters' ? (
-                  <SettingsScreen initialTab="letters" />
-                ) : screen === 'setup' ? (
-                  <SetupWizard onFinish={() => setScreen('home')} />
+                ) : file === null ? null : open ? (
+                  screen === 'students' ? (
+                    <StudentsScreen
+                      key={focus?.n ?? 'students'}
+                      onImport={() => setScreen('import')}
+                      focus={
+                        focus?.studentId
+                          ? { studentId: focus.studentId, intent: focus.intent }
+                          : null
+                      }
+                    />
+                  ) : screen === 'import' ? (
+                    <ImportWizard onClose={() => setScreen('students')} />
+                  ) : screen === 'lockers' ? (
+                    <LockersScreen
+                      key={focus?.n ?? 'lockers'}
+                      onSetUp={() => setScreen('setup')}
+                      onAllocate={() => setScreen('allocate')}
+                      focusLockerId={focus?.lockerId ?? null}
+                    />
+                  ) : screen === 'allocate' ? (
+                    <AllocateScreen onDone={() => setScreen('lockers')} />
+                  ) : screen === 'history' ? (
+                    <HistoryScreen state={open} />
+                  ) : screen === 'print' ? (
+                    <PrintLabelsScreen onSettings={() => setScreen('settings-labels')} />
+                  ) : screen === 'letters' ? (
+                    <LettersScreen onDesign={() => setScreen('settings-letters')} />
+                  ) : screen === 'reports' ? (
+                    <ReportsScreen />
+                  ) : screen === 'rollover' ? (
+                    <RolloverScreen onNavigate={setScreen} />
+                  ) : screen === 'settings' ? (
+                    <SettingsScreen />
+                  ) : screen === 'settings-labels' ? (
+                    <SettingsScreen initialTab="labels" />
+                  ) : screen === 'settings-letters' ? (
+                    <SettingsScreen initialTab="letters" />
+                  ) : screen === 'setup' ? (
+                    <SetupWizard onFinish={() => setScreen('home')} />
+                  ) : (
+                    <HomeScreen
+                      state={open}
+                      onError={setError}
+                      onNavigate={setScreen}
+                      onFind={(intent) =>
+                        setFinder({ title: FIND_TITLES[intent ?? 'find'], intent })
+                      }
+                    />
+                  )
                 ) : (
-                  <HomeScreen
-                    state={open}
+                  <WelcomeScreen
+                    onNew={() => setNewOpen(true)}
                     onError={setError}
-                    onNavigate={setScreen}
-                    onFind={(intent) => setFinder({ title: FIND_TITLES[intent ?? 'find'], intent })}
+                    managed={computer?.managed}
                   />
-                )
-              ) : (
-                <WelcomeScreen onNew={() => setNewOpen(true)} onError={setError} />
-              )}
-              {info && (
-                <p className="pb-6 text-center text-xs text-ink-muted" data-testid="version-line">
-                  Version {info.version}
-                  {info.signed ? '' : ' · unsigned build'} · Free and open source · Your data never
-                  leaves your school
-                </p>
-              )}
-            </div>
-          </main>
-        </div>
-        {open && finder && (
-          <QuickFind open title={finder.title} onClose={() => setFinder(null)} onPick={onFound} />
-        )}
+                )}
+                {info && (
+                  <p className="pb-6 text-center text-xs text-ink-muted" data-testid="version-line">
+                    Version {info.version}
+                    {info.signed ? '' : ' · unsigned build'} · Free and open source · Your data
+                    never leaves your school
+                  </p>
+                )}
+              </div>
+            </main>
+          </div>
+          {open && finder && (
+            <QuickFind open title={finder.title} onClose={() => setFinder(null)} onPick={onFound} />
+          )}
+        </PinGateProvider>
       </AppContextProvider>
 
       {open && (

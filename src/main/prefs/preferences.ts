@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { hostname, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { z } from 'zod'
+import { ComputerSettingsSchema } from '@shared/computer'
 import { errorCode, nodeFs, type FsPort } from '../file/fsPort'
 
 // Settings that belong to this computer, not to the school's data file:
@@ -17,7 +18,11 @@ export const PrefsSchema = z.object({
   version: z.literal(1).default(1),
   operatorName: z.string().nullable().default(null),
   recentFiles: z.array(RecentSchema).default([]),
-  ignoredCopies: z.record(z.string(), z.array(z.string())).default({})
+  ignoredCopies: z.record(z.string(), z.array(z.string())).default({}),
+  computer: ComputerSettingsSchema.default(ComputerSettingsSchema.parse({})),
+  /** Starts that did not reach a working window, for the recovery screen (SPEC.md 9.3). */
+  failedStarts: z.number().int().min(0).default(0),
+  lastStartedVersion: z.string().nullable().default(null)
 })
 export type Prefs = z.infer<typeof PrefsSchema>
 

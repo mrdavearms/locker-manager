@@ -9,16 +9,20 @@ import {
   X
 } from 'lucide-react'
 import type { RecentFile } from '@shared/ipc'
+import type { Managed } from '@shared/computer'
 import { Button } from '@renderer/components/Button'
+import { cn } from '@renderer/lib/cn'
 import { LockerBank } from '@renderer/components/LockerBank'
 import { formatWhen } from '@renderer/lib/format'
 
 interface Props {
   onNew: () => void
+  /** School IT's managed settings (SPEC.md 9.5). */
+  managed?: Managed | undefined
   onError: (message: string) => void
 }
 
-export function WelcomeScreen({ onNew, onError }: Props): React.JSX.Element {
+export function WelcomeScreen({ onNew, onError, managed }: Props): React.JSX.Element {
   const [recent, setRecent] = useState<RecentFile[]>([])
   const [busy, setBusy] = useState(false)
 
@@ -58,7 +62,8 @@ export function WelcomeScreen({ onNew, onError }: Props): React.JSX.Element {
       action: () => void act(() => window.api.openDemo()),
       testId: 'open-demo'
     }
-  ]
+  ].filter((c) => c.testId !== 'open-demo' || managed?.demoEnabled !== false)
+  const itFile = managed?.defaultDataFile
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-10">
@@ -83,7 +88,26 @@ export function WelcomeScreen({ onNew, onError }: Props): React.JSX.Element {
         </div>
       </section>
 
-      <ul className="stagger mt-8 grid gap-4 md:grid-cols-3">
+      {itFile && (
+        <div className="card mt-8 flex flex-wrap items-center gap-4 p-5" data-testid="it-file">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">Your school’s file, set by your IT team</p>
+            <p className="truncate text-sm text-ink-muted" title={itFile}>
+              {itFile}
+            </p>
+          </div>
+          <Button disabled={busy} onClick={() => void act(() => window.api.openFilePath(itFile))}>
+            Open it
+          </Button>
+        </div>
+      )}
+
+      <ul
+        className={cn(
+          'stagger mt-8 grid gap-4',
+          choices.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'
+        )}
+      >
         {choices.map(({ icon: Icon, title, body, action, testId }) => (
           <li key={title}>
             <button

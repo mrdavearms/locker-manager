@@ -12,10 +12,43 @@ import {
   releasePageUrl
 } from './policy'
 
+/** What the platform allows. */
+let platformMode: UpdateMode = 'disabled'
+/** What this computer does (and reports): notify only when automatic installs are off. */
 let mode: UpdateMode = 'disabled'
 let status: UpdateStatus = { state: 'idle', mode }
 let manualCheck = false
 let timer: NodeJS.Timeout | undefined
+let interval: NodeJS.Timeout | undefined
+
+export interface UpdatePrefs {
+  /** Download and install by itself (where the platform allows). */
+  autoInstall: boolean
+  channel: 'stable' | 'beta'
+  /** Check on start and every 4 hours; off when school IT turns updates off. */
+  autoCheck: boolean
+}
+
+/** Applies this computer's update settings (SPEC.md 7 item 14, 9.3 channels, 9.5). */
+export function applyUpdatePrefs(next: UpdatePrefs): void {
+  if (platformMode === 'disabled') return
+  mode = platformMode === 'auto' && !next.autoInstall ? 'manual-download' : platformMode
+  autoUpdater.allowPrerelease = next.channel === 'beta' || allowPrerelease(app.getVersion())
+  const install = mode === 'auto'
+  autoUpdater.autoDownload = install
+  autoUpdater.autoInstallOnAppQuit = install
+  if (!next.autoCheck) {
+    if (timer) clearTimeout(timer)
+    if (interval) clearInterval(interval)
+    timer = interval = undefined
+  } else if (!timer && !interval) {
+    timer = setTimeout(() => {
+      timer = undefined
+      void checkForUpdates(false)
+      interval = setInterval(() => void checkForUpdates(false), CHECK_INTERVAL_MS)
+    }, CHECK_DELAY_MS)
+  }
+}
 
 function releaseNotesText(info: UpdateInfo): string | undefined {
   const notes = info.releaseNotes
@@ -39,7 +72,8 @@ export function getUpdateMode(): UpdateMode {
   return mode
 }
 
-export function setupUpdater(initialMode: UpdateMode): void {
+export function setupUpdater(initialMode: UpdateMode, initialPrefs: UpdatePrefs): void {
+  platformMode = initialMode
   mode = initialMode
   status = { state: 'idle', mode }
   if (mode === 'disabled') {
@@ -48,11 +82,7 @@ export function setupUpdater(initialMode: UpdateMode): void {
   }
 
   autoUpdater.logger = log
-  autoUpdater.allowPrerelease = allowPrerelease(app.getVersion())
   autoUpdater.allowDowngrade = false
-  // On an unsigned Mac we only notify; the install would be rejected.
-  autoUpdater.autoDownload = mode === 'auto'
-  autoUpdater.autoInstallOnAppQuit = mode === 'auto'
   autoUpdater.fullChangelog = false
 
   autoUpdater.on('checking-for-update', () => {
@@ -101,12 +131,11 @@ export function setupUpdater(initialMode: UpdateMode): void {
     manualCheck = false
   })
 
-  timer = setTimeout(() => {
-    void checkForUpdates(false)
-    setInterval(() => void checkForUpdates(false), CHECK_INTERVAL_MS)
-  }, CHECK_DELAY_MS)
+  // On an unsigned Mac, or when this computer says so, we only notify; see applyUpdatePrefs.
+  applyUpdatePrefs(initialPrefs)
   app.on('before-quit', () => {
     if (timer) clearTimeout(timer)
+    if (interval) clearInterval(interval)
   })
 }
 

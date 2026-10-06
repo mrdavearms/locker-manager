@@ -105,6 +105,23 @@
   }
 }
 
+/* High contrast (Settings, This computer): stronger text and lines, no faint greys. */
+:root[data-contrast='high'] {
+  --color-ink: #000000;
+  --color-ink-muted: #2b3238;
+  --color-line: #8a8170;
+  --color-line-strong: #4d473c;
+  --color-surface-muted: #e4ddcf;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-contrast='high'] {
+    --color-ink: #ffffff;
+    --color-ink-muted: #d6dde1;
+    --color-line: #6b7d87;
+    --color-line-strong: #9fb0b9;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
