@@ -12,6 +12,16 @@ import {
   type ResetTask
 } from './codes'
 import type { HistoryEntryView, QuickResult } from './history'
+import {
+  LabelSelectionSchema,
+  LabelTemplateSchema,
+  PrinterOffsetSchema,
+  StockSchema,
+  type LabelPreview,
+  type LabelTemplate,
+  type PrinterOffset,
+  type StockView
+} from './labels'
 import { LOCK_TYPES, LockDefaultsSchema, type LockDefaults } from './locks'
 import { TerminologySchema, type Terminology } from './terminology'
 
@@ -221,7 +231,25 @@ export const rpcParams = {
     limit: z.number().int().min(1).max(1000),
     before: z.string().max(40).optional()
   }),
-  'search.quick': z.object({ q: z.string().max(100) })
+  'search.quick': z.object({ q: z.string().max(100) }),
+  'labels.stocks': z.object({}),
+  'labels.stock.save': z.object({ stock: StockSchema }),
+  'labels.stock.reset': z.object({ id: z.string().min(1).max(64) }),
+  'labels.template.get': z.object({}),
+  'labels.template.set': z.object({ template: LabelTemplateSchema }),
+  'labels.template.reset': z.object({}),
+  'labels.printers.list': z.object({}),
+  'labels.printers.save': z.object({ printer: PrinterOffsetSchema }),
+  'labels.printers.delete': z.object({ name: z.string().min(1).max(80) }),
+  'labels.preview': z.object({
+    selection: LabelSelectionSchema,
+    startAt: z.number().int().min(1).max(100),
+    template: LabelTemplateSchema.optional()
+  }),
+  'labels.calibrationPreview': z.object({
+    stockId: z.string().max(64).nullable(),
+    printer: z.string().max(80).nullable()
+  })
 } as const
 
 export interface SetupStatus {
@@ -301,6 +329,17 @@ export interface RpcResults {
   'student.swap': null
   'history.list': HistoryEntryView[]
   'search.quick': QuickResult[]
+  'labels.stocks': StockView[]
+  'labels.stock.save': StockView[]
+  'labels.stock.reset': StockView[]
+  'labels.template.get': LabelTemplate
+  'labels.template.set': LabelTemplate
+  'labels.template.reset': LabelTemplate
+  'labels.printers.list': PrinterOffset[]
+  'labels.printers.save': PrinterOffset[]
+  'labels.printers.delete': PrinterOffset[]
+  'labels.preview': LabelPreview
+  'labels.calibrationPreview': { html: string }
 }
 
 export type RpcMethod = keyof typeof rpcParams

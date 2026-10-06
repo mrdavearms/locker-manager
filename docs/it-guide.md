@@ -126,6 +126,19 @@ who should see codes.
 Restoring is done in the app (Backups button) by the person editing. The current version is
 kept as a named backup first.
 
+## Printing and PDFs
+
+- Labels and the calibration page are made as PDF files by the app itself (Chromium's
+  built-in PDF writer). No printer driver or PDF software is needed to make them.
+- **Print…** uses the operating system's print window. Users must choose **Actual size**
+  (100%). Scaling to fit moves every label.
+- Page sizes in the PDF are within about 0.1 mm of the label maker's sheet size, because
+  Chromium sets page sizes in small steps. Label positions are exact.
+- Label stock measurements, printer nudges and the label layout are stored in the data file,
+  so every computer prints the same way. A nudge belongs to a printer name, not to a computer.
+- Labels use the Arimo typeface (SIL Open Font Licence), shipped inside the app, so names
+  measure and print the same on Windows and macOS. No fonts are installed on the computer.
+
 ## Other files on each computer
 
 | What | Windows | macOS |

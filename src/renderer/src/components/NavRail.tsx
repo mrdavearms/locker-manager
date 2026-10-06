@@ -1,9 +1,18 @@
-import { DoorClosed, History, Home, Settings, Users } from 'lucide-react'
+import { DoorClosed, History, Home, Printer, Settings, Users } from 'lucide-react'
 import { cn } from '@renderer/lib/cn'
 import { useTerms } from '@renderer/lib/appContext'
 
 export type Screen =
-  'home' | 'students' | 'import' | 'lockers' | 'allocate' | 'history' | 'settings' | 'setup'
+  | 'home'
+  | 'students'
+  | 'import'
+  | 'lockers'
+  | 'allocate'
+  | 'print'
+  | 'history'
+  | 'settings'
+  | 'settings-labels'
+  | 'setup'
 
 /** The left-hand menu while a file is open. Every item has a text label. */
 export function NavRail({
@@ -18,6 +27,7 @@ export function NavRail({
     { id: 'home', label: 'Home', icon: Home },
     { id: 'students', label: 'Students', icon: Users },
     { id: 'lockers', label: terms.locker.many, icon: DoorClosed },
+    { id: 'print', label: 'Print', icon: Printer },
     { id: 'history', label: 'History', icon: History },
     { id: 'settings', label: 'Settings', icon: Settings }
   ]
@@ -34,7 +44,8 @@ export function NavRail({
               aria-current={
                 screen === id ||
                 (screen === 'import' && id === 'students') ||
-                (screen === 'allocate' && id === 'lockers')
+                (screen === 'allocate' && id === 'lockers') ||
+                (screen === 'settings-labels' && id === 'settings')
                   ? 'page'
                   : undefined
               }

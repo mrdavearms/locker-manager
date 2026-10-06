@@ -1,9 +1,12 @@
+import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
 import log from 'electron-log/main'
 import { brand } from '@shared/brand'
 import { fileSession, initFileService, openFromOs, registerFileHandlers } from './fileService'
 import { registerIpcHandlers } from './ipc/handlers'
 import { handlers as rpcHandlers } from './rpc/handlers'
+import { registerRenderHandlers } from './renderService'
+import { setFontDir } from './render/fonts'
 import { registerRpc } from './rpc/registry'
 import { buildMenu } from './menu'
 import { detectDeveloperIdSignature } from './signing'
@@ -62,11 +65,18 @@ if (!app.requestSingleInstanceLock()) {
       `${brand.name} ${app.getVersion()} starting; platform=${process.platform} signed=${signed} updates=${mode}`
     )
 
+    // Fonts for labels and letters: beside the app when packaged, in the project in development.
+    setFontDir(
+      app.isPackaged
+        ? join(process.resourcesPath, 'fonts')
+        : join(app.getAppPath(), 'resources', 'fonts')
+    )
     installContentSecurityPolicy()
     await initFileService()
     registerIpcHandlers(signed)
     registerFileHandlers()
     registerRpc(fileSession, rpcHandlers)
+    registerRenderHandlers()
     setupUpdater(mode)
     buildMenu()
     const win = createMainWindow()

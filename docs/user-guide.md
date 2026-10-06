@@ -350,3 +350,65 @@ Home and the Lockers screen list every lock that needs a physical reset. Reset e
 Press **Ctrl+Z** (Cmd+Z on a Mac) to undo the last change, and **Ctrl+Shift+Z** to redo it.
 The History screen also has **Undo** and **Redo** buttons, and lists every change: who made
 it, on which computer, and when. Up to 50 changes can be undone while the file is open.
+
+## Print locker labels
+
+1. Click **Print** in the left-hand menu.
+2. Under **Which labels**, choose every locker, one Homeroom, one bank, chosen locker numbers
+   (for example `1-10, 15`), lockers changed since the last print, or spare lockers only.
+3. Check the preview on the right. It is the real sheet, exactly as it will print.
+4. Click **Save as PDF…** (best) or **Print…**.
+5. In the print window choose **Actual size** (or 100%). Never choose **Fit to page**: it
+   shrinks everything and the labels will not line up.
+
+**Part-used sheet**: set **Start at label** to the first empty label (1 is the top-left).
+Label makers advise against putting a part-used sheet back through a laser printer, because
+the backing can lift and jam. Use a fresh sheet if you can.
+
+**Names too long to fit**: the app shrinks long names, then breaks them over two lines. If a
+name still does not fit, a yellow message lists it. Give the student a shorter preferred name,
+or make the smallest size in the layout smaller.
+
+## Choose and measure your label sheets
+
+The app knows the common Avery sheets (L7163 is the usual 14 per sheet). Boxes vary, and
+labels printed to the published figures can come out a millimetre or two low.
+
+1. Go to **Settings**, then **Labels**.
+2. Under **Label sheets**, choose the code printed on your box.
+3. Open **Measure your sheet**. With a steel ruler, measure from the top edge of the paper to
+   the top of the first row, and to the top of the last row. Do the same from the left edge
+   for the first and last columns.
+4. Click **Work out the numbers**, then **Save measurements**.
+
+**Back to the published figures** undoes your measurements.
+
+## Line up your printer (calibration page)
+
+Most printers shift everything slightly. You fix this once per printer.
+
+1. In **Settings**, **Labels**, click **Calibration page…** and save the PDF.
+2. Print it on plain paper at **Actual size**. The bar on the page must measure exactly
+   100 mm. If it does not, the printer is shrinking the page.
+3. Lay the printout on a sheet of labels and hold both up to a window.
+4. Read the rulers at the edges. If the printed outlines sit 1 mm to the right of the real
+   labels, the nudge right is **-1**. If they sit 1 mm low, the nudge down is **-1**.
+5. Type the printer's name (for example "Office laser"), set the nudges, and click **Save**.
+6. To check, click **Change** beside the printer, then **Calibration page…** again. The new
+   page includes the nudge.
+
+When you print labels, choose that printer under **Printer nudge**.
+
+## Change the label layout
+
+In **Settings**, **Labels**, **Label layout** shows the first locker, enlarged.
+
+- **Move** a box by dragging it. **Resize** it by dragging its bottom-right corner.
+  Everything snaps to half a millimetre.
+- Click a box (or its name in the list) to change its position, sizes, line-up and boldness
+  by typing numbers.
+- **Add…** puts back the logo, a line, a QR code or your own text. **Remove** takes one away.
+- The dashed line is the **clear edge**: nothing prints closer to the edge of the label than
+  this, so a slightly misaligned printer never cuts anything off.
+- **Logo**: one colour suits black-and-white printers. Colour uses your full logo.
+- **Start again from the standard layout** undoes all of your changes to the layout.

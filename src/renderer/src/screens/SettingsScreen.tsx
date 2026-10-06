@@ -2,14 +2,17 @@ import { useState } from 'react'
 import { cn } from '@renderer/lib/cn'
 import { useTerms } from '@renderer/lib/appContext'
 import { CodesForm } from '@renderer/settings/CodesForm'
+import { LabelsForm } from '@renderer/settings/LabelsForm'
 import { LocationsEditor } from '@renderer/settings/LocationsEditor'
 import { LocksForm } from '@renderer/settings/LocksForm'
 import { SchoolForm } from '@renderer/settings/SchoolForm'
 import { TermsForm } from '@renderer/settings/TermsForm'
 
-type Tab = 'school' | 'terms' | 'locations' | 'locks' | 'codes'
+type Tab = 'school' | 'terms' | 'locations' | 'locks' | 'codes' | 'labels'
 
 /** SPEC.md section 7, grouped into tabs. More tabs arrive with later features. */
+export type SettingsTab = Tab
+
 export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }): React.JSX.Element {
   const terms = useTerms()
   const [tab, setTab] = useState<Tab>(initialTab)
@@ -18,7 +21,8 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
     { id: 'terms', label: 'Words we use' },
     { id: 'locations', label: `${terms.area.many} and ${terms.locker.many.toLowerCase()}` },
     { id: 'locks', label: 'Locks' },
-    { id: 'codes', label: 'Lock codes' }
+    { id: 'codes', label: 'Lock codes' },
+    { id: 'labels', label: 'Labels' }
   ]
   return (
     <div className="w-full space-y-6 px-6 py-8">
@@ -51,6 +55,7 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
         {tab === 'locations' && <LocationsEditor />}
         {tab === 'locks' && <LocksForm />}
         {tab === 'codes' && <CodesForm />}
+        {tab === 'labels' && <LabelsForm />}
       </div>
     </div>
   )

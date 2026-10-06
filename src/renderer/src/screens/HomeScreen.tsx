@@ -279,6 +279,7 @@ export function HomeScreen({
       <TaskGrid
         handlers={{
           'Find a student': () => onFind(null),
+          'Print labels': () => onNavigate('print'),
           ...(state.mode === 'edit'
             ? {
                 'New student': () => onFind('assign'),

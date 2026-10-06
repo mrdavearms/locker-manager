@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { channels } from '../shared/channels'
 import type { RpcMethod, RpcParams, RpcResponse } from '../shared/rpc'
+import type { LabelSelection } from '../shared/labels'
 import type { BackupPreview, BackupView, FileState } from '../shared/fileState'
 import type {
   ActionResult,
@@ -15,6 +16,7 @@ import type {
 // function here maps to one IPC handler that validates its input with Zod.
 
 type BackupRef = { source: BackupView['source']; name: string }
+type LabelsJob = { selection: LabelSelection; startAt: number; printer: string | null }
 
 function subscribe<T>(channel: string, listener: (value: T) => void): () => void {
   const wrapped = (_event: Electron.IpcRendererEvent, value: T): void => listener(value)
@@ -53,6 +55,17 @@ const api = {
   openDemo: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileOpenDemo),
   closeFile: (): Promise<void> => ipcRenderer.invoke(channels.fileClose),
   undo: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileUndo),
+  labelsPdf: (job: LabelsJob): Promise<ActionResult & { path?: string }> =>
+    ipcRenderer.invoke(channels.renderLabelsPdf, job),
+  labelsPrint: (job: LabelsJob): Promise<ActionResult> =>
+    ipcRenderer.invoke(channels.renderLabelsPrint, job),
+  calibrationPdf: (job: {
+    stockId: string | null
+    printer: string | null
+  }): Promise<ActionResult & { path?: string }> =>
+    ipcRenderer.invoke(channels.renderCalibrationPdf, job),
+  openPdf: (path: string): Promise<ActionResult> =>
+    ipcRenderer.invoke(channels.renderOpenPdf, { path }),
   redo: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileRedo),
   showInFolder: (): Promise<void> => ipcRenderer.invoke(channels.fileShowInFolder),
   takeOver: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileTakeOver),

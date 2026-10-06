@@ -209,6 +209,10 @@ All data reads and writes from the window go through ONE channel, `rpc`:
 - Windows CI runners are slow at file operations: the atomic-save property test took over
   5 seconds there, so `vitest.config.ts` gives tests 30 seconds on CI. v0.3.0 was never
   tagged because of this; M3 shipped inside v0.4.0.
+- Chromium's printToPDF sets page sizes in steps of about 0.24 pt: with `preferCSSPageSize` an
+  A4 page is 594.96 x 841.92 pt (0.11 mm narrow); giving `pageSize` in inches is worse
+  (0.23 mm wide). Content is laid out from the top-left in exact CSS mm, so label positions
+  are unaffected; the labels e2e test allows 0.15 mm on page size and checks text positions.
 - `scripts/release.sh` stops if CI fails. Do not pipe it through `tail` in the background:
   the pipe hides its exit status.
 - Node's `TextDecoder('windows-1252')` is really Latin-1: it turns Excel's curly apostrophe
@@ -257,4 +261,18 @@ tests/unit/__snapshots__/allocation.test.ts.snap (checked by eye 6 Oct 2026). Ma
 assign (suggests first spare in the student's area), release, move, swap. Undo and redo:
 session snapshots before each write (50 steps, 200 MB cap); history lines written since a
 snapshot are copied into it, so history stays append-only. History screen, Ctrl+K quick find,
-Ctrl+Z undo. Releasing as v0.4.0. Next: M5 labels.
+Ctrl+Z undo. v0.4.0 released; update proof passed on Windows and Mac.
+
+**M5: labels.** Built 6 Oct 2026. Stocks in src/main/render/stocks.ts (published Avery
+geometry; measured values saved as overrides; custom stocks), geometry maths in
+src/shared/labelGeometry.ts, Layout A designed on a 99.1 x 38 mm label and scaled
+(src/main/render/layout.ts), auto-fit with fontkit measuring the bundled Arimo font
+(src/main/render/fit.ts: shrink by 0.5 pt, then two lines, then report too long), sheets
+as HTML in exact mm (labelSheet.ts), printed to PDF by a hidden window with JavaScript off
+(pdf.ts), calibration page with 100 mm scale bar and rulers, printer nudges by name,
+designer with drag, resize and 0.5 mm snap. The default stock is L7163 at the published
+figures, not WHS's measured ones (no named WHS preset); the "Measure your sheet" helper
+covers the low-printing problem. Golden image tests/golden/labels-L7163-sheet1.png is
+checked on macOS only (fonts render differently on Windows); the e2e test checks text
+positions in the PDF with pdf.js on every platform. Releasing as v0.5.0. Next: M6 letters
+and reports.

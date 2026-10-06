@@ -11,7 +11,7 @@ export function Field({
   htmlFor
 }: {
   label: string
-  hint?: string
+  hint?: string | undefined
   children: ReactNode
   htmlFor: string
 }): React.JSX.Element {

@@ -30,6 +30,10 @@ export const channels = {
   schoolRename: 'school:rename',
   rpc: 'rpc',
   fileUndo: 'file:undo',
+  renderLabelsPdf: 'render:labelsPdf',
+  renderLabelsPrint: 'render:labelsPrint',
+  renderCalibrationPdf: 'render:calibrationPdf',
+  renderOpenPdf: 'render:openPdf',
   fileRedo: 'file:redo',
   // main -> renderer events
   updateStatus: 'event:update:status',
