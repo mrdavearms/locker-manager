@@ -4,6 +4,8 @@ A free, open-source desktop app for schools to manage student lockers, lock code
 labels and welcome letters. Windows and macOS. No server, no accounts, no internet
 connection needed except for updates.
 
+**Website: [mrdavearms.github.io/locker-manager](https://mrdavearms.github.io/locker-manager/)**
+
 **Status: pre-release (0.x).** Every feature in the specification is built. Version 1.0
 follows once a school has checked printing on real label sheets and printers.
 
