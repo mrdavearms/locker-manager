@@ -14,7 +14,6 @@ import { historyOnlyIn, summarise } from '../db/summary'
 import { saveAtomically, SaveFailedError } from './atomicSave'
 import {
   BACKUP_FOLDER_NAME,
-  DEFAULT_POLICY,
   listBackups,
   sharedBackupDir,
   writeBackup,
@@ -34,6 +33,8 @@ import {
   type LockInfo
 } from './lockFile'
 import { readDataFile, readProblemMessage } from './readDataFile'
+import { BackupRulesSchema, DEFAULT_BACKUP_RULES } from '@shared/storage'
+import { getSetting } from '../repos/settings'
 import {
   baseName,
   findConflictCopies,
@@ -120,6 +121,12 @@ const UNDO_STEPS = 50
 const UNDO_BYTES = 200 * 1024 * 1024
 
 const DAY = 24 * 60 * 60 * 1000
+
+/** The school's backup rules from the file (Settings, Storage), else the defaults. */
+export function backupPolicyFor(db: LockerDb): BackupPolicy {
+  const r = getSetting(db, 'storage.backupRules', BackupRulesSchema, DEFAULT_BACKUP_RULES)
+  return { keepAllDays: r.keepAllDays, dailyDays: r.dailyDays, maxBytes: r.maxMb * 1024 * 1024 }
+}
 
 export class DataFileSession {
   private cur: Open | null = null
@@ -561,7 +568,7 @@ export class DataFileSession {
     if (!c) return null
     const base = baseName(basename(c.path))
     const at = this.d.now()
-    const policy = this.d.backupPolicy ?? DEFAULT_POLICY
+    const policy = this.d.backupPolicy ?? backupPolicyFor(c.db)
     const opts = { randomSuffix: this.d.randomSuffix, policy, ...(label ? { label } : {}) }
     const errors: string[] = []
     try {

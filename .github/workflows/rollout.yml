@@ -1,0 +1,44 @@
+name: Rollout percentage
+
+# Staged rollout (SPEC.md 9.3): offer a release to only some computers first, then
+# raise the share. Run from the Actions page: choose the release tag and a percentage.
+# 100 offers it to everyone. electron-updater reads `stagingPercentage` from the
+# release's latest.yml (Windows) and latest-mac.yml (Mac); each computer keeps a fixed
+# random number, so the same computers stay in or out as the share rises.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, for example v1.0.1'
+        required: true
+      percentage:
+        description: 'Share of computers offered the update (1 to 100)'
+        required: true
+        default: '20'
+
+permissions:
+  contents: write
+
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ inputs.tag }}
+      PCT: ${{ inputs.percentage }}
+    steps:
+      - name: Check the inputs
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { echo "Bad tag: $TAG"; exit 1; }
+          [[ "$PCT" =~ ^[0-9]+$ ]] && (( PCT >= 1 && PCT <= 100 )) || { echo "Bad percentage: $PCT"; exit 1; }
+      - name: Set the share in the update files
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p latest.yml -p latest-mac.yml
+          for f in latest.yml latest-mac.yml; do
+            grep -v '^stagingPercentage:' "$f" > "$f.new" || true
+            if (( PCT < 100 )); then echo "stagingPercentage: $PCT" >> "$f.new"; fi
+            mv "$f.new" "$f"
+            echo "--- $f"; cat "$f"
+          done
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" latest.yml latest-mac.yml --clobber

@@ -42,6 +42,7 @@ const SHOW_ME: Record<string, Screen> = {
   'start-next-year': 'rollover',
   keys: 'lockers',
   'protect-codes-with-a-pin': 'settings-privacy',
+  'change-how-long-backups-are-kept': 'settings-storage',
   'text-size-dark-mode-and-high-contrast': 'settings-computer'
 }
 

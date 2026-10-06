@@ -140,6 +140,14 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     key is left for later: losing it loses every code, which is the bigger risk for schools.
 17. **Codes returned by assign, move and new code are logged as reveals** (`shownCode` in
     `src/main/privacy.ts`). Before M8 they reached the screen without a reveal log entry.
+18. **Edit-lock timings are fixed, not a setting** (7 Oct 2026). SPEC.md 7 item 13 lists the
+    heartbeat interval and stale-lock time as settings. They stay fixed (60 seconds and 10
+    minutes) and Settings, Storage shows them with the reason: two computers with different
+    timings could each think the other had stopped. Backup rules are a setting
+    (`storage.backupRules`, read by `backupPolicyFor` at every backup).
+19. **Staged rollout is a manual workflow** (`.github/workflows/rollout.yml`): it sets
+    `stagingPercentage` in a release's latest.yml and latest-mac.yml. Releases go out at 100%
+    unless someone runs it; the update proof runs before any share is set.
 15. **Anything with codes prints or exports only in edit mode** (Dave, 7 Oct 2026). Every
     code that leaves the app is written to `code_reveal_log`, which needs a write. The rule
     is stated next to every print button that can carry codes, in the user guide and in

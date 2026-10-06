@@ -139,6 +139,16 @@ Every save keeps the version it replaced.
 The version you had before restoring is kept as a backup too, so you can change your mind.
 Only the person editing the file can restore.
 
+## Change how long backups are kept
+
+Go to **Settings**, then **Storage**. It shows where the data file is, and how many backups
+are kept beside it and on this computer.
+
+Every backup is kept for 7 days, then one a day until 92 days old, then one a week, and the
+backups folder is kept under 500 MB. To change this, type new numbers and click **Save
+backup rules**. The rules are kept in the data file, so every computer follows them. Named
+backups, such as "Before starting 2027", are always kept.
+
 ## Close the file
 
 Click **Close file** at the bottom right, or just close the window. Your changes are saved

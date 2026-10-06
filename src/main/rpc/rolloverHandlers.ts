@@ -1,5 +1,6 @@
 import { addKeyEvent, keyInfo, setKeyNumber } from '../repos/keys'
 import { listProblems } from '../repos/problems'
+import { setSetting } from '../repos/settings'
 import { lockCodes, privacyView, setAutoHide, setPin, unlockCodes } from '../privacy'
 import {
   archiveYear,
@@ -29,6 +30,7 @@ type Keys =
   | 'privacy.setPin'
   | 'privacy.setAutoHide'
   | 'problems.list'
+  | 'storage.rules.set'
 
 export const rolloverHandlers: Pick<Handlers, Keys> = {
   'rollover.status': { kind: 'read', run: (db) => rolloverStatus(db) },
@@ -103,6 +105,14 @@ export const rolloverHandlers: Pick<Handlers, Keys> = {
     }
   },
   'problems.list': { kind: 'read', run: (db) => listProblems(db) },
+  'storage.rules.set': {
+    kind: 'write',
+    audit: (p) => ({ action: 'storage.rules_set', entity: 'settings', after: p.rules }),
+    run: (db, ctx, p) => {
+      setSetting(db, ctx, 'storage.backupRules', p.rules)
+      return p.rules
+    }
+  },
   'privacy.get': { kind: 'read', run: (db) => privacyView(db) },
   // Unlocking changes nothing in the file, only this computer's memory.
   'privacy.unlock': { kind: 'read', run: (db, p) => unlockCodes(db, p.pin) },

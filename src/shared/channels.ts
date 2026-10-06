@@ -45,6 +45,7 @@ export const channels = {
   filePractice: 'file:practice',
   settingsExport: 'file:settingsExport',
   fileMergeConflict: 'file:mergeConflict',
+  fileStorage: 'file:storage',
   recordRestorePreview: 'history:restorePreview',
   recordRestore: 'history:restore',
   settingsImport: 'file:settingsImport',

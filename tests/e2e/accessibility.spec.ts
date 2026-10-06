@@ -45,7 +45,7 @@ test('every main screen passes the automatic WCAG 2.1 AA checks', async () => {
     await l.page.getByTestId(nav).click()
     await check(l.page, name)
   }
-  for (const tab of ['Letters', 'Privacy', 'This computer', 'Labels', 'Lock codes']) {
+  for (const tab of ['Letters', 'Privacy', 'Storage', 'This computer', 'Labels', 'Lock codes']) {
     await l.page.getByRole('tab', { name: tab }).click()
     await check(l.page, `Settings ${tab}`)
   }

@@ -32,7 +32,7 @@ import { HelpScreen } from './help/HelpScreen'
 import { HistoryScreen } from './screens/HistoryScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { LockersScreen } from './screens/LockersScreen'
-import { SettingsScreen } from './screens/SettingsScreen'
+import { SettingsScreen, type SettingsTab } from './screens/SettingsScreen'
 import { SetupWizard } from './screens/SetupWizard'
 import { StudentsScreen } from './screens/StudentsScreen'
 import { WelcomeScreen } from './screens/WelcomeScreen'
@@ -279,10 +279,12 @@ export function App(): React.JSX.Element {
                     <RolloverScreen onNavigate={setScreen} />
                   ) : screen === 'settings' ? (
                     <SettingsScreen />
-                  ) : screen === 'settings-labels' ? (
-                    <SettingsScreen initialTab="labels" />
-                  ) : screen === 'settings-letters' ? (
-                    <SettingsScreen initialTab="letters" />
+                  ) : screen.startsWith('settings-') ? (
+                    // settings-labels, settings-privacy and so on open that tab.
+                    <SettingsScreen
+                      key={screen}
+                      initialTab={screen.slice('settings-'.length) as SettingsTab}
+                    />
                   ) : screen === 'setup' ? (
                     <SetupWizard onFinish={() => setScreen('home')} />
                   ) : (

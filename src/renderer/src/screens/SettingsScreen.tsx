@@ -11,6 +11,7 @@ import { LocksForm } from '@renderer/settings/LocksForm'
 import { PrivacyForm } from '@renderer/settings/PrivacyForm'
 import { SchoolForm } from '@renderer/settings/SchoolForm'
 import { ShareSetupCard } from '@renderer/settings/ShareSetupCard'
+import { StorageForm } from '@renderer/settings/StorageForm'
 import { TermsForm } from '@renderer/settings/TermsForm'
 
 type Tab =
@@ -22,6 +23,7 @@ type Tab =
   | 'labels'
   | 'letters'
   | 'privacy'
+  | 'storage'
   | 'computer'
 
 /** SPEC.md section 7, grouped into tabs. More tabs arrive with later features. */
@@ -40,6 +42,7 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
     { id: 'labels', label: 'Labels' },
     { id: 'letters', label: 'Letters' },
     { id: 'privacy', label: 'Privacy' },
+    { id: 'storage', label: 'Storage' },
     { id: 'computer', label: 'This computer' }
   ]
   // What each tab covers, so a search finds the right one (SPEC.md 7: a search box).
@@ -52,6 +55,7 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
     labels: 'labels sheets avery stock measure printer nudge calibration layout qr',
     letters: 'letters sections pictures images language translation words',
     privacy: 'pin privacy hide codes seconds security',
+    storage: 'storage backups file folder location move size days editing lock',
     computer: 'appearance dark light text size zoom contrast updates beta'
   }
   const q = query.trim().toLowerCase()
@@ -126,6 +130,7 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
         {tab === 'labels' && <LabelsForm />}
         {tab === 'letters' && <LettersForm />}
         {tab === 'privacy' && <PrivacyForm />}
+        {tab === 'storage' && <StorageForm />}
         {tab === 'computer' && <ComputerForm />}
       </div>
     </div>

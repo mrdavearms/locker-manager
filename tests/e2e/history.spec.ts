@@ -50,3 +50,25 @@ test('a label QR link opens its locker (SPEC.md 5.6)', async () => {
   await expect(l.page.getByLabel('Locker 7', { exact: true })).toBeVisible()
   await l.close()
 })
+
+test('the guide’s Show me opens the right Settings tab', async () => {
+  const l = await launchApp()
+  await l.page.setViewportSize({ width: 1300, height: 950 })
+  await answerNextDialog(l.app, 'open', placeFixture(sharedFolder()))
+  await l.page.getByTestId('open-file').click()
+  for (const [section, tab] of [
+    ['Protect codes with a PIN', 'Privacy'],
+    ['Change how long backups are kept', 'Storage'],
+    ['Text size, dark mode and high contrast', 'This computer'],
+    ['Lock codes and their rules', 'Lock codes']
+  ] as const) {
+    await l.page.getByTestId('open-help').click()
+    await l.page
+      .getByRole('navigation', { name: 'Guide sections' })
+      .getByRole('button', { name: section, exact: true })
+      .click()
+    await l.page.getByTestId('help-show-me').click()
+    await expect(l.page.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true')
+  }
+  await l.close()
+})

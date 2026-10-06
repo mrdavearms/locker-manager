@@ -36,6 +36,9 @@ import { codesLocked, noteOpenFile } from './privacy'
 import { pickOutputPath, saveOutput, stampDate, writeOutput } from './renderService'
 import { createDemoDatabase } from './demo/demoSchool'
 import { nodeFs } from './file/fsPort'
+import { HEARTBEAT_MS, STALE_AFTER_MS } from './file/lockFile'
+import { getSetting } from './repos/settings'
+import { BackupRulesSchema, DEFAULT_BACKUP_RULES, type StorageView } from '@shared/storage'
 import { DataFileSession } from './file/session'
 import { machineName, Preferences, suggestedOperatorName } from './prefs/preferences'
 import { savedMappings, setSavedMappingsReader } from './rpc/studentHandlers'
@@ -458,6 +461,31 @@ export function registerFileHandlers(): void {
       return { ok: true, value: await restoreRecord(session, RecordRestore.parse(raw).entryId) }
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  // Settings, Storage (SPEC.md 7 item 13): where the file and its backups are.
+  ipcMain.handle(channels.fileStorage, async (): Promise<StorageView | null> => {
+    const st = session.state
+    if (st.status !== 'open') return null
+    const all = await session.listAllBackups()
+    const mb = (n: number): number => Math.round((n / 1024 / 1024) * 10) / 10
+    const shared = all.filter((b) => b.source === 'shared')
+    const local = all.filter((b) => b.source === 'this_computer')
+    const rules = session.read((db) =>
+      getSetting(db, 'storage.backupRules', BackupRulesSchema, DEFAULT_BACKUP_RULES)
+    )
+    return {
+      path: st.path,
+      rules,
+      backups: {
+        shared: shared.length,
+        thisComputer: local.length,
+        sharedMb: mb(shared.reduce((n, b) => n + b.size, 0)),
+        thisComputerMb: mb(local.reduce((n, b) => n + b.size, 0))
+      },
+      heartbeatSeconds: HEARTBEAT_MS / 1000,
+      staleMinutes: STALE_AFTER_MS / 60_000
     }
   })
 

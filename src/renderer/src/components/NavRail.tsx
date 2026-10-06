@@ -17,6 +17,7 @@ export type Screen =
   | 'settings-letters'
   | 'settings-codes'
   | 'settings-privacy'
+  | 'settings-storage'
   | 'settings-computer'
   | 'setup'
   | 'rollover'

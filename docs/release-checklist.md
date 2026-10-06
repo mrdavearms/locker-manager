@@ -60,6 +60,19 @@ git tag -d v0.0.2 && git push origin :refs/tags/v0.0.2
    printer and check it against the calibration page.
 5. Note anything learned in CLAUDE.md.
 
+## Staged rollout (optional)
+
+To offer a release to some schools' computers first (SPEC.md 9.3):
+
+1. Publish the release as usual.
+2. On the Actions page, open **Rollout percentage**, click **Run workflow**, type the tag
+   (for example `v1.0.1`) and a percentage (for example `20`).
+3. If no problems are reported after a few days, run it again with `100`.
+
+Each computer keeps the same random number, so a computer that already has the update keeps
+it, and raising the share only adds computers. Run it with `100` straight away to undo a
+mistake. The automatic update test runs before you set a share, so it is not affected.
+
 ## Hand checks before 1.0
 
 Automated tests cannot do these. Each needs a person, real paper or a real computer.

@@ -38,6 +38,7 @@ import type { RolloverStatus, SelfResetGroup } from './rollover'
 import { KEY_EVENTS, type KeyInfo } from './keys'
 import type { PrivacyView } from './privacy'
 import type { Problem } from './problems'
+import { BackupRulesSchema, type BackupRules } from './storage'
 import { TerminologySchema, type Terminology } from './terminology'
 
 // The one contract for data requests between the window and the main process
@@ -312,7 +313,8 @@ export const rpcParams = {
     currentPin: z.string().max(8).nullable()
   }),
   'privacy.setAutoHide': z.object({ seconds: z.number().int().min(5).max(600) }),
-  'problems.list': z.object({})
+  'problems.list': z.object({}),
+  'storage.rules.set': z.object({ rules: BackupRulesSchema })
 } as const
 
 export interface SetupStatus {
@@ -428,6 +430,7 @@ export interface RpcResults {
   'privacy.setPin': PrivacyView
   'privacy.setAutoHide': PrivacyView
   'problems.list': Problem[]
+  'storage.rules.set': BackupRules
 }
 
 export type RpcMethod = keyof typeof rpcParams

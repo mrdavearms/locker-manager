@@ -36,6 +36,7 @@ export function describeAction(action: string): string {
     'school.renamed': 'Renamed the school',
     'lock.taken_over': 'Took over editing',
     'conflict.kept_mine': 'Kept their own version in a conflict',
+    'storage.rules_set': 'Changed how long backups are kept',
     'record.restored': 'Put a record back to how it was',
     'conflict.merged': 'Added their changes to the other version after a conflict',
     'copy.set_aside': 'Set aside a sync copy',

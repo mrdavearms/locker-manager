@@ -6,6 +6,7 @@ import type { LetterLanguage, LetterSelection, LetterTemplate } from '../shared/
 import type { ExportFormat, ReportRequest } from '../shared/reports'
 import type { ComputerSettings, ComputerView } from '../shared/computer'
 import type { RecordRestorePreview } from '../shared/history'
+import type { StorageView } from '../shared/storage'
 import type { BackupPreview, BackupView, FileState } from '../shared/fileState'
 import type {
   ActionResult,
@@ -96,6 +97,7 @@ const api = {
     ipcRenderer.invoke(channels.fileExportAll, { includeCodes }),
   fileFromExport: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileFromExport),
   practice: (): Promise<ActionResult> => ipcRenderer.invoke(channels.filePractice),
+  storage: (): Promise<StorageView | null> => ipcRenderer.invoke(channels.fileStorage),
   exportSettings: (): Promise<Saved> => ipcRenderer.invoke(channels.settingsExport),
   importSettings: (): Promise<ActionResult & { fromSchool?: string }> =>
     ipcRenderer.invoke(channels.settingsImport),
