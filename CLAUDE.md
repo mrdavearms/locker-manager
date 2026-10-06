@@ -206,6 +206,11 @@ All data reads and writes from the window go through ONE channel, `rpc`:
 - Prettier reflows long lines, so scripted find-and-replace edits against source often miss.
   Use the Edit tool on freshly read text.
 - Windows reports an installed app's version with four parts (0.1.0.0).
+- Windows CI runners are slow at file operations: the atomic-save property test took over
+  5 seconds there, so `vitest.config.ts` gives tests 30 seconds on CI. v0.3.0 was never
+  tagged because of this; M3 shipped inside v0.4.0.
+- `scripts/release.sh` stops if CI fails. Do not pipe it through `tail` in the background:
+  the pipe hides its exit status.
 - Node's `TextDecoder('windows-1252')` is really Latin-1: it turns Excel's curly apostrophe
   (0x92) into a control character. `src/main/import/decode.ts` maps 0x80 to 0x9F by hand.
 - Year levels are stored as plain text numbers ("7"), never "Year 7"; screens add the
