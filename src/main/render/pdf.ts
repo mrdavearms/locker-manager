@@ -9,13 +9,19 @@ import { PDFDocument } from 'pdf-lib'
 // network, page size from CSS, zero margins. The page is written to a private
 // temporary file (data URLs that big are refused) and removed afterwards.
 
-async function withPage<T>(html: string, fn: (win: BrowserWindow) => Promise<T>): Promise<T> {
+async function withPage<T>(
+  html: string,
+  fn: (win: BrowserWindow) => Promise<T>,
+  javascript = false
+): Promise<T> {
   const file = join(tmpdir(), `locker-manager-${randomBytes(8).toString('hex')}.html`)
   await writeFile(file, html, { encoding: 'utf8', mode: 0o600 })
   const win = new BrowserWindow({
     show: false,
     webPreferences: {
-      javascript: false,
+      // Only the letter measuring step turns this on, to run our own measuring code;
+      // the page's own Content-Security-Policy still forbids any script in it.
+      javascript,
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
@@ -68,6 +74,63 @@ export async function printHtml(
               width: Math.round(page.widthMm * 1000),
               height: Math.round(page.heightMm * 1000)
             }
+          },
+          (printed, reason) => resolve(printed ? { printed } : { printed, reason })
+        )
+      })
+  )
+}
+
+/**
+ * Letters whose content runs past the end of their page (SPEC.md 5.2: one student
+ * per page, guaranteed). Returns the data-student value of each one.
+ */
+export async function overflowingLetters(html: string): Promise<string[]> {
+  return withPage(
+    html,
+    async (win) =>
+      (await win.webContents.executeJavaScript(
+        `Array.from(document.querySelectorAll('section.letter')).filter(function (s) {
+           var c = s.querySelector('.content');
+           var style = getComputedStyle(s);
+           var room = s.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+           return c && c.scrollHeight > room + 1;
+         }).map(function (s) { return s.getAttribute('data-student'); })`
+      )) as string[],
+    true
+  )
+}
+
+/** A report: page size from the CSS (portrait or landscape), with a page-number footer. */
+export async function reportToPdf(html: string, footer: string): Promise<Uint8Array> {
+  return withPage(html, async (win) => {
+    const pdf = await win.webContents.printToPDF({
+      printBackground: true,
+      preferCSSPageSize: true,
+      displayHeaderFooter: true,
+      headerTemplate: '<span></span>',
+      footerTemplate: footer
+    })
+    return new Uint8Array(pdf)
+  })
+}
+
+/** Sends a report to a printer through the system print dialog. */
+export async function printReport(
+  html: string,
+  opts: { landscape: boolean; footer: string }
+): Promise<{ printed: boolean; reason?: string }> {
+  return withPage(
+    html,
+    (win) =>
+      new Promise((resolve) => {
+        win.webContents.print(
+          {
+            silent: false,
+            printBackground: true,
+            landscape: opts.landscape,
+            pageSize: 'A4',
+            footer: opts.footer
           },
           (printed, reason) => resolve(printed ? { printed } : { printed, reason })
         )

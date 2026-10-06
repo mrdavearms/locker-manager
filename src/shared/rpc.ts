@@ -22,7 +22,18 @@ import {
   type PrinterOffset,
   type StockView
 } from './labels'
+import {
+  LETTER_IMAGE_TYPES,
+  LetterLanguageSchema,
+  LetterSelectionSchema,
+  LetterTemplateSchema,
+  LANGUAGE_CODE,
+  type ImageView,
+  type LetterPreview,
+  type LetterTemplate
+} from './letters'
 import { LOCK_TYPES, LockDefaultsSchema, type LockDefaults } from './locks'
+import { ReportRequestSchema, type ReportPreview } from './reports'
 import { TerminologySchema, type Terminology } from './terminology'
 
 // The one contract for data requests between the window and the main process
@@ -249,7 +260,27 @@ export const rpcParams = {
   'labels.calibrationPreview': z.object({
     stockId: z.string().max(64).nullable(),
     printer: z.string().max(80).nullable()
-  })
+  }),
+  'letters.template.get': z.object({}),
+  'letters.template.set': z.object({ template: LetterTemplateSchema }),
+  'letters.template.reset': z.object({}),
+  'letters.images.list': z.object({}),
+  'letters.images.add': z.object({
+    name: z.string().trim().min(1).max(120),
+    mime: z.enum(LETTER_IMAGE_TYPES),
+    bytes: z.instanceof(Uint8Array),
+    width: z.number().int().min(1).max(20_000),
+    height: z.number().int().min(1).max(20_000)
+  }),
+  'letters.images.delete': z.object({ id }),
+  'letters.preview': z.object({
+    selection: LetterSelectionSchema,
+    language: LetterLanguageSchema,
+    index: z.number().int().min(0).max(100_000),
+    template: LetterTemplateSchema.optional()
+  }),
+  'students.setLanguage': z.object({ studentId: id, code: LANGUAGE_CODE.nullable() }),
+  'reports.preview': z.object({ request: ReportRequestSchema })
 } as const
 
 export interface SetupStatus {
@@ -340,6 +371,15 @@ export interface RpcResults {
   'labels.printers.delete': PrinterOffset[]
   'labels.preview': LabelPreview
   'labels.calibrationPreview': { html: string }
+  'letters.template.get': LetterTemplate
+  'letters.template.set': LetterTemplate
+  'letters.template.reset': LetterTemplate
+  'letters.images.list': ImageView[]
+  'letters.images.add': ImageView[]
+  'letters.images.delete': ImageView[]
+  'letters.preview': LetterPreview
+  'students.setLanguage': null
+  'reports.preview': ReportPreview
 }
 
 export type RpcMethod = keyof typeof rpcParams

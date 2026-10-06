@@ -1,5 +1,6 @@
 import m001 from './migrations/001_initial.sql?raw'
 import m002 from './migrations/002_import.sql?raw'
+import m003 from './migrations/003_letters.sql?raw'
 import type { LockerDb } from './db'
 
 export interface Migration {
@@ -11,7 +12,8 @@ export interface Migration {
 /** Every migration, in order. Append only; never edit one that has shipped. */
 export const migrations: readonly Migration[] = [
   { version: 1, name: '001_initial', sql: m001 },
-  { version: 2, name: '002_import', sql: m002 }
+  { version: 2, name: '002_import', sql: m002 },
+  { version: 3, name: '003_letters', sql: m003 }
 ]
 
 export const LATEST_SCHEMA_VERSION = migrations[migrations.length - 1]?.version ?? 0

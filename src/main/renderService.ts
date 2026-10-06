@@ -27,22 +27,30 @@ const OpenPdf = z.object({ path: z.string().min(1) })
 /** PDFs this session made; only these may be opened from the window. */
 const made = new Set<string>()
 
-async function savePdf(defaultName: string, bytes: Uint8Array): Promise<string | null> {
+/** Asks where to save, writes the file, and remembers it so the window may open it. */
+export async function saveOutput(
+  defaultName: string,
+  bytes: Uint8Array | string,
+  filter: { name: string; extension: string } = { name: 'PDF', extension: 'pdf' }
+): Promise<string | null> {
   const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
   const opts = {
-    title: 'Save the PDF',
+    title: `Save the ${filter.name}`,
     defaultPath: `${app.getPath('documents')}/${defaultName}`,
-    filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    filters: [{ name: filter.name, extensions: [filter.extension] }]
   }
   const pick = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
   if (pick.canceled || !pick.filePath) return null
-  const path = pick.filePath.toLowerCase().endsWith('.pdf') ? pick.filePath : `${pick.filePath}.pdf`
+  const ext = `.${filter.extension}`
+  const path = pick.filePath.toLowerCase().endsWith(ext) ? pick.filePath : `${pick.filePath}${ext}`
   await writeFile(path, bytes)
   made.add(path)
   return path
 }
 
-function stampDate(): string {
+const savePdf = (name: string, bytes: Uint8Array): Promise<string | null> => saveOutput(name, bytes)
+
+export function stampDate(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
@@ -124,7 +132,7 @@ export function registerRenderHandlers(): void {
 
   ipcMain.handle(channels.renderOpenPdf, async (_e, raw: unknown): Promise<ActionResult> => {
     const { path } = OpenPdf.parse(raw)
-    if (!made.has(path)) return { ok: false, message: 'Only PDFs made here can be opened.' }
+    if (!made.has(path)) return { ok: false, message: 'Only files made here can be opened.' }
     const err = await shell.openPath(path)
     return err ? { ok: false, message: err } : { ok: true }
   })

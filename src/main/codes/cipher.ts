@@ -16,6 +16,12 @@ export function codeKey(db: LockerDb): Buffer {
   return key
 }
 
+/** The key if the file has one, without making one: safe inside a read. */
+export function readCodeKey(db: LockerDb): Buffer | null {
+  const stored = getMeta(db, KEY_META)
+  return stored ? Buffer.from(stored, 'base64') : null
+}
+
 /** iv (12) + tag (16) + ciphertext. */
 export function encryptCode(key: Buffer, code: string): Uint8Array {
   const iv = randomBytes(12)
@@ -24,8 +30,8 @@ export function encryptCode(key: Buffer, code: string): Uint8Array {
   return new Uint8Array(Buffer.concat([iv, c.getAuthTag(), body]))
 }
 
-export function decryptCode(key: Buffer, blob: Uint8Array | null): string | null {
-  if (!blob || blob.byteLength < 29) return null
+export function decryptCode(key: Buffer | null, blob: Uint8Array | null): string | null {
+  if (!key || !blob || blob.byteLength < 29) return null
   const b = Buffer.from(blob)
   const d = createDecipheriv('aes-256-gcm', key, b.subarray(0, 12))
   d.setAuthTag(b.subarray(12, 28))

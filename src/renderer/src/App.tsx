@@ -22,6 +22,8 @@ import { useFileState } from './lib/useFileState'
 import { useUpdateStatus } from './lib/useUpdateStatus'
 import { AllocateScreen } from './lockers/AllocateScreen'
 import { PrintLabelsScreen } from './print/PrintLabelsScreen'
+import { LettersScreen } from './letters/LettersScreen'
+import { ReportsScreen } from './reports/ReportsScreen'
 import type { LockerIntent } from './lockers/LockerActions'
 import { HistoryScreen } from './screens/HistoryScreen'
 import { HomeScreen } from './screens/HomeScreen'
@@ -223,6 +225,10 @@ export function App(): React.JSX.Element {
                   <HistoryScreen state={open} />
                 ) : screen === 'print' ? (
                   <PrintLabelsScreen onSettings={() => setScreen('settings-labels')} />
+                ) : screen === 'letters' ? (
+                  <LettersScreen onDesign={() => setScreen('settings')} />
+                ) : screen === 'reports' ? (
+                  <ReportsScreen />
                 ) : screen === 'settings' ? (
                   <SettingsScreen />
                 ) : screen === 'settings-labels' ? (

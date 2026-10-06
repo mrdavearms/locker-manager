@@ -1,4 +1,4 @@
-import { DoorClosed, History, Home, Printer, Settings, Users } from 'lucide-react'
+import { DoorClosed, FileText, History, Home, Mail, Printer, Settings, Users } from 'lucide-react'
 import { cn } from '@renderer/lib/cn'
 import { useTerms } from '@renderer/lib/appContext'
 
@@ -9,6 +9,8 @@ export type Screen =
   | 'lockers'
   | 'allocate'
   | 'print'
+  | 'letters'
+  | 'reports'
   | 'history'
   | 'settings'
   | 'settings-labels'
@@ -27,7 +29,9 @@ export function NavRail({
     { id: 'home', label: 'Home', icon: Home },
     { id: 'students', label: 'Students', icon: Users },
     { id: 'lockers', label: terms.locker.many, icon: DoorClosed },
-    { id: 'print', label: 'Print', icon: Printer },
+    { id: 'print', label: 'Labels', icon: Printer },
+    { id: 'letters', label: 'Letters', icon: Mail },
+    { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'history', label: 'History', icon: History },
     { id: 'settings', label: 'Settings', icon: Settings }
   ]

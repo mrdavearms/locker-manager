@@ -6,6 +6,7 @@ import { fileSession, initFileService, openFromOs, registerFileHandlers } from '
 import { registerIpcHandlers } from './ipc/handlers'
 import { handlers as rpcHandlers } from './rpc/handlers'
 import { registerRenderHandlers } from './renderService'
+import { registerDocumentHandlers } from './documentService'
 import { setFontDir } from './render/fonts'
 import { registerRpc } from './rpc/registry'
 import { buildMenu } from './menu'
@@ -77,6 +78,7 @@ if (!app.requestSingleInstanceLock()) {
     registerFileHandlers()
     registerRpc(fileSession, rpcHandlers)
     registerRenderHandlers()
+    registerDocumentHandlers()
     setupUpdater(mode)
     buildMenu()
     const win = createMainWindow()

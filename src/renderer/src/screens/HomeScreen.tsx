@@ -280,6 +280,7 @@ export function HomeScreen({
         handlers={{
           'Find a student': () => onFind(null),
           'Print labels': () => onNavigate('print'),
+          'Print letters': () => onNavigate('letters'),
           ...(state.mode === 'edit'
             ? {
                 'New student': () => onFind('assign'),

@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { channels } from '../shared/channels'
 import type { RpcMethod, RpcParams, RpcResponse } from '../shared/rpc'
 import type { LabelSelection } from '../shared/labels'
+import type { LetterLanguage, LetterSelection, LetterTemplate } from '../shared/letters'
+import type { ExportFormat, ReportRequest } from '../shared/reports'
 import type { BackupPreview, BackupView, FileState } from '../shared/fileState'
 import type {
   ActionResult,
@@ -17,6 +19,9 @@ import type {
 
 type BackupRef = { source: BackupView['source']; name: string }
 type LabelsJob = { selection: LabelSelection; startAt: number; printer: string | null }
+type LettersJob = { selection: LetterSelection; language: LetterLanguage }
+type ReportJob = { request: ReportRequest }
+type Saved = ActionResult & { path?: string }
 
 function subscribe<T>(channel: string, listener: (value: T) => void): () => void {
   const wrapped = (_event: Electron.IpcRendererEvent, value: T): void => listener(value)
@@ -66,6 +71,21 @@ const api = {
     ipcRenderer.invoke(channels.renderCalibrationPdf, job),
   openPdf: (path: string): Promise<ActionResult> =>
     ipcRenderer.invoke(channels.renderOpenPdf, { path }),
+  lettersPdf: (job: LettersJob): Promise<Saved> =>
+    ipcRenderer.invoke(channels.renderLettersPdf, job),
+  lettersPrint: (job: LettersJob): Promise<ActionResult> =>
+    ipcRenderer.invoke(channels.renderLettersPrint, job),
+  lettersCheck: (
+    job: LettersJob & { template?: LetterTemplate }
+  ): Promise<{ overflow: string[] }> => ipcRenderer.invoke(channels.renderLettersCheck, job),
+  reportPdf: (job: ReportJob): Promise<Saved> => ipcRenderer.invoke(channels.renderReportPdf, job),
+  reportPrint: (job: ReportJob): Promise<ActionResult> =>
+    ipcRenderer.invoke(channels.renderReportPrint, job),
+  reportExport: (job: ReportJob & { format: ExportFormat }): Promise<Saved> =>
+    ipcRenderer.invoke(channels.renderReportExport, job),
+  exportAll: (includeCodes: boolean): Promise<Saved> =>
+    ipcRenderer.invoke(channels.fileExportAll, { includeCodes }),
+  fileFromExport: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileFromExport),
   redo: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileRedo),
   showInFolder: (): Promise<void> => ipcRenderer.invoke(channels.fileShowInFolder),
   takeOver: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileTakeOver),
