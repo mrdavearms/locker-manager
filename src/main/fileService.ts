@@ -28,12 +28,12 @@ import { LockerDb } from './db/db'
 import { appendAudit, newId, setMeta } from './db/context'
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
-import { revealCode } from './repos/codes'
+import { lockersWithAnyCode, logReveal, spareCodeCount } from './repos/codes'
 import { exportWorkbook, importWorkbook } from './portable/workbook'
 import { exportSettings, importSettings, parseSettingsFile } from './portable/settingsFile'
 import { readManaged } from './managed'
 import { codesLocked, noteOpenFile } from './privacy'
-import { saveOutput, stampDate } from './renderService'
+import { pickOutputPath, saveOutput, stampDate, writeOutput } from './renderService'
 import { createDemoDatabase } from './demo/demoSchool'
 import { nodeFs } from './file/fsPort'
 import { DataFileSession } from './file/session'
@@ -227,6 +227,9 @@ export function registerFileHandlers(): void {
     if (st.summary.demo || st.summary.practice)
       return { ok: false, message: 'This is already a practice or demo file.' }
     const school = st.summary.schoolName
+    // The school's own file records that a copy was taken (the copy holds every code).
+    if (st.mode === 'edit' && !st.conflict)
+      session.write({ action: 'practice.copied', entity: 'file' }, () => null)
     const bytes = session.read((db) => db.export())
     const db = await LockerDb.fromBytes(bytes)
     const ctx = { operator: operatorName(), machine: machineName(), now: () => new Date() }
@@ -317,39 +320,49 @@ export function registerFileHandlers(): void {
         const locked = session.read((db) => codesLocked(db))
         if (locked) return { ok: false, message: locked }
       }
-      const { bytes, lockerIds, school } = await session.read(async (db) => ({
-        bytes: await exportWorkbook(db, {
+      // Which lockers' codes the workbook will hold: current, past and next year's.
+      // Worked out before the export runs, while nothing else can change the file.
+      const lockerIds = includeCodes ? session.read((db) => lockersWithAnyCode(db)) : []
+      const spares = includeCodes ? session.read((db) => spareCodeCount(db)) : 0
+      const bytes = await session.read((db) =>
+        exportWorkbook(db, {
           operator: operatorName(),
           appVersion: app.getVersion(),
           includeCodes,
           now: new Date()
-        }),
-        lockerIds: includeCodes
-          ? db
-              .all<{ locker_id: string }>(
-                "SELECT locker_id FROM lock WHERE locker_id IS NOT NULL AND code_cipher IS NOT NULL AND status IN ('in_use','spare')"
-              )
-              .map((r) => r.locker_id)
-          : [],
-        school: st.summary.schoolName
-      }))
-      const path = await saveOutput(
-        `${includeCodes ? 'CONFIDENTIAL ' : ''}${school} portable export ${stampDate()}.xlsx`,
-        bytes,
+        })
+      )
+      const path = await pickOutputPath(
+        `${includeCodes ? 'CONFIDENTIAL ' : ''}${st.summary.schoolName} portable export ${stampDate()}.xlsx`,
         { name: 'Excel workbook', extension: 'xlsx' }
       )
       if (!path) return { ok: false, cancelled: true, message: '' }
-      if (st.mode === 'edit' && !st.conflict)
-        session.write(
-          {
-            action: 'file.exported',
-            entity: 'file',
-            after: { includeCodes, codes: lockerIds.length }
-          },
-          (db, ctx) => {
-            for (const id of lockerIds) revealCode(db, ctx, id, 'export')
-          }
+      // Recorded before the file is written: no code leaves the app unrecorded.
+      try {
+        if (
+          session.state.status === 'open' &&
+          session.state.mode === 'edit' &&
+          !session.state.conflict
         )
+          session.write(
+            {
+              action: 'file.exported',
+              entity: 'file',
+              after: { includeCodes, lockers: lockerIds.length, spareCodes: spares }
+            },
+            (db, ctx) => {
+              for (const id of lockerIds) logReveal(db, ctx, id, 'export')
+              if (spares > 0) logReveal(db, ctx, null, 'export')
+            }
+          )
+        else if (includeCodes) throw new Error('The file is no longer open for editing.')
+      } catch (error) {
+        return {
+          ok: false,
+          message: `${error instanceof Error ? error.message : String(error)} Nothing was saved.`
+        }
+      }
+      await writeOutput(path, bytes)
       log.info('portable export written', { includeCodes })
       return { ok: true, path }
     }

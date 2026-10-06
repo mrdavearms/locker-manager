@@ -22,7 +22,7 @@ import {
 } from './render/pdf'
 import { prepareLetters, type PreparedLetters } from './render/prepareLetters'
 import { buildReportHtml, reportDate, reportFooter } from './render/report'
-import { saveOutput, stampDate } from './renderService'
+import { pickOutputPath, stampDate, writeOutput } from './renderService'
 
 // Letters and reports (SPEC.md 4.8, 4.9, 5.2, 5.4, 5.5). Every code that leaves
 // the app on paper, in a PDF or in an export is recorded in the reveal log, so
@@ -81,16 +81,37 @@ async function readyLetters(
   return { ok: true, p }
 }
 
-function recordLetters(p: PreparedLetters, to: 'pdf' | 'printer'): void {
-  if (!canRecord()) return
+/**
+ * Records the letters (and every code in them) BEFORE the file is written, so no
+ * code ever leaves the app unrecorded. Returns why it could not, or null.
+ */
+function recordLetters(p: PreparedLetters, to: 'pdf' | 'printer'): string | null {
+  const hasCodes = p.items.some((i) => i.code)
+  const why = recordBlocked(hasCodes)
+  if (why !== undefined) return why
   const lockerIds = p.items.map((i) => i.record.lockerId)
-  fileSession().write(
-    { action: 'letters.printed', entity: 'print_job', after: { letters: lockerIds.length, to } },
-    (db, ctx) => {
-      for (const i of p.items) if (i.code) revealCode(db, ctx, i.record.lockerId, 'letter')
-      recordPrintJob(db, ctx, 'letters', lockerIds)
-    }
-  )
+  try {
+    fileSession().write(
+      { action: 'letters.printed', entity: 'print_job', after: { letters: lockerIds.length, to } },
+      (db, ctx) => {
+        for (const i of p.items) if (i.code) revealCode(db, ctx, i.record.lockerId, 'letter')
+        recordPrintJob(db, ctx, 'letters', lockerIds)
+      }
+    )
+  } catch (error) {
+    if (hasCodes) return error instanceof Error ? error.message : String(error)
+  }
+  return null
+}
+
+/** undefined: go ahead and record. null: nothing to record. A string: refuse. */
+function recordBlocked(hasCodes: boolean): string | null | undefined {
+  if (!canRecord()) return hasCodes ? NEEDS_EDIT : null
+  if (hasCodes) {
+    const locked = fileSession().read((db) => codesLocked(db))
+    if (locked) return locked
+  }
+  return undefined
 }
 
 function readyReport(
@@ -108,20 +129,27 @@ function readyReport(
   return { ok: true, report, school }
 }
 
-function recordReport(report: BuiltReport, how: 'printed' | 'exported', to: string): void {
-  if (!canRecord()) return
-  fileSession().write(
-    {
-      action: how === 'printed' ? 'report.printed' : 'report.exported',
-      entity: 'print_job',
-      after: { report: report.title, rows: report.rows, to, codes: report.revealedLockers.length }
-    },
-    (db, ctx) => {
-      for (const id of report.revealedLockers)
-        revealCode(db, ctx, id, how === 'printed' ? 'report' : 'export')
-      if (how === 'printed') recordPrintJob(db, ctx, 'report', report.revealedLockers)
-    }
-  )
+function recordReport(report: BuiltReport, how: 'printed' | 'exported', to: string): string | null {
+  const hasCodes = report.revealedLockers.length > 0
+  const why = recordBlocked(hasCodes)
+  if (why !== undefined) return why
+  try {
+    fileSession().write(
+      {
+        action: how === 'printed' ? 'report.printed' : 'report.exported',
+        entity: 'print_job',
+        after: { report: report.title, rows: report.rows, to, codes: report.revealedLockers.length }
+      },
+      (db, ctx) => {
+        for (const id of report.revealedLockers)
+          revealCode(db, ctx, id, how === 'printed' ? 'report' : 'export')
+        if (how === 'printed') recordPrintJob(db, ctx, 'report', report.revealedLockers)
+      }
+    )
+  } catch (error) {
+    if (hasCodes) return error instanceof Error ? error.message : String(error)
+  }
+  return null
 }
 
 function fileName(report: BuiltReport, ext: string): string {
@@ -156,9 +184,11 @@ export function registerDocumentHandlers(): void {
         message: `The PDF came out with ${pages} pages for ${ready.p.items.length} letters, so a letter must have spilled over. Nothing was saved.`
       }
     }
-    const path = await saveOutput(`Locker letters ${stampDate()}.pdf`, bytes)
+    const path = await pickOutputPath(`Locker letters ${stampDate()}.pdf`)
     if (!path) return { ok: false, cancelled: true, message: '' }
-    recordLetters(ready.p, 'pdf')
+    const refused = recordLetters(ready.p, 'pdf')
+    if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
+    await writeOutput(path, bytes)
     return { ok: true, path }
   })
 
@@ -176,7 +206,8 @@ export function registerDocumentHandlers(): void {
         message:
           r.reason === 'cancelled' ? '' : `Printing did not finish: ${r.reason ?? 'unknown'}.`
       }
-    recordLetters(ready.p, 'printer')
+    const notRecorded = recordLetters(ready.p, 'printer')
+    if (notRecorded) log.warn('printed letters could not be recorded', notRecorded)
     return { ok: true }
   })
 
@@ -188,9 +219,11 @@ export function registerDocumentHandlers(): void {
       buildReportHtml(ready.report, page),
       reportFooter(ready.report, page)
     )
-    const path = await saveOutput(fileName(ready.report, 'pdf'), bytes)
+    const path = await pickOutputPath(fileName(ready.report, 'pdf'))
     if (!path) return { ok: false, cancelled: true, message: '' }
-    recordReport(ready.report, 'printed', 'pdf')
+    const refused = recordReport(ready.report, 'printed', 'pdf')
+    if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
+    await writeOutput(path, bytes)
     return { ok: true, path }
   })
 
@@ -209,7 +242,8 @@ export function registerDocumentHandlers(): void {
         message:
           r.reason === 'cancelled' ? '' : `Printing did not finish: ${r.reason ?? 'unknown'}.`
       }
-    recordReport(ready.report, 'printed', 'printer')
+    const notRecorded = recordReport(ready.report, 'printed', 'printer')
+    if (notRecorded) log.warn('printed report could not be recorded', notRecorded)
     return { ok: true }
   })
 
@@ -219,18 +253,17 @@ export function registerDocumentHandlers(): void {
     if (!ready.ok) return ready
     // Codes are only in the report when its request asked for them.
     const report = ready.report
-    const path =
+    const bytes = job.format === 'csv' ? reportCsv(report) : await reportXlsx(report, ready.school)
+    const path = await pickOutputPath(
+      fileName(report, job.format),
       job.format === 'csv'
-        ? await saveOutput(fileName(report, 'csv'), reportCsv(report), {
-            name: 'CSV file',
-            extension: 'csv'
-          })
-        : await saveOutput(fileName(report, 'xlsx'), await reportXlsx(report, ready.school), {
-            name: 'Excel workbook',
-            extension: 'xlsx'
-          })
+        ? { name: 'CSV file', extension: 'csv' }
+        : { name: 'Excel workbook', extension: 'xlsx' }
+    )
     if (!path) return { ok: false, cancelled: true, message: '' }
-    recordReport(ready.report, 'exported', job.format)
+    const refused = recordReport(ready.report, 'exported', job.format)
+    if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
+    await writeOutput(path, bytes)
     return { ok: true, path }
   })
 }

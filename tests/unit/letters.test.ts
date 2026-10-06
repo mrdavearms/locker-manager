@@ -5,7 +5,13 @@ import { defaultLetterTemplate } from '../../src/main/letters/defaultTemplate'
 import { formatBody, formatLine } from '../../src/main/letters/text'
 import { buildLetters, pick, showsFor, type LetterItem } from '../../src/main/render/letter'
 import { prepareLetters } from '../../src/main/render/prepareLetters'
-import { markNeedsNewCode, lockForLocker } from '../../src/main/repos/codes'
+import {
+  issueCode,
+  lockForLocker,
+  markNeedsNewCode,
+  markResetDone
+} from '../../src/main/repos/codes'
+import { recordPrintJob } from '../../src/main/repos/labels'
 import {
   addImage,
   deleteImage,
@@ -168,6 +174,23 @@ describe('who gets a letter (SPEC.md 4.8)', () => {
       letterSet(db, { mode: 'student', studentId: all[3]!.studentId }, true).records
     ).toHaveLength(1)
     expect(letterSet(db, { mode: 'changed' }, true).records).toHaveLength(all.length)
+  })
+  it('brings back a held-back letter under "changed" once its lock is sorted out', async () => {
+    const { db, ctx } = await allocatedDemo()
+    const all = letterSet(db, { mode: 'all' }, true).records
+    const held = all[0]!
+    markNeedsNewCode(db, ctx, lockForLocker(db, held.lockerId)!.id)
+    // Every other letter is printed.
+    const printedIds = letterSet(db, { mode: 'all' }, true).records.map((r) => r.lockerId)
+    ctx.advance(60_000)
+    recordPrintJob(db, ctx, 'letters', printedIds)
+    expect(letterSet(db, { mode: 'changed' }, true).records).toHaveLength(0)
+    // The lock is reset and given a new code: its letter is due again.
+    ctx.advance(60_000)
+    markResetDone(db, ctx, lockForLocker(db, held.lockerId)!.id)
+    issueCode(db, ctx, lockForLocker(db, held.lockerId)!.id, 'issued')
+    const due = letterSet(db, { mode: 'changed' }, true).records.map((r) => r.lockerId)
+    expect(due).toEqual([held.lockerId])
   })
   it('renders the preview of one letter with every code hidden', async () => {
     const { db } = await allocatedDemo()

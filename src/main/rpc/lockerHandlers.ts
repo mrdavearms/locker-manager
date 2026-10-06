@@ -3,6 +3,7 @@ import {
   codeRules,
   setCodeRules,
   generateYearSet,
+  reserveSetForNextYear,
   listCodeSets,
   resetTasks,
   markResetDone,
@@ -89,6 +90,11 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
         schoolYearId: activeYearId(db),
         seed: p.seed
       })
+      // Lockers already given out: this set is for next year, kept until the rollover.
+      const out = db.get<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM assignment WHERE status = 'current'"
+      )?.n
+      if (Number(out ?? 0) > 0) reserveSetForNextYear(db, ctx, r.set)
       return { codes: r.codes, spares: r.spares, validCount: r.validCount, overHalf: r.overHalf }
     }
   },

@@ -98,6 +98,7 @@ export function describeAction(action: string): string {
     'file.rebuilt_from_export': 'Made this file from a portable export',
     'file.named_backup': 'Kept a named backup',
     'practice.started': 'Started a practice copy',
+    'practice.copied': 'Made a practice copy on their computer',
     'settings.imported': 'Brought in settings from a settings file',
     'rollover.started': 'Started the move to next year',
     'locks.reset_by_students': 'Recorded locks reset to 0 0 0 0 by students',

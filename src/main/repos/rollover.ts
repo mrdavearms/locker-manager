@@ -6,6 +6,7 @@ import type { LockerDb } from '../db/db'
 import { newId, stamp, type OperatorContext } from '../db/context'
 import { displayGroup } from '../import/groups'
 import { compareLockerNumbers } from '../locations/lockerNumbers'
+import { releaseReservedSets } from './codes'
 import { letterSet } from './letters'
 import { getSetting, setSetting } from './settings'
 import { groupMap } from './students'
@@ -231,6 +232,8 @@ export function archiveYear(
       $by: s.updated_by
     }
   )
+  // Code sets made for next year while lockers were out move into it.
+  releaseReservedSets(db, ctx, nextId)
   // A year code set made before the rollover, and never used, was made for next year.
   db.run(
     `UPDATE code_set SET school_year_id = $next, updated_at = $at, updated_by = $by

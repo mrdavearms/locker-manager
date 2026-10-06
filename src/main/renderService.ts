@@ -27,11 +27,13 @@ const OpenPdf = z.object({ path: z.string().min(1) })
 /** PDFs this session made; only these may be opened from the window. */
 const made = new Set<string>()
 
-/** Asks where to save, writes the file, and remembers it so the window may open it. */
-export async function saveOutput(
+type OutputFilter = { name: string; extension: string }
+const PDF: OutputFilter = { name: 'PDF', extension: 'pdf' }
+
+/** Asks where to save. Nothing is written yet, so a record can be made first. */
+export async function pickOutputPath(
   defaultName: string,
-  bytes: Uint8Array | string,
-  filter: { name: string; extension: string } = { name: 'PDF', extension: 'pdf' }
+  filter: OutputFilter = PDF
 ): Promise<string | null> {
   const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
   const opts = {
@@ -42,9 +44,24 @@ export async function saveOutput(
   const pick = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
   if (pick.canceled || !pick.filePath) return null
   const ext = `.${filter.extension}`
-  const path = pick.filePath.toLowerCase().endsWith(ext) ? pick.filePath : `${pick.filePath}${ext}`
+  return pick.filePath.toLowerCase().endsWith(ext) ? pick.filePath : `${pick.filePath}${ext}`
+}
+
+/** Writes a file chosen with pickOutputPath, and remembers it so the window may open it. */
+export async function writeOutput(path: string, bytes: Uint8Array | string): Promise<void> {
   await writeFile(path, bytes)
   made.add(path)
+}
+
+/** Asks where to save, writes the file, and remembers it so the window may open it. */
+export async function saveOutput(
+  defaultName: string,
+  bytes: Uint8Array | string,
+  filter: OutputFilter = PDF
+): Promise<string | null> {
+  const path = await pickOutputPath(defaultName, filter)
+  if (!path) return null
+  await writeOutput(path, bytes)
   return path
 }
 

@@ -341,3 +341,13 @@ skipping any that throw. History "Put back to before this…" (`src/main/restore
 reads the student or locker from the first backup after the change that does not yet hold
 its history line. Label QR links open the locker (`src/main/links.ts`). Landing page draft
 in `site/index.html`, not published (GitHub Pages needs Dave's yes).
+
+**Independent review fixes** (7 Oct 2026, before v0.9.0). Undo copies history rows into the
+older snapshot with foreign keys off, and puts the step back if it fails. Every file with
+codes is recorded first, then written (`pickOutputPath`, record, `writeOutput`). The
+whole-file export records every locker with a current, past or next-year code, plus one
+line for the spare pool (`lockersWithAnyCode`, `logReveal`). Letters "changed" is per
+locker, from `print_job.records`. A year code set made while lockers are out is reserved
+(setting `codes.reservedForNextYear`), skipped by `nextCodeFor`, and moved to the new year by
+`archiveYear`. A PIN change empties the undo list. A practice copy is recorded in the real
+file. Workbook import drops logo types the app does not make.

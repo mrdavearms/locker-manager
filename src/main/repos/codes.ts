@@ -160,7 +160,9 @@ function nextCodeFor(
   if (lock.locker_id && year) {
     const e = db.get<{ id: string; code_cipher: Uint8Array }>(
       `SELECT e.id, e.code_cipher FROM code_set_entry e JOIN code_set s ON s.id = e.code_set_id
-        WHERE s.purpose = 'year' AND s.school_year_id = $y AND e.locker_id = $l AND e.status = 'available' LIMIT 1`,
+        WHERE s.purpose = 'year' AND s.school_year_id = $y AND e.locker_id = $l AND e.status = 'available'
+          AND s.id NOT IN (SELECT value FROM json_each(COALESCE((SELECT value FROM settings WHERE key = 'codes.reservedForNextYear'), '[]')))
+        LIMIT 1`,
       { $y: year, $l: lock.locker_id }
     )
     const c = e ? decryptCode(key, e.code_cipher) : null
@@ -468,6 +470,7 @@ export function generateYearSet(
 }
 
 export function listCodeSets(db: LockerDb): CodeSetView[] {
+  const reserved = new Set(reservedSetIds(db))
   return db
     .all<{
       id: string
@@ -487,6 +490,7 @@ export function listCodeSets(db: LockerDb): CodeSetView[] {
       id: r.id,
       name: r.name,
       purpose: r.purpose,
+      forNextYear: reserved.has(r.id),
       schoolYear: r.label,
       total: Number(r.total),
       available: Number(r.available),
@@ -518,3 +522,88 @@ export function setFixedCode(
 }
 
 export { codeAt }
+
+/** Lockers with any code in the file: on the lock now, in its history, or in a code set. */
+export function lockersWithAnyCode(db: LockerDb): string[] {
+  return db
+    .all<{ locker_id: string }>(
+      `SELECT locker_id FROM lock WHERE locker_id IS NOT NULL AND code_cipher IS NOT NULL
+       UNION SELECT k.locker_id FROM code_history h JOIN lock k ON k.id = h.lock_id
+              WHERE k.locker_id IS NOT NULL AND h.code_cipher IS NOT NULL
+       UNION SELECT locker_id FROM code_set_entry WHERE locker_id IS NOT NULL`
+    )
+    .map((r) => r.locker_id)
+}
+
+/** Spare codes held in code sets, not tied to any locker. */
+export function spareCodeCount(db: LockerDb): number {
+  return Number(
+    db.get<{ n: number }>('SELECT COUNT(*) AS n FROM code_set_entry WHERE locker_id IS NULL')?.n ??
+      0
+  )
+}
+
+/** Records that codes left the app (SPEC.md 3.10). A null locker means the spare codes. */
+export function logReveal(
+  db: LockerDb,
+  ctx: OperatorContext,
+  lockerId: string | null,
+  where: 'screen' | 'letter' | 'export' | 'report'
+): void {
+  const holder = lockerId
+    ? db.get<{ student_id: string }>(
+        "SELECT student_id FROM assignment WHERE locker_id = $l AND status = 'current' LIMIT 1",
+        { $l: lockerId }
+      )
+    : undefined
+  const s = stamp(ctx)
+  db.run(
+    `INSERT INTO code_reveal_log (id, at, operator, machine, student_id, locker_id, revealed_in, created_at, updated_at, updated_by)
+     VALUES ($id, $at, $op, $m, $st, $l, $w, $at, $at, $op)`,
+    {
+      $id: newId(),
+      $at: s.created_at,
+      $op: ctx.operator,
+      $m: ctx.machine,
+      $st: holder?.student_id ?? null,
+      $l: lockerId,
+      $w: where
+    }
+  )
+}
+
+const RESERVED_KEY = 'codes.reservedForNextYear'
+
+/** Year code sets made while lockers are out: kept for next year, not used before it. */
+export function reservedSetIds(db: LockerDb): string[] {
+  const row = db.get<{ value: string }>('SELECT value FROM settings WHERE key = $k', {
+    $k: RESERVED_KEY
+  })
+  try {
+    const v: unknown = row ? JSON.parse(row.value) : []
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function reserveSetForNextYear(db: LockerDb, ctx: OperatorContext, setId: string): void {
+  setSetting(db, ctx, RESERVED_KEY, [...new Set([...reservedSetIds(db), setId])])
+}
+
+/** At the rollover: the reserved sets become the new year's. */
+export function releaseReservedSets(db: LockerDb, ctx: OperatorContext, newYearId: string): number {
+  const ids = reservedSetIds(db)
+  for (const id of ids)
+    db.run(
+      'UPDATE code_set SET school_year_id = $y, updated_at = $at, updated_by = $by WHERE id = $id',
+      {
+        $id: id,
+        $y: newYearId,
+        $at: ctx.now().toISOString(),
+        $by: ctx.operator
+      }
+    )
+  db.run('DELETE FROM settings WHERE key = $k', { $k: RESERVED_KEY })
+  return ids.length
+}

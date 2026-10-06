@@ -86,6 +86,8 @@ export interface CodeSetView {
   id: string
   name: string
   purpose: 'year' | 'spares'
+  /** Made while lockers were out: kept for next year (SPEC.md 4.10 step 5). */
+  forNextYear: boolean
   schoolYear: string | null
   total: number
   available: number

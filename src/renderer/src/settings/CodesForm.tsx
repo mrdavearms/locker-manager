@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
-import { RULE_TEXT, type CodeRules, type CodeRulesSummary } from '@shared/codes'
+import { DEFAULT_CODE_RULES, RULE_TEXT, type CodeRules, type CodeRulesSummary } from '@shared/codes'
 import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, Select, TextInput } from '@renderer/components/Field'
@@ -157,6 +157,18 @@ export function CodesForm(): React.JSX.Element {
             </p>
           </div>
         )}
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          {JSON.stringify(r) !== JSON.stringify(DEFAULT_CODE_RULES) && (
+            <Button
+              variant="ghost"
+              disabled={!canEdit}
+              onClick={() => setDraft(DEFAULT_CODE_RULES)}
+              data-testid="codes-reset"
+            >
+              Back to the recommended rules
+            </Button>
+          )}
+        </div>
         {draft && (
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setDraft(null)}>
@@ -177,7 +189,7 @@ export function CodesForm(): React.JSX.Element {
 
       <SectionCard
         title="Code sets"
-        description={`Make next year's codes in advance: one for every ${terms.locker.one.toLowerCase()}, never the same as its code before, plus spares for changes during the year.`}
+        description={`Make next year's codes in advance: one for every ${terms.locker.one.toLowerCase()}, never the same as its code before, plus spares for changes during the year. A set made while ${terms.locker.many.toLowerCase()} are given out is kept for next year and used when you start next year.`}
       >
         {summary && lockers + r.sparePoolSize > summary.validCount / 2 && (
           <div className="mb-4">
@@ -225,6 +237,11 @@ export function CodesForm(): React.JSX.Element {
                   <td className="py-1.5 font-semibold">{s.name}</td>
                   <td className="py-1.5">
                     {s.purpose === 'year' ? `Each ${terms.locker.one.toLowerCase()}` : 'Spares'}
+                    {s.forNextYear && (
+                      <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 text-xs text-brand">
+                        Kept for next year
+                      </span>
+                    )}
                   </td>
                   <td className="py-1.5 tabular-nums">{s.total}</td>
                   <td className="py-1.5 tabular-nums">{s.available}</td>

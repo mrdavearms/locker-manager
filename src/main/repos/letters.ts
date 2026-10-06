@@ -18,7 +18,7 @@ import { displayGroup } from '../import/groups'
 import { compareLockerNumbers } from '../locations/lockerNumbers'
 import { defaultLetterTemplate } from '../letters/defaultTemplate'
 import type { LetterImage, LetterItem, LetterSchool } from '../render/letter'
-import { lastPrintAt, parseLockerList } from './labels'
+import { parseLockerList } from './labels'
 import { getSchoolProfile, getTerms } from './school'
 import { getSetting, setSetting } from './settings'
 import { groupMap } from './students'
@@ -262,21 +262,32 @@ export function letterSet(
       chosen = rows.filter((r) => r.student_id === selection.studentId)
       break
     case 'changed': {
-      // New holders and new codes since the last letters were printed.
-      const since = lastPrintAt(db, 'letters')
-      if (since) {
-        const newCodes = new Set(
-          db
-            .all<{ lock_id: string }>(
-              'SELECT DISTINCT lock_id FROM code_history WHERE from_date > $s',
-              { $s: since }
-            )
-            .map((r) => r.lock_id)
-        )
-        chosen = rows.filter(
-          (r) => r.assigned_at > since || (r.lock_id !== null && newCodes.has(r.lock_id))
-        )
-      }
+      // Per locker: a letter is due when that locker has had no letter printed since
+      // its holder arrived or its code last changed. A letter held back for a reset
+      // stays due until it has been printed.
+      const printed = new Map(
+        db
+          .all<{ locker_id: string; at: string }>(
+            `SELECT j.value AS locker_id, MAX(p.printed_at) AS at
+               FROM print_job p, json_each(p.records) j
+              WHERE p.kind = 'letters' GROUP BY j.value`
+          )
+          .map((r) => [r.locker_id, r.at])
+      )
+      const codeFrom = new Map(
+        db
+          .all<{ lock_id: string; at: string }>(
+            'SELECT lock_id, MAX(from_date) AS at FROM code_history GROUP BY lock_id'
+          )
+          .map((r) => [r.lock_id, r.at])
+      )
+      chosen = rows.filter((r) => {
+        const last = printed.get(r.locker_id)
+        if (!last) return true
+        const code = r.lock_id ? (codeFrom.get(r.lock_id) ?? '') : ''
+        const since = code > r.assigned_at ? code : r.assigned_at
+        return last < since
+      })
       break
     }
   }

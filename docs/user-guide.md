@@ -144,6 +144,11 @@ Only the person editing the file can restore.
 Click **Close file** at the bottom right, or just close the window. Your changes are saved
 and other staff can then edit.
 
+## Find a setting
+
+At the top of **Settings**, type in **Search settings** (for example `PIN` or `labels`). Only
+the tabs that cover it stay, and the first one opens.
+
 ## Set up your school (first time only)
 
 When you start a new school file, Locker Manager opens **Set up your school**. Each step
@@ -317,8 +322,11 @@ repeated or doubled pairs (1212, 1122), years (1900 to 2099), one number away fr
 and codes starting with 0. The box underneath shows how many codes the rules allow and ten
 examples.
 
+**Back to the recommended rules** puts the lock makers' advice back if the rules were changed.
+
 **Code sets**: before a new year, click **Make the code set**. Every locker gets a code that
-is never the same as its old one, plus spare codes for changes during the year.
+is never the same as its old one, plus spare codes for changes during the year. A set made while lockers are given out is marked **Kept for next year**: new students
+during the year never use it, and it becomes next year's codes when you start next year.
 
 ## A new student arrives
 

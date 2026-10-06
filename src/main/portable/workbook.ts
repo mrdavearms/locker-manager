@@ -309,6 +309,14 @@ export async function importWorkbook(
           db.run(sql, params)
         }
       }
+      // Only picture types the app makes may come back in (a tampered workbook could
+      // otherwise carry markup into letters).
+      db.run(
+        "UPDATE school SET logo = NULL, logo_type = NULL WHERE logo_type IS NOT NULL AND logo_type NOT IN ('image/png','image/svg+xml','image/jpeg')"
+      )
+      db.run(
+        "UPDATE school SET logo_mono = NULL, logo_mono_type = NULL WHERE logo_mono_type IS NOT NULL AND logo_mono_type NOT IN ('image/png','image/svg+xml','image/jpeg')"
+      )
       if (!codesIncluded) {
         // Without codes, nobody knows what the locks are set to.
         db.run(

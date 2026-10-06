@@ -482,7 +482,7 @@ function changes(db: LockerDb, req: ReportRequest, terms: Terminology): BuiltRep
          LEFT JOIN student s ON h.entity = 'student' AND s.id = h.entity_id
          LEFT JOIN locker l ON h.entity = 'locker' AND l.id = h.entity_id
         WHERE h.at >= $since ORDER BY h.at, h.rowid`,
-      { $since: `${since}T00:00:00` }
+      { $since: new Date(`${since}T00:00:00`).toISOString() }
     )
     .map((r) => ({
       when: new Date(r.at).toLocaleString('en-AU', {

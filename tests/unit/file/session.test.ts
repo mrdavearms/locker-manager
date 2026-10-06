@@ -420,6 +420,39 @@ describe('conflicts (SPEC.md 6.4)', () => {
     expect(backups.some((b) => b.includes('my unsaved changes'))).toBe(true)
   })
 
+  it('undo past a record that a later history line points at still works', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    await dave.session.open(path)
+    // A bank and a locker, then a code reveal pointing at that locker.
+    dave.session.write({ action: 'lockers.added', entity: 'locker' }, (db) => {
+      db.run(
+        "INSERT INTO area (id, name, created_at, updated_at, updated_by) VALUES ('a1', 'SYNTHETIC Area', 'x', 'x', 'x')"
+      )
+      db.run(
+        "INSERT INTO bank (id, area_id, name, created_at, updated_at, updated_by) VALUES ('b1', 'a1', 'SYNTHETIC Bank', 'x', 'x', 'x')"
+      )
+      db.run(
+        "INSERT INTO locker (id, number, sort_key, bank_id, qr_id, created_at, updated_at, updated_by) VALUES ('l1', '1', '1', 'b1', 'q1', 'x', 'x', 'x')"
+      )
+    })
+    dave.session.write({ action: 'code.shown', entity: 'locker' }, (db) =>
+      db.run(
+        "INSERT INTO code_reveal_log (id, at, operator, machine, locker_id, revealed_in, created_at, updated_at, updated_by) VALUES ('r1', 'x', 'Dave', 'M', 'l1', 'screen', 'x', 'x', 'Dave')"
+      )
+    )
+    expect(await dave.session.undo()).toEqual({ ok: true })
+    expect(await dave.session.undo()).toEqual({ ok: true })
+    // The locker is gone; the reveal line is kept, as history always is.
+    expect(dave.session.read((db) => db.all('SELECT id FROM locker'))).toEqual([])
+    expect(
+      dave.session
+        .read((db) => db.all<{ id: string }>('SELECT id FROM code_reveal_log'))
+        .map((r) => r.id)
+    ).toEqual(['r1'])
+  })
+
   it('a vanished file is noticed and can be written back', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)

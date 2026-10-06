@@ -421,6 +421,8 @@ export class DataFileSession {
     })
     this.pushUndo(c, { bytes: before, action })
     c.redo = []
+    // A PIN change cannot be undone: that would let anyone at the computer remove it.
+    if (action.startsWith('privacy.pin')) c.undo = []
     c.journal.push({ action, at: ctx.now().toISOString(), replay })
     c.redoJournal = []
     this.markChanged()
@@ -464,26 +466,39 @@ export class DataFileSession {
       }
     const current = c.db.export()
     const next = await LockerDb.fromBytes(step.bytes)
-    next.transaction(() => {
-      for (const table of ['audit_log', 'code_reveal_log']) {
-        const have = new Set(next.all<{ id: string }>(`SELECT id FROM ${table}`).map((r) => r.id))
-        const cols = next.all<{ name: string }>(`PRAGMA table_info(${table})`).map((r) => r.name)
-        for (const row of c.db.all<Record<string, string | number | null>>(
-          `SELECT * FROM ${table}`
-        )) {
-          if (have.has(String(row.id))) continue
-          next.run(
-            `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((col) => `$${col}`).join(', ')})`,
-            Object.fromEntries(cols.map((col) => [`$${col}`, row[col] ?? null]))
-          )
+    try {
+      // History rows may point at students or lockers the older snapshot does not
+      // have yet; history is kept whole, so the link check is off while copying.
+      next.run('PRAGMA foreign_keys = OFF')
+      next.transaction(() => {
+        for (const table of ['audit_log', 'code_reveal_log']) {
+          const have = new Set(next.all<{ id: string }>(`SELECT id FROM ${table}`).map((r) => r.id))
+          const cols = next.all<{ name: string }>(`PRAGMA table_info(${table})`).map((r) => r.name)
+          for (const row of c.db.all<Record<string, string | number | null>>(
+            `SELECT * FROM ${table}`
+          )) {
+            if (have.has(String(row.id))) continue
+            next.run(
+              `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((col) => `$${col}`).join(', ')})`,
+              Object.fromEntries(cols.map((col) => [`$${col}`, row[col] ?? null]))
+            )
+          }
         }
-      }
-      appendAudit(next, this.ctx(), {
-        action: kind === 'undo' ? 'undo' : 'redo',
-        entity: 'file',
-        reason: step.action
+        appendAudit(next, this.ctx(), {
+          action: kind === 'undo' ? 'undo' : 'redo',
+          entity: 'file',
+          reason: step.action
+        })
       })
-    })
+      next.run('PRAGMA foreign_keys = ON')
+    } catch (error) {
+      next.close()
+      from.push(step)
+      return {
+        ok: false,
+        message: `That could not be ${kind === 'undo' ? 'undone' : 'redone'}: ${error instanceof Error ? error.message : String(error)}`
+      }
+    }
     to.push({ bytes: current, action: step.action })
     if (kind === 'undo') {
       const j = c.journal.pop()
