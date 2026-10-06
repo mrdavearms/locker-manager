@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 7 October 2026 (v0.9.0 released; 1.0 waits for Dave's hand checks)._
+_Last updated: 7 October 2026 (v0.10.0 released; 1.0 waits for Dave's hand checks)._
 
 ## What this is
 
