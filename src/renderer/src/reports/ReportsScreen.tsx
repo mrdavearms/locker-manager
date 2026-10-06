@@ -293,7 +293,7 @@ export function ReportsScreen(): React.JSX.Element {
 
           <SectionCard
             title="Export everything"
-            description="The whole file as one Excel workbook: a sheet for each part, readable by people. Keep it as an archive, or use it to move to another system. It can be turned back into a data file (File, New file from a portable export)."
+            description="The whole file as one Excel workbook: a sheet for each part, readable by people. Keep it as an archive, or use it to move to another system. It can be turned back into a data file from the Welcome screen."
           >
             <label className="flex items-center gap-2 text-sm">
               <input

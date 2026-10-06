@@ -44,12 +44,13 @@ type Row = {
   locker_id: string | null
   locker_number: string | null
   excluded_reason: string | null
+  custom: string | null
 }
 
 const SELECT = `
   SELECT s.id, s.external_id, s.first_name, s.last_name, s.preferred_name, s.first_name_raw, s.last_name_raw,
          s.name_override, s.name_check, s.year_level, s.group_code, s.house, s.needs_accessible, s.active,
-         s.left_at, s.not_in_import_since,
+         s.left_at, s.not_in_import_since, s.custom,
          l.id AS locker_id, l.number AS locker_number,
          COALESCE(
            (SELECT e.reason FROM exclusion e WHERE e.kind = 'student' AND e.value = s.external_id),
@@ -89,8 +90,22 @@ function toView(r: Row, map: Record<string, string>): StudentView {
     leftAt: r.left_at,
     notInImportSince: r.not_in_import_since,
     locker: r.locker_id && r.locker_number ? { id: r.locker_id, number: r.locker_number } : null,
-    excludedReason: r.excluded_reason
+    excludedReason: r.excluded_reason,
+    language: languageOf(r.custom)
   }
+}
+
+function languageOf(custom: string | null): string | null {
+  try {
+    const v: unknown = JSON.parse(custom || '{}')
+    if (v && typeof v === 'object' && 'language' in v) {
+      const l = (v as { language: unknown }).language
+      return typeof l === 'string' ? l : null
+    }
+  } catch {
+    return null
+  }
+  return null
 }
 
 const FILTERS: Record<StudentFilter, string> = {

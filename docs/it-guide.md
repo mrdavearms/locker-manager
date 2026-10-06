@@ -139,6 +139,26 @@ kept as a named backup first.
 - Labels use the Arimo typeface (SIL Open Font Licence), shipped inside the app, so names
   measure and print the same on Windows and macOS. No fonts are installed on the computer.
 
+## Letters, reports and exports
+
+- Letters, reports and exports are made by the app itself. No Word, mail merge or Excel is
+  needed to make them.
+- Anything containing lock codes (letters, the master list, a reset list with codes, a
+  whole-file export with codes) can only be produced by the person editing the file. Every
+  code is recorded in the file's code reveal log with the operator's name and computer.
+- Before saving letters, the app measures every letter and refuses to save if any would
+  run onto a second page, then checks the PDF has exactly one page per letter.
+- CSV exports start with a byte order mark so Excel reads accented names, and cells that
+  start with `=`, `+`, `-` or `@` are prefixed with an apostrophe so they never run as
+  formulas.
+- The whole-file export is an Excel workbook with a "Read me" sheet, a "Lockers" summary,
+  one sheet per database table, and a "Files" sheet holding pictures in base64 pieces. The
+  key that protects codes in the data file is never exported. Codes are included as plain
+  text only if the person exporting ticks the box. Rebuilding a data file from the workbook
+  makes a new file with its own identity and a new key; the original data file is not
+  touched.
+- Pictures for letters are stored inside the data file (PNG, JPEG or SVG, up to 3 MB each).
+
 ## Other files on each computer
 
 | What | Windows | macOS |

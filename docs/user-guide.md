@@ -412,3 +412,105 @@ In **Settings**, **Labels**, **Label layout** shows the first locker, enlarged.
   this, so a slightly misaligned printer never cuts anything off.
 - **Logo**: one colour suits black-and-white printers. Colour uses your full logo.
 - **Start again from the standard layout** undoes all of your changes to the layout.
+
+## Print letters
+
+Each student with a locker gets a one-page letter with their locker number and code.
+
+1. Click **Letters** in the left-hand menu.
+2. Under **Which letters**, choose every student, one Homeroom, one bank, chosen locker
+   numbers, or **New lockers and codes since the last letters**.
+3. Check the preview. Use **Next** and **Previous** to look through the letters. Codes show
+   as dots on screen; the real codes are in the PDF.
+4. Wait for **Every letter fits on one page.**
+5. Click **Save as PDF…** (best) or **Print…**. Print at **Actual size** (100%).
+
+**Letters print only while the file is open for editing.** Every code that is printed is
+recorded in the history with your name. If someone else is editing, wait until they close
+the file.
+
+**Held back**: a letter is held back while its lock still needs sorting out, for example
+when it needs a new code or must be reset first. The yellow message lists them. Deal with
+them under **Locks to reset** on Home, then print their letters.
+
+**Spare lockers never get a letter.**
+
+**One student's letter**: find the student, then click **Save their letter as PDF…** in
+their panel.
+
+## Change the letter
+
+Go to **Settings**, then **Letters**.
+
+**A letter is built from sections**, top to bottom: a heading band, a colour stripe, the
+student's name, locker and code, then blocks of words and pictures. You choose the sections
+and write the words. The app does the layout. This keeps **every letter to exactly one
+page**, so each student's letter comes off the printer on its own sheet. If any letter would
+run onto a second page, the app names it and prints nothing until you shorten it.
+
+1. Click a section in the list to change it. The preview updates as you type.
+2. **Show this section for** decides which students see it. For example, **Set your code**
+   is only for locks whose code can be set, and **Your key** only for keyed locks.
+3. In **Words**:
+   - a blank line starts a new paragraph
+   - start a line with `-` for a bullet point, or `1.` for a numbered step
+   - put `**two stars**` around words to make them bold
+   - click a detail, such as **Locker number**, to put each student's own detail in
+4. Use the arrows to move a section up or down. **Add a section…** adds one.
+5. Click **Check every letter fits**, then **Save the letter**.
+
+**Start again from the standard letter** undoes all your changes. The standard letter has
+no footer or credit line: your school's name is the only sign-off.
+
+## Add pictures to letters
+
+The app comes with no pictures. To show the steps from your lock maker's instructions:
+
+1. In **Settings**, **Letters**, click **Add a picture…** and choose a PNG, JPEG or SVG file
+   (up to 3 MB).
+2. Click a section of words, choose the picture under **Picture**, and choose its side and
+   width.
+
+## Letters in other languages
+
+1. In **Settings**, **Letters**, under **Languages**, type the language name (for example
+   Tiếng Việt) and a short code (for example `vi`), then click **Add**.
+2. Click the language under **Words in:** and type the words for each section. Words you
+   leave empty are printed in English.
+3. Set a student's language in their panel on the Students screen (**Letter in…**).
+4. When printing, choose one language for everyone, or **Each student's own language**.
+
+## Lists and reports
+
+Click **Reports** in the left-hand menu, then choose a report:
+
+- **Group lists for teachers**: each Homeroom on its own page. No codes.
+- **Master list with codes**: every locker, student and code.
+- **Lockers by bank**: every locker, including spares and those out of service.
+- **Locks to reset**: a tick list for whoever has the master key. Tick **Include the new
+  codes** if they need to set locks to new codes.
+- **End-of-year reset checklist**: each Homeroom on its own page, so students can reset their
+  own lock to 0 0 0 0 on their last day.
+- **Sign-off sheet**: students sign that they received their letter.
+- **Key register**: keyed locks and keys not yet returned.
+- **Changes since a date**: everything changed in the file since a date you choose.
+
+Then click **Save as PDF…**, **Print…**, **Excel…** or **CSV…**.
+
+**Reports with codes** are marked CONFIDENTIAL. Tick **I understand** first. They print
+only while the file is open for editing, because every code printed or exported is
+recorded. Keep the paper locked away and shred it when finished.
+
+## Export the whole file
+
+At the bottom of **Reports**, **Export the whole file…** saves everything in one Excel
+workbook: a summary of lockers, then a sheet for each part of the file. Keep it as an
+archive, or use it to move to another system.
+
+Lock codes are left out unless you tick **Include lock codes**. With codes, the workbook is
+CONFIDENTIAL and every code is recorded.
+
+**To make a new data file from an export**: close the open file, then on the Welcome screen
+click **Make a new file from it…**. Choose the workbook, then where to save the new file.
+The workbook is never changed. If the export had no codes, every lock is marked as needing a
+new code.

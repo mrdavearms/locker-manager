@@ -20,6 +20,8 @@ export interface StudentView {
   notInImportSince: string | null
   locker: { id: string; number: string } | null
   excludedReason: string | null
+  /** Language code for their letter, if set (SPEC.md 5.2). */
+  language: string | null
 }
 
 export type StudentFilter =

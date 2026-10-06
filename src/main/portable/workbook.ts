@@ -129,7 +129,7 @@ export async function exportWorkbook(db: LockerDb, info: ExportInfo): Promise<Ui
     ],
     [
       'Bringing it back',
-      'In Locker Manager, choose File, then "New file from a portable export". Do not rename the sheets or the first-row column names, or that will not work.'
+      'In Locker Manager, close any open file, then on the Welcome screen click "Make a new file from it". Do not rename the sheets or the first-row column names, or that will not work.'
     ],
     [
       'Keep it safe',

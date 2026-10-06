@@ -111,6 +111,20 @@ export function WelcomeScreen({ onNew, onError }: Props): React.JSX.Element {
         ))}
       </ul>
 
+      <p className="mt-5 text-sm text-ink-muted">
+        Have a portable export from Locker Manager?{' '}
+        <button
+          type="button"
+          disabled={busy}
+          className="font-semibold text-brand underline-offset-2 hover:underline"
+          data-testid="file-from-export"
+          onClick={() => void act(() => window.api.fileFromExport())}
+        >
+          Make a new file from it…
+        </button>{' '}
+        The workbook itself is never changed.
+      </p>
+
       {recent.length > 0 && (
         <section className="mt-10 animate-rise" aria-labelledby="recent-heading">
           <h2 id="recent-heading" className="flex items-center gap-2 text-lg font-semibold">

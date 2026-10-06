@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 6 October 2026 (M4 built, releasing as v0.4.0)._
+_Last updated: 7 October 2026 (M6 built, releasing as v0.6.0)._
 
 ## What this is
 
@@ -128,6 +128,16 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     re-applies the pragmas after each export; never keep a prepared statement across a save.
     JSON functions are available. `initSqlJs()` with no options finds its own WASM file,
     including inside the packaged app's asar, so sql.js must stay in `dependencies`.
+14. **Letters are built from sections, not free rich text** (explained to Dave 6 Oct 2026,
+    and shown to staff at the top of Settings, Letters). A template is an ordered list of
+    blocks (heading band, stripe, student panel, words, picture, space), each shown for all
+    locks or one kind, with words per language. This keeps every letter to one page and
+    makes the WHS layout the default. Words use a tiny format: blank line, `- `, `1. `,
+    `**bold**`, `{merge_field}`.
+15. **Anything with codes prints or exports only in edit mode** (Dave, 7 Oct 2026). Every
+    code that leaves the app is written to `code_reveal_log`, which needs a write. The rule
+    is stated next to every print button that can carry codes, in the user guide and in
+    the IT guide. The screen never shows codes in previews; they are masked.
 
 ## Known, accepted
 
@@ -222,6 +232,11 @@ All data reads and writes from the window go through ONE channel, `rpc`:
   (setting) gives the display ("7A").
 - Import presets live in `src/shared/importPresets.ts` so the window can re-match columns
   instantly when the operator picks another header row.
+- `codeKey(db)` CREATES the key if the file has none. Inside `session.read` use
+  `readCodeKey(db)` instead, or a read silently changes the file.
+- Letters are measured in a hidden window with JavaScript on (`overflowingLetters` in
+  `src/main/render/pdf.ts`); the page itself carries a CSP that forbids scripts. Labels and
+  PDFs are rendered with JavaScript off.
 - Never pipe `curl` into `grep -q` in a workflow: grep stops early, curl reports a write
   failure, and pipefail fails the step even though the text was found.
 
@@ -276,3 +291,15 @@ covers the low-printing problem. Golden image tests/golden/labels-L7163-sheet1.p
 checked on macOS only (fonts render differently on Windows); the e2e test checks text
 positions in the PDF with pdf.js on every platform. Releasing as v0.5.0. Next: M6 letters
 and reports.
+
+**M6: letters, reports and exports.** Built 6 and 7 Oct 2026. Migration 003 adds the
+`image` table (school's own pictures). Letters: `src/shared/letters.ts` (model),
+`src/main/letters/` (standard template, word format), `src/main/render/letter.ts` (HTML in
+mm), `src/main/repos/letters.ts` (who gets a letter, held back reasons, languages via
+`student.custom.language`), `src/main/documentService.ts` (save, print, overflow check,
+page count check, reveal log). Reports: `src/shared/reports.ts`, `src/main/reports/build.ts`
+(eight reports), `src/main/render/report.ts` (tables, CONFIDENTIAL watermark, page-number
+footer), `src/main/reports/export.ts` (CSV with BOM and formula guard, XLSX). Whole-file
+export and rebuild: `src/main/portable/workbook.ts`. Screens: Letters, Reports, Settings
+Letters (designer), student panel letter and language. Releasing as v0.6.0. Next: M7 year
+rollover and key register.

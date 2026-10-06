@@ -258,10 +258,12 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
             >
               <Printer size={18} aria-hidden /> Print…
             </Button>
-            <p className="text-xs text-ink-muted">
+            <p className="text-xs text-ink-muted" data-testid="letters-rule">
+              Letters print only while the file is open for editing, because every code printed is
+              recorded in the history with your name.{' '}
               {canEdit
-                ? 'Every code printed is recorded in the history. Print at Actual size (100%).'
-                : 'The file is open read-only. Letters carry codes, and every printed code is recorded, so open the file for editing to print them.'}
+                ? 'Print at Actual size (100%).'
+                : 'The file is open read-only on this computer, so wait until the person editing closes it.'}
             </p>
           </div>
           {saved && (

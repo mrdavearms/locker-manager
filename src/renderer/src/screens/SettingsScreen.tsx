@@ -3,12 +3,13 @@ import { cn } from '@renderer/lib/cn'
 import { useTerms } from '@renderer/lib/appContext'
 import { CodesForm } from '@renderer/settings/CodesForm'
 import { LabelsForm } from '@renderer/settings/LabelsForm'
+import { LettersForm } from '@renderer/settings/LettersForm'
 import { LocationsEditor } from '@renderer/settings/LocationsEditor'
 import { LocksForm } from '@renderer/settings/LocksForm'
 import { SchoolForm } from '@renderer/settings/SchoolForm'
 import { TermsForm } from '@renderer/settings/TermsForm'
 
-type Tab = 'school' | 'terms' | 'locations' | 'locks' | 'codes' | 'labels'
+type Tab = 'school' | 'terms' | 'locations' | 'locks' | 'codes' | 'labels' | 'letters'
 
 /** SPEC.md section 7, grouped into tabs. More tabs arrive with later features. */
 export type SettingsTab = Tab
@@ -22,7 +23,8 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
     { id: 'locations', label: `${terms.area.many} and ${terms.locker.many.toLowerCase()}` },
     { id: 'locks', label: 'Locks' },
     { id: 'codes', label: 'Lock codes' },
-    { id: 'labels', label: 'Labels' }
+    { id: 'labels', label: 'Labels' },
+    { id: 'letters', label: 'Letters' }
   ]
   return (
     <div className="w-full space-y-6 px-6 py-8">
@@ -56,6 +58,7 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
         {tab === 'locks' && <LocksForm />}
         {tab === 'codes' && <CodesForm />}
         {tab === 'labels' && <LabelsForm />}
+        {tab === 'letters' && <LettersForm />}
       </div>
     </div>
   )

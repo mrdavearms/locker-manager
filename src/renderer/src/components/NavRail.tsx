@@ -14,6 +14,7 @@ export type Screen =
   | 'history'
   | 'settings'
   | 'settings-labels'
+  | 'settings-letters'
   | 'setup'
 
 /** The left-hand menu while a file is open. Every item has a text label. */
@@ -49,7 +50,8 @@ export function NavRail({
                 screen === id ||
                 (screen === 'import' && id === 'students') ||
                 (screen === 'allocate' && id === 'lockers') ||
-                (screen === 'settings-labels' && id === 'settings')
+                ((screen === 'settings-labels' || screen === 'settings-letters') &&
+                  id === 'settings')
                   ? 'page'
                   : undefined
               }

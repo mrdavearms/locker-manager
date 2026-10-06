@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeftRight, DoorOpen, KeyRound, MoveRight, UserMinus } from 'lucide-react'
+import { ArrowLeftRight, DoorOpen, KeyRound, Mail, MoveRight, UserMinus } from 'lucide-react'
 import type { StudentView } from '@shared/students'
 import { Button } from '@renderer/components/Button'
 import { CodeBoxes, CodeReveal } from '@renderer/components/CodeReveal'
@@ -175,6 +175,7 @@ export function StudentLockerCard({
               <UserMinus size={15} aria-hidden /> Has left…
             </Button>
           </div>
+          <StudentLetter s={s} />
         </>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
@@ -422,5 +423,69 @@ export function ResetList(): React.JSX.Element | null {
         ))}
       </ul>
     </section>
+  )
+}
+
+/**
+ * One student's letter, and the language it is written in (SPEC.md 4.8 and 5.2).
+ * Letters carry codes, and every printed code is recorded, so this needs editing.
+ */
+function StudentLetter({ s }: { s: StudentView }): React.JSX.Element {
+  const canEdit = useCanEdit()
+  const act = useAction()
+  const { data: template } = useRpc('letters.template.get', {})
+  const [saved, setSaved] = useState<string | null>(null)
+  const languages = template?.languages ?? []
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={!canEdit}
+        data-testid="student-letter"
+        title={
+          canEdit
+            ? undefined
+            : 'Letters show codes, so they print only while the file is open for editing.'
+        }
+        onClick={() =>
+          void act(async () => {
+            const r = await window.api.lettersPdf({
+              selection: { mode: 'student', studentId: s.id },
+              language: { kind: 'each' }
+            })
+            if (r.ok) setSaved(r.path ?? null)
+            else if (!r.cancelled) throw new Error(r.message)
+          })
+        }
+      >
+        <Mail size={15} aria-hidden /> Save their letter as PDF…
+      </Button>
+      {languages.length > 1 && (
+        <Select
+          aria-label="Letter language"
+          className="w-auto"
+          disabled={!canEdit}
+          value={s.language ?? ''}
+          onChange={(e) =>
+            void act(() =>
+              call('students.setLanguage', { studentId: s.id, code: e.target.value || null })
+            )
+          }
+        >
+          <option value="">Letter in {languages[0]!.name}</option>
+          {languages.slice(1).map((l) => (
+            <option key={l.code} value={l.code}>
+              Letter in {l.name}
+            </option>
+          ))}
+        </Select>
+      )}
+      {saved && (
+        <Button size="sm" variant="ghost" onClick={() => void window.api.openPdf(saved)}>
+          Open it
+        </Button>
+      )}
+    </div>
   )
 }

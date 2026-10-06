@@ -226,13 +226,15 @@ export function App(): React.JSX.Element {
                 ) : screen === 'print' ? (
                   <PrintLabelsScreen onSettings={() => setScreen('settings-labels')} />
                 ) : screen === 'letters' ? (
-                  <LettersScreen onDesign={() => setScreen('settings')} />
+                  <LettersScreen onDesign={() => setScreen('settings-letters')} />
                 ) : screen === 'reports' ? (
                   <ReportsScreen />
                 ) : screen === 'settings' ? (
                   <SettingsScreen />
                 ) : screen === 'settings-labels' ? (
                   <SettingsScreen initialTab="labels" />
+                ) : screen === 'settings-letters' ? (
+                  <SettingsScreen initialTab="letters" />
                 ) : screen === 'setup' ? (
                   <SetupWizard onFinish={() => setScreen('home')} />
                 ) : (
