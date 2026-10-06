@@ -1,0 +1,68 @@
+name: Update proof
+
+# Every release must prove the previous release updates to it (SPEC.md 14).
+# Runs by itself when the Release workflow finishes, and can be started by hand
+# for any published release (Actions tab, "Update proof", "Run workflow").
+# workflow_run always uses this file from main, so fixes apply to old releases too.
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to prove, for example v0.1.0'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    name: Prove ${{ matrix.name }} updates to ${{ github.event.inputs.tag || github.event.workflow_run.head_branch }}
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: macOS
+    runs-on: ${{ matrix.os }}
+    env:
+      NEW_TAG: ${{ github.event.inputs.tag || github.event.workflow_run.head_branch }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Find the release before it
+        id: prev
+        shell: bash
+        run: |
+          PREV=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,isDraft \
+            --jq '.[] | select(.isDraft | not) | .tagName' | sort -V | awk -v t="$NEW_TAG" '$0 == t { print prev; exit } { prev = $0 }')
+          echo "previous=$PREV" >> "$GITHUB_OUTPUT"
+          echo "Proving $NEW_TAG; previous release: ${PREV:-none}"
+      - name: Wait until GitHub's release feed lists the release
+        if: steps.prev.outputs.previous != ''
+        shell: bash
+        run: |
+          for i in $(seq 1 60); do
+            # Read the whole feed first: piping curl into grep -q makes curl fail
+            # with "Failure writing output" when grep stops early.
+            FEED=$(curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/releases.atom" || true)
+            if grep -q "releases/tag/${NEW_TAG}" <<< "$FEED"; then echo "Feed lists $NEW_TAG"; exit 0; fi
+            sleep 5
+          done
+          echo "::error::The release feed never listed $NEW_TAG"; exit 1
+      - name: Prove the update (Windows)
+        if: runner.os == 'Windows' && steps.prev.outputs.previous != ''
+        shell: pwsh
+        env:
+          PREV_TAG: ${{ steps.prev.outputs.previous }}
+        run: ./scripts/update-proof/windows.ps1
+      - name: Prove the update (macOS)
+        if: runner.os == 'macOS' && steps.prev.outputs.previous != ''
+        env:
+          PREV_TAG: ${{ steps.prev.outputs.previous }}
+        run: ./scripts/update-proof/mac.sh

@@ -60,6 +60,7 @@ export function parseBackupName(
 }
 
 const DAY = 24 * 60 * 60 * 1000
+const HOUR = 60 * 60 * 1000
 
 function localDayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
@@ -76,8 +77,9 @@ function weekKey(d: Date): number {
  * Pure: which backups to delete. Keeps everything from the last keepAllDays, the
  * newest of each day up to dailyDays, then the newest of each week. Named
  * backups ("before update to 1.4.0") are kept regardless of age. Then, while over
- * the size cap, deletes the oldest unnamed, then the oldest named. The newest
- * backup is never deleted.
+ * the size cap: thins recent bursts (older than an hour) to one per 10 minutes,
+ * then deletes the oldest unnamed, then the oldest named. The newest backup is
+ * never deleted.
  */
 export function planPrune(
   entries: readonly BackupEntry[],
@@ -111,6 +113,24 @@ export function planPrune(
   const newest = sorted[0]?.name
   let total = sorted.filter((e) => keep.has(e.name)).reduce((n, e) => n + e.size, 0)
   const oldestFirst = [...sorted].reverse()
+  // Over the cap: first thin bursts of recent saves to one per 10 minutes (keeping
+  // the last hour whole), so a busy day never pushes out months of history.
+  if (total > policy.maxBytes) {
+    const seenSlots = new Set<number>()
+    for (const e of sorted) {
+      if (total <= policy.maxBytes) break
+      if (!keep.has(e.name) || e.label !== null || e.name === newest) continue
+      const age = now.getTime() - e.at.getTime()
+      if (age < HOUR || age >= policy.keepAllDays * DAY) continue
+      const slot = Math.floor(e.at.getTime() / (10 * 60 * 1000))
+      if (seenSlots.has(slot)) {
+        keep.delete(e.name)
+        total -= e.size
+      } else {
+        seenSlots.add(slot)
+      }
+    }
+  }
   for (const pass of ['unnamed', 'named'] as const) {
     for (const e of oldestFirst) {
       if (total <= policy.maxBytes) break
