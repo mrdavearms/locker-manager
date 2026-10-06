@@ -113,6 +113,14 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
 9. **Playwright launches the project folder** (`electron.launch({ args: ['.'] })`), not the
    built file, so Electron reads package.json and `app.getVersion()` is ours.
 
+## Known, accepted
+
+- `npm audit` reports sprintf-js (moderate, denial of service) through electron-builder's
+  own dependencies. It runs only on the build machine and is not inside the shipped app.
+  No fixed electron-builder exists as of 6 Oct 2026; re-check after each electron-builder bump.
+- The renderer bundle is about 870 kB. Loaded from disk inside Electron this is
+  instant; look at it only if start-up ever feels slow.
+
 ## Lessons carried over from Dave's other desktop apps
 
 From `~/Antigravity/redaction tool/CLAUDE.md` and `~/Antigravity/jacks iep generator/`:
