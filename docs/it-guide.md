@@ -59,6 +59,14 @@ Allow outbound HTTPS (port 443) to:
 
 The app uses the system proxy. Nothing else is contacted.
 
+## Importing students
+
+Staff import exports from the school's student system (CSV in UTF-8, UTF-16 or Windows-1252;
+XLSX; XLS; ODS; or a table pasted from Excel). Files are read on the computer and are not
+copied anywhere: their rows go into the data file only when the operator applies the import.
+Nothing is sent over the network. Column choices are remembered in the data file, keyed by
+the export's heading row.
+
 ## The data file
 
 Each school has one data file ending in `.lockers`: a SQLite database (journal mode

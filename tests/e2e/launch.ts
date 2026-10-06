@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
@@ -49,10 +49,13 @@ export function sharedFolder(): string {
   return mkdtempSync(join(tmpdir(), 'lockers-e2e-share-'))
 }
 
-/** Copies the SYNTHETIC demo-shaped fixture into place as a school's data file. */
+/** Copies the newest SYNTHETIC demo-shaped fixture into place as a school's data file. */
 export function placeFixture(folder: string, name = 'Locker data.lockers'): string {
   const path = join(folder, name)
-  copyFileSync(resolve('tests/fixtures/schema/v1-SYNTHETIC.lockers'), path)
+  const newest = readdirSync(resolve('tests/fixtures/schema'))
+    .filter((f) => /^v\d+-SYNTHETIC\.lockers$/.test(f))
+    .sort((a, b) => Number(/\d+/.exec(b)![0]) - Number(/\d+/.exec(a)![0]))[0]!
+  copyFileSync(resolve('tests/fixtures/schema', newest), path)
   return path
 }
 

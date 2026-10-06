@@ -52,19 +52,19 @@ export class LockerDb {
     this.raw.exec(sql)
   }
 
-  all<T extends Row = Row>(sql: string, params?: BindParams): T[] {
+  all<T extends object = Row>(sql: string, params?: BindParams): T[] {
     const stmt = this.raw.prepare(sql)
     try {
       if (params !== undefined) stmt.bind(params)
       const rows: T[] = []
-      while (stmt.step()) rows.push(stmt.getAsObject() as T)
+      while (stmt.step()) rows.push(stmt.getAsObject() as unknown as T)
       return rows
     } finally {
       stmt.free()
     }
   }
 
-  get<T extends Row = Row>(sql: string, params?: BindParams): T | undefined {
+  get<T extends object = Row>(sql: string, params?: BindParams): T | undefined {
     return this.all<T>(sql, params)[0]
   }
 

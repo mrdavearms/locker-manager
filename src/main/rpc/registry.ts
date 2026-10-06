@@ -20,13 +20,13 @@ export type Handler<M extends RpcMethod> =
       audit: (p: Params<M>, result: RpcResults[M]) => AuditEntry
       run: (db: LockerDb, ctx: OperatorContext, p: Params<M>) => RpcResults[M]
     }
-  /** Needs no open file (pure calculation). */
-  | { kind: 'pure'; run: (p: Params<M>) => RpcResults[M] }
+  /** Needs no open file; may be asynchronous (for example reading an Excel file). */
+  | { kind: 'pure'; run: (p: Params<M>) => RpcResults[M] | Promise<RpcResults[M]> }
 
 export type Handlers = { [M in RpcMethod]: Handler<M> }
 
 export function registerRpc(session: () => DataFileSession, handlers: Handlers): void {
-  ipcMain.handle(channels.rpc, (_event, method: unknown, raw: unknown) => {
+  ipcMain.handle(channels.rpc, async (_event, method: unknown, raw: unknown) => {
     if (!isRpcMethod(method)) return { ok: false, message: 'Unknown request.' }
     const parsed = rpcParams[method].safeParse(raw ?? {})
     if (!parsed.success) {
@@ -38,7 +38,7 @@ export function registerRpc(session: () => DataFileSession, handlers: Handlers):
     }
     const h = handlers[method] as Handler<RpcMethod>
     try {
-      if (h.kind === 'pure') return { ok: true, value: h.run(parsed.data as never) }
+      if (h.kind === 'pure') return { ok: true, value: await h.run(parsed.data as never) }
       const s = session()
       if (h.kind === 'read')
         return { ok: true, value: s.read((db) => h.run(db, parsed.data as never)) }

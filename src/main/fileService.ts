@@ -27,6 +27,7 @@ import { createDemoDatabase } from './demo/demoSchool'
 import { nodeFs } from './file/fsPort'
 import { DataFileSession } from './file/session'
 import { machineName, Preferences, suggestedOperatorName } from './prefs/preferences'
+import { savedMappings, setSavedMappingsReader } from './rpc/studentHandlers'
 
 // Connects the Electron-free DataFileSession to dialogs, the window and IPC.
 // No student data is ever logged (SPEC.md 8.1): only actions and outcomes.
@@ -85,6 +86,9 @@ export async function initFileService(): Promise<void> {
 export function fileSession(): DataFileSession {
   return session
 }
+
+/** Mappings remembered in the open file, for the import screen (empty if none open). */
+setSavedMappingsReader(() => (session?.isOpen ? session.read((db) => savedMappings(db)) : {}))
 
 function focusedWindow(): BrowserWindow | undefined {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]

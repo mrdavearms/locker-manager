@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 6 October 2026 (M2 built, releasing as v0.2.0)._
+_Last updated: 6 October 2026 (M3 built, releasing as v0.3.0)._
 
 ## What this is
 
@@ -206,6 +206,13 @@ All data reads and writes from the window go through ONE channel, `rpc`:
 - Prettier reflows long lines, so scripted find-and-replace edits against source often miss.
   Use the Edit tool on freshly read text.
 - Windows reports an installed app's version with four parts (0.1.0.0).
+- Node's `TextDecoder('windows-1252')` is really Latin-1: it turns Excel's curly apostrophe
+  (0x92) into a control character. `src/main/import/decode.ts` maps 0x80 to 0x9F by hand.
+- Year levels are stored as plain text numbers ("7"), never "Year 7"; screens add the
+  terminology word. Groups are stored as the export code ("07A"); `groups.displayMap`
+  (setting) gives the display ("7A").
+- Import presets live in `src/shared/importPresets.ts` so the window can re-match columns
+  instantly when the operator picks another header row.
 - Never pipe `curl` into `grep -q` in a workflow: grep stops early, curl reports a write
   failure, and pipefail fails the step even though the text was found.
 
@@ -223,4 +230,13 @@ and Mac (download page offered).
 automatic mono version (with the white-on-transparent warning), terminology presets,
 areas, banks, bulk locker builder with preview, the Lockers screen, out of service,
 reserve, accessible, shared lockers, the deliberate Renumber tool, lock kinds per bank.
-Releasing as v0.2.0. Next: M3 import.
+v0.2.0 released; update proof passed automatically on Windows and Mac.
+
+**M3: import.** Built 6 Oct 2026: CSV (any delimiter, BOM, UTF-16, Windows-1252), XLSX
+(exceljs), XLS and ODS (SheetJS from cdn.sheetjs.com, not npm), pasted tables; header-row
+detection; presets (Compass confirmed; Sentral, SIMON, Xuno, Synergetic, TASS, CASES21 best
+known); name case with Mac, particle and two-word flags; group display mapping; year level
+from column, group code or file; validation; comparison; apply; possible leavers limited to
+the year levels imported; exclusions (ZZZ by default in new files); Students screen with
+name checks and corrections that survive imports. Migration 002 adds
+`student.not_in_import_since` and `student.name_check`. Releasing as v0.3.0. Next: M4.

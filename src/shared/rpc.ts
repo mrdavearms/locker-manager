@@ -1,5 +1,8 @@
 import { z } from 'zod'
+import type { FilePreview, ImportAnalysis, ImportOptions, ImportResult } from './importTypes'
+import { IMPORT_FIELDS } from './importTypes'
 import type { AreaView, LockerView, SchoolProfile } from './locations'
+import type { ExclusionView, GroupView, StudentCounts, StudentView } from './students'
 import { LOCK_TYPES, LockDefaultsSchema, type LockDefaults } from './locks'
 import { TerminologySchema, type Terminology } from './terminology'
 
@@ -20,6 +23,27 @@ export const BulkPlanInputSchema = z.object({
   order: z.enum(['down_then_across', 'across_then_down'])
 })
 export type BulkPlanInputView = z.infer<typeof BulkPlanInputSchema>
+
+const FileSettingsSchema = z.object({
+  sheetIndex: z.number().int().min(0),
+  headerRow: z.number().int().min(0),
+  mapping: z.partialRecord(z.enum(IMPORT_FIELDS), z.number().int().min(0)),
+  yearSource: z.enum(['column', 'group', 'fixed']),
+  fixedYear: z.string().max(20).nullable()
+})
+const ImportOptionsSchema = z.object({
+  particles: z.enum(['lower', 'capital']),
+  groupMap: z.record(z.string().max(40), z.string().max(40)),
+  wholeSchool: z.boolean()
+})
+const studentFilter = z.enum([
+  'current',
+  'possible_leavers',
+  'name_check',
+  'no_locker',
+  'left',
+  'all'
+])
 
 export const rpcParams = {
   'school.get': z.object({}),
@@ -90,7 +114,62 @@ export const rpcParams = {
   'locks.defaults.get': z.object({}),
   'locks.defaults.set': z.object({ lock: LockDefaultsSchema }),
   'setup.status': z.object({}),
-  'setup.complete': z.object({ done: z.boolean() })
+  'setup.complete': z.object({ done: z.boolean() }),
+  'import.load': z.object({
+    files: z
+      .array(z.object({ name: z.string().min(1).max(260), bytes: z.instanceof(Uint8Array) }))
+      .max(12),
+    pasted: z.string().max(5_000_000).nullable()
+  }),
+  'import.options.get': z.object({}),
+  'import.analyse': z.object({
+    importId: id,
+    files: z.array(FileSettingsSchema).max(12),
+    options: ImportOptionsSchema
+  }),
+  'import.apply': z.object({
+    importId: id,
+    files: z.array(FileSettingsSchema).max(12),
+    options: ImportOptionsSchema,
+    selections: z.object({
+      add: z.array(z.string().max(64)),
+      update: z.array(id),
+      markMissing: z.array(id)
+    }),
+    profile: z.string().max(60)
+  }),
+  'import.discard': z.object({ importId: id }),
+  'students.list': z.object({
+    filter: studentFilter,
+    search: z.string().max(100).optional(),
+    yearLevel: z.string().max(20).optional(),
+    group: z.string().max(40).optional()
+  }),
+  'students.counts': z.object({}),
+  'student.get': z.object({ id }),
+  'student.update': z.object({
+    id,
+    firstName: z.string().max(80).optional(),
+    lastName: z.string().max(80).optional(),
+    preferredName: z.string().max(80).nullable().optional(),
+    needsAccessible: z.boolean().optional(),
+    confirmName: z.boolean().optional()
+  }),
+  'student.stillHere': z.object({ id }),
+  'student.confirmLeft': z.object({ id }),
+  'exclusions.list': z.object({}),
+  'exclusion.add': z.object({
+    kind: z.enum(['student', 'group', 'year_level']),
+    value: z.string().trim().min(1).max(64),
+    reason: z.string().trim().min(3).max(200)
+  }),
+  'exclusion.remove': z.object({ id }),
+  'groups.list': z.object({}),
+  'group.setDisplay': z.object({
+    code: z.string().min(1).max(40),
+    display: z.string().max(40).nullable()
+  }),
+  'group.setSortLast': z.object({ code: z.string().min(1).max(40), sortLast: z.boolean() })
 } as const
 
 export interface SetupStatus {
@@ -132,6 +211,23 @@ export interface RpcResults {
   'locks.defaults.set': LockDefaults
   'setup.status': SetupStatus
   'setup.complete': SetupStatus
+  'import.load': { importId: string; previews: FilePreview[] }
+  'import.options.get': ImportOptions
+  'import.analyse': ImportAnalysis
+  'import.apply': ImportResult
+  'import.discard': null
+  'students.list': StudentView[]
+  'students.counts': StudentCounts
+  'student.get': StudentView | null
+  'student.update': StudentView
+  'student.stillHere': null
+  'student.confirmLeft': null
+  'exclusions.list': ExclusionView[]
+  'exclusion.add': string
+  'exclusion.remove': null
+  'groups.list': GroupView[]
+  'group.setDisplay': null
+  'group.setSortLast': null
 }
 
 export type RpcMethod = keyof typeof rpcParams

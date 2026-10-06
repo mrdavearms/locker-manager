@@ -15,9 +15,9 @@ describe('the demo school', () => {
       [1, 114],
       [115, 228]
     ])
-    for (const year of ['Year 7', 'Year 8']) {
+    for (const year of ['7', '8']) {
       const groups = new Set(s.students.filter((x) => x.yearLevel === year).map((x) => x.groupCode))
-      const y = year.slice(-1)
+      const y = year
       expect([...groups].sort()).toEqual([
         `0${y}A`,
         `0${y}B`,

@@ -271,7 +271,12 @@ export function HomeScreen({
         )}
       </div>
 
-      <TaskGrid />
+      <TaskGrid
+        handlers={{
+          'Find a student': () => onNavigate('students'),
+          ...(state.mode === 'edit' ? { 'Import students': () => onNavigate('import') } : {})
+        }}
+      />
     </div>
   )
 }

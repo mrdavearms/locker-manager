@@ -23,6 +23,7 @@ import {
 import { getSchoolProfile, getTerms, setLogo, setTerms, updateSchoolProfile } from '../repos/school'
 import { getSetting, setSetting } from '../repos/settings'
 import type { Handlers } from './registry'
+import { studentHandlers } from './studentHandlers'
 
 function setupStatus(db: LockerDb): SetupStatus {
   const school = getSchoolProfile(db)
@@ -48,6 +49,7 @@ function lockDefaults(db: LockerDb) {
 }
 
 export const handlers: Handlers = {
+  ...studentHandlers,
   'school.get': { kind: 'read', run: (db) => getSchoolProfile(db) },
   'school.update': {
     kind: 'write',

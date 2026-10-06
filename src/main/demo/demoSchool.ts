@@ -173,16 +173,16 @@ export function generateDemoSchool(seed = 2026): DemoSchool {
   for (const year of ['7', '8']) {
     for (const g of ['A', 'B', 'C', 'D', 'E']) {
       const size = 20 + Math.floor(rand() * 3) // 20 to 22
-      for (let i = 0; i < size; i++) add(`Year ${year}`, `0${year}${g}`)
+      for (let i = 0; i < size; i++) add(year, `0${year}${g}`)
     }
-    for (let i = 0; i < 4; i++) add(`Year ${year}`, 'HUB')
-    for (let i = 0; i < 3; i++) add(`Year ${year}`, 'ZZZ')
+    for (let i = 0; i < 4; i++) add(year, 'HUB')
+    for (let i = 0; i < 3; i++) add(year, 'ZZZ')
   }
   return {
     schoolName: 'Demo Secondary College',
     areas: [
-      { name: 'Year 7 side', yearLevel: 'Year 7', first: 1, last: 114, columns: 38 },
-      { name: 'Year 8 side', yearLevel: 'Year 8', first: 115, last: 228, columns: 38 }
+      { name: 'Year 7 side', yearLevel: '7', first: 1, last: 114, columns: 38 },
+      { name: 'Year 8 side', yearLevel: '8', first: 115, last: 228, columns: 38 }
     ],
     students,
     excludedGroups: ['ZZZ']

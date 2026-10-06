@@ -3,7 +3,7 @@
 This guide is for school office staff and year level leaders. Each section is one task.
 Sections are added as the app gains features.
 
-_Last updated: 6 October 2026 (version 0.2.0: setting up the school and its lockers)._
+_Last updated: 6 October 2026 (version 0.3.0: importing students)._
 
 ## Install Locker Manager on Windows
 
@@ -211,3 +211,64 @@ To give a student a different locker, use **Move** instead (arriving in a later 
 2. **Usual lock** is used for new lockers.
 3. To change a whole bank, click **Change the lock for this bank**, choose the kind of lock,
    and click **Apply**. Any codes those locks had are cleared, because they no longer apply.
+
+## Get an export from Compass
+
+1. In Compass, open the student export your school uses for year levels (for example
+   **Student Year Level Export**) for each year level that has lockers.
+2. Save each file (CSV or Excel). One file per year level is fine.
+
+Other student systems (Sentral, SIMON, Xuno, Synergetic, TASS, CASES21) work too: any export
+with a student ID, first name and last name.
+
+## Import students
+
+1. Click **Students** on the left, then **Import students**.
+2. Click **Choose files…** and pick your export files (you can pick several), or drag them in.
+   You can also copy rows from Excel and paste them into the box on the right.
+3. Click **Read the files**.
+4. **Columns**: the app recognises Compass and most other systems and matches the columns.
+   Check the highlighted row is the heading row; if not, click the right row. If a file holds
+   one year level only (for example "Year 7 Export"), check the year in **Everyone in this
+   file is year**.
+5. **Check**: read the problems.
+   - Red: the row is skipped (for example no student ID).
+   - Yellow: check it (for example a Year 8 student in the Year 7 file).
+   - Grey: for your information (for example names to check).
+   Change how each Homeroom code shows (07A becomes 7A by itself).
+   Tick **These files list every student in the school** only if they do.
+6. **Compare and import**: four lists.
+   - **New students** are ticked. A student whose year level looks wrong is not ticked:
+     decide, then tick or leave them.
+   - **Changed** shows exactly what changes (for example Homeroom 7B to 7D).
+   - **Possible leavers** are in your file but not in this import. Nobody is removed:
+     ticked students go on the Possible leavers list for you to check.
+7. Click **Import**. A backup is kept first.
+
+Next time you import the same export, the columns are remembered.
+
+## Check names
+
+Student systems give surnames in capitals. The app fixes most (McNair, O'Brien, Smith-Jones),
+but not names it cannot be sure of: MacDonald or Macdonald, De La Rue or de la Rue, and
+two-word surnames.
+
+1. Click **Students**, then **Names to check**.
+2. Click a student. The yellow box says what to check and shows the name as it is in the
+   student system.
+3. If the name is right, click **The spelling is right**. If not, correct it and click
+   **Save name**. A name you correct is never changed by a later import.
+
+## Possible leavers
+
+1. Click **Students**, then **Possible leavers**.
+2. Click a student and check with the office.
+3. Click **Still enrolled** or **Has left**.
+
+## Students who never get a locker
+
+1. Click **Students** and scroll to **Who never gets a locker**.
+2. Click **Exclude a Homeroom or year level…**, enter the code (for example ZZZ) and why.
+
+New school files already exclude Homeroom ZZZ ("not in a homeroom"). To exclude one student,
+click them and choose **Never give a locker…**.

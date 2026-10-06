@@ -47,6 +47,15 @@ export async function createNewDatabase(
         $by: s.updated_by
       }
     )
+    // Compass uses ZZZ for "not in a homeroom"; such students never get a locker
+    // (SPEC.md section 15, item 6). Harmless where no group is called ZZZ.
+    if (!opts.demo) {
+      db.run(
+        `INSERT INTO exclusion (id, kind, value, reason, created_at, updated_at, updated_by)
+         VALUES ($id, 'group', 'ZZZ', 'Not in a homeroom', $c, $u, $by)`,
+        { $id: newId(), $c: s.created_at, $u: s.updated_at, $by: s.updated_by }
+      )
+    }
     appendAudit(db, ctx, {
       action: 'file.created',
       entity: 'school',

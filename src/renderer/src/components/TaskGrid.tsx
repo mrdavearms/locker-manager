@@ -25,38 +25,62 @@ const tasks = [
   { icon: CalendarRange, title: 'Start next year', hint: 'Guided, reversible rollover' }
 ] as const
 
-export function TaskGrid(): React.JSX.Element {
+export type TaskId = (typeof tasks)[number]['title']
+
+/** Tasks with a handler are live; the rest show "Soon". */
+export function TaskGrid({
+  handlers = {}
+}: {
+  handlers?: Partial<Record<TaskId, () => void>>
+}): React.JSX.Element {
   return (
     <section aria-labelledby="tasks-heading">
       <div className="flex items-baseline justify-between gap-4">
         <h2 id="tasks-heading" className="text-xl font-semibold">
           What do you want to do?
         </h2>
-        <p className="text-sm text-ink-muted">These arrive in the next updates.</p>
+        <p className="text-sm text-ink-muted">Grey tasks arrive in the next updates.</p>
       </div>
       <ul className="stagger mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {tasks.map(({ icon: Icon, title, hint }) => (
-          <li key={title}>
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              title="Coming in a later version"
-              className="card flex w-full items-center gap-4 p-4 text-left opacity-75"
-            >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-ink-muted">
-                <Icon size={22} aria-hidden />
-              </span>
-              <span className="flex-1">
-                <span className="block font-semibold">{title}</span>
-                <span className="block text-sm text-ink-muted">{hint}</span>
-              </span>
-              <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-semibold text-ink-muted">
-                Soon
-              </span>
-            </button>
-          </li>
-        ))}
+        {tasks.map(({ icon: Icon, title, hint }) => {
+          const run = handlers[title]
+          return (
+            <li key={title}>
+              <button
+                type="button"
+                disabled={!run}
+                aria-disabled={!run}
+                onClick={run}
+                title={run ? undefined : 'Coming in a later version'}
+                data-testid={`task-${title.toLowerCase().replace(/[^a-z]+/g, '-')}`}
+                className={
+                  run
+                    ? 'card group flex w-full items-center gap-4 p-4 text-left transition-[box-shadow,transform] hover:-translate-y-0.5 hover:shadow-[var(--shadow-lift)]'
+                    : 'card flex w-full items-center gap-4 p-4 text-left opacity-60'
+                }
+              >
+                <span
+                  className={
+                    run
+                      ? 'flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand'
+                      : 'flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-ink-muted'
+                  }
+                >
+                  <Icon size={22} aria-hidden />
+                </span>
+                <span className="flex-1">
+                  <span className="block font-semibold">{title}</span>
+                  <span className="block text-sm text-ink-muted">{hint}</span>
+                </span>
+                {!run && (
+                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-semibold text-ink-muted">
+                    Soon
+                  </span>
+                )}
+              </button>
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

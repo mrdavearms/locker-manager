@@ -17,10 +17,12 @@ import { useFileState } from './lib/useFileState'
 import { useUpdateStatus } from './lib/useUpdateStatus'
 import { NavRail, type Screen } from './components/NavRail'
 import { AppContextProvider } from './lib/appContext'
+import { ImportWizard } from './import/ImportWizard'
 import { HomeScreen } from './screens/HomeScreen'
 import { LockersScreen } from './screens/LockersScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { SetupWizard } from './screens/SetupWizard'
+import { StudentsScreen } from './screens/StudentsScreen'
 import { WelcomeScreen } from './screens/WelcomeScreen'
 
 export function App(): React.JSX.Element {
@@ -106,7 +108,11 @@ export function App(): React.JSX.Element {
                 </div>
               )}
               {file === null ? null : open ? (
-                screen === 'lockers' ? (
+                screen === 'students' ? (
+                  <StudentsScreen onImport={() => setScreen('import')} />
+                ) : screen === 'import' ? (
+                  <ImportWizard onClose={() => setScreen('students')} />
+                ) : screen === 'lockers' ? (
                   <LockersScreen onSetUp={() => setScreen('setup')} />
                 ) : screen === 'settings' ? (
                   <SettingsScreen />
