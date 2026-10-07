@@ -283,7 +283,7 @@ export function HomeScreen({
                 'New student': () => onFind('assign'),
                 'Student has left': () => onFind('leave'),
                 'New code': () => onFind('recode'),
-                'Move or swap': () => onFind('move'),
+                'Move or swap': () => onFind('moveOrSwap'),
                 'Import students': () => onNavigate('import'),
                 'Start next year': () => onNavigate('rollover')
               }

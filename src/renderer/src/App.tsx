@@ -52,7 +52,8 @@ const FIND_TITLES: Record<NonNullable<LockerIntent> | 'find', string> = {
   leave: 'Who has left?',
   recode: 'Whose code needs changing?',
   move: 'Who is moving?',
-  swap: 'Who is swapping?'
+  swap: 'Who is swapping?',
+  moveOrSwap: 'Who is moving or swapping?'
 }
 
 function isTyping(target: EventTarget | null): boolean {

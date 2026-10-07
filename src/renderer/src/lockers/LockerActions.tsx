@@ -10,7 +10,7 @@ import { useCodeGate } from '@renderer/components/PinGate'
 import { useAction, useCanEdit, useNotify, useTerms } from '@renderer/lib/appContext'
 import { call, useRpc } from '@renderer/lib/rpc'
 
-export type LockerIntent = 'assign' | 'leave' | 'recode' | 'move' | 'swap' | null
+export type LockerIntent = 'assign' | 'leave' | 'recode' | 'move' | 'swap' | 'moveOrSwap' | null
 
 function IssuedDialog({
   title,
@@ -118,6 +118,9 @@ export function StudentLockerCard({
   const [dialog, setDialog] = useState<LockerIntent>(intent)
   const [lockerId, setLockerId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
+  const [swapWith, setSwapWith] = useState<{ id: string; name: string; number: string } | null>(
+    null
+  )
   const [issued, setIssued] = useState<{
     title: string
     code: string | null
@@ -127,6 +130,7 @@ export function StudentLockerCard({
     setDialog(null)
     setLockerId(null)
     setReason('')
+    setSwapWith(null)
     onIntentDone()
   }
 
@@ -278,7 +282,29 @@ export function StudentLockerCard({
           </div>
         </Modal>
       )}
-      {dialog === 'swap' && s.locker && (
+      {dialog === 'moveOrSwap' && s.locker && (
+        <Modal
+          open
+          onOpenChange={(o) => !o && close()}
+          title={`Move or swap ${s.displayName}?`}
+          description={`Now in ${terms.locker.one.toLowerCase()} ${s.locker.number}.`}
+        >
+          <div className="grid gap-3">
+            <Button size="lg" onClick={() => setDialog('move')}>
+              <MoveRight size={18} aria-hidden /> Move to a spare {terms.locker.one.toLowerCase()}
+            </Button>
+            <Button size="lg" variant="secondary" onClick={() => setDialog('swap')}>
+              <ArrowLeftRight size={18} aria-hidden /> Swap with another student
+            </Button>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <Button variant="secondary" onClick={close}>
+              Cancel
+            </Button>
+          </div>
+        </Modal>
+      )}
+      {dialog === 'swap' && s.locker && !swapWith && (
         <QuickFind
           open
           title={`Swap ${s.displayName} with…`}
@@ -287,12 +313,54 @@ export function StudentLockerCard({
             void act(async () => {
               if (!r.studentId || r.studentId === s.id)
                 throw new Error('Choose another student who has a locker.')
-              await call('student.swap', { studentId: s.id, otherStudentId: r.studentId })
-              notify(`Swapped ${s.displayName} and ${r.title}.`)
-              close()
+              const other = await call('student.get', { id: r.studentId })
+              if (!other || !other.locker)
+                throw new Error('Choose another student who has a locker.')
+              setSwapWith({ id: other.id, name: other.displayName, number: other.locker.number })
             })
           }
         />
+      )}
+      {dialog === 'swap' && s.locker && swapWith && (
+        <Modal
+          open
+          onOpenChange={(o) => !o && close()}
+          title={`Swap ${s.displayName} and ${swapWith.name}?`}
+          description="Nothing changes until you choose Swap them."
+          testId="swap-summary"
+        >
+          <ul className="grid gap-1 text-sm">
+            <li>
+              {s.displayName} goes to {terms.locker.one.toLowerCase()} {swapWith.number}
+            </li>
+            <li>
+              {swapWith.name} goes to {terms.locker.one.toLowerCase()} {s.locker.number}
+            </li>
+          </ul>
+          <p className="mt-3 text-sm text-ink-muted">
+            Both codes change, because each knows the other&apos;s, and both locks go on the reset
+            list.
+          </p>
+          <div className="mt-6 flex justify-end gap-2">
+            <Button variant="secondary" onClick={close}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                void act(async () => {
+                  await call('student.swap', { studentId: s.id, otherStudentId: swapWith.id })
+                  const mine = s.locker!.number
+                  close()
+                  notify(
+                    `Swapped ${s.displayName} (${swapWith.number}) and ${swapWith.name} (${mine}).`
+                  )
+                })
+              }
+            >
+              Swap them
+            </Button>
+          </div>
+        </Modal>
       )}
       {dialog === 'recode' && s.locker && (
         <Modal
