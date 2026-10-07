@@ -53,6 +53,7 @@ export function describeAction(action: string): string {
     'bank.updated': 'Changed a bank',
     'bank.removed': 'Removed a bank',
     'lockers.added': 'Added lockers',
+    'lockers.quick_start': 'Added all the lockers in one step',
     'locker.updated': 'Changed a locker',
     'locker.renumbered': 'Renumbered a locker',
     'locker.removed': 'Removed a locker',

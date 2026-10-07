@@ -56,6 +56,48 @@ test('set up a school: an area, a bank, 114 lockers in 3 tiers', async () => {
   await l.close()
 })
 
+test('quick start: 40 lockers with no lock in one step', async () => {
+  const share = sharedFolder()
+  const l = await launchApp()
+  await answerNextDialog(l.app, 'save', join(share, 'Quick start.lockers'))
+  await l.page.getByTestId('new-file').click()
+  await l.page.getByLabel('School name').fill('SYNTHETIC Quick Start School')
+  await l.page.getByRole('button', { name: 'Choose where to save…' }).click()
+
+  await expect(l.page.getByText('Set up your school')).toBeVisible()
+  await l.page
+    .getByRole('list', { name: 'Steps' })
+    .getByRole('button', { name: /Lockers/ })
+    .click()
+
+  await l.page.getByLabel('How many lockers?').fill('40')
+  await l.page.getByLabel('Kind of lock').selectOption({ label: 'No lock' })
+  await expect(l.page.getByTestId('quick-start-preview')).toHaveText('Lockers 1 to 40, in one bank')
+  await l.page.getByTestId('quick-start-add').click()
+
+  // The card goes, and the full editor shows what was made.
+  await expect(l.page.getByTestId('quick-start-add')).toHaveCount(0)
+  await expect(l.page.getByRole('heading', { name: 'All lockers' })).toBeVisible()
+  await expect(l.page.getByText('Bank 1')).toBeVisible()
+
+  await l.page.getByTestId('setup-next').click()
+  await expect(l.page.getByText('Lock for each bank')).toBeVisible()
+  await expect(l.page.getByText('now: No lock')).toBeVisible()
+  for (const text of ['Lock code rules', 'How letters work']) {
+    await l.page.getByTestId('setup-next').click()
+    await expect(l.page.getByText(text).first()).toBeVisible()
+  }
+  await l.page.getByTestId('setup-next').click()
+  await expect(l.page.getByTestId('setup-file')).toContainText('Quick start.lockers')
+  await l.page.getByTestId('setup-next').click()
+  await l.page.getByTestId('setup-finish').click()
+
+  await l.page.getByTestId('nav-lockers').click()
+  await expect(l.page.getByRole('button', { name: /^Locker 40, spare$/ })).toBeVisible()
+  await expect(l.page.getByRole('button', { name: /^Locker 41,/ })).toHaveCount(0)
+  await l.close()
+})
+
 test('the demo school shows both sides on the Lockers screen, and Renumber is a deliberate tool', async () => {
   const share = sharedFolder()
   const path = placeFixture(share)

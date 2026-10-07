@@ -130,6 +130,11 @@ export const rpcParams = {
     capacity: z.number().int().min(1).max(6),
     lock: LockDefaultsSchema.nullable()
   }),
+  'lockers.quickStart': z.object({
+    count: z.number().int().min(1).max(2000),
+    firstNumber: z.number().int().min(0).max(999_999),
+    lockType: z.enum(LOCK_TYPES)
+  }),
   'locker.update': z.object({
     id,
     capacity: z.number().int().min(1).max(6).optional(),
@@ -366,6 +371,7 @@ export interface RpcResults {
   'lockers.list': LockerView[]
   'lockers.planBulk': { planned: PlannedLockerView[]; duplicates: string[] }
   'lockers.addBulk': number
+  'lockers.quickStart': number
   'locker.update': null
   'locker.renumber': { from: string; to: string }
   'locker.archive': null

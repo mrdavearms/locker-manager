@@ -14,6 +14,7 @@ import {
   existingLockerNumbers,
   listAreas,
   listLockers,
+  quickStartLockers,
   renumberLocker,
   setBankLocks,
   updateArea,
@@ -164,6 +165,24 @@ export const handlers: Handlers = {
         capacity: p.capacity,
         lock: p.lock
       })
+  },
+  'lockers.quickStart': {
+    kind: 'write',
+    audit: (p, n) => ({
+      action: 'lockers.quick_start',
+      entity: 'bank',
+      after: { firstNumber: p.firstNumber, count: n, lock: p.lockType }
+    }),
+    run: (db, ctx, p) => {
+      const terms = getTerms(db)
+      return quickStartLockers(db, ctx, {
+        areaName: `All ${terms.locker.many.toLowerCase()}`,
+        bankName: `${terms.bank.one} 1`,
+        count: p.count,
+        firstNumber: p.firstNumber,
+        lock: { ...lockDefaults(db), type: p.lockType }
+      })
+    }
   },
   'locker.update': {
     kind: 'write',
