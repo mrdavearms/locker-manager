@@ -93,13 +93,8 @@ test('a small school with no locks, no import and no labels', async () => {
   await p.getByTestId('confirm-assign').click()
   await expect(p.getByTestId('issued-dialog')).toContainText('No code to show here')
   await p.getByRole('button', { name: 'Done' }).click()
-  // SMALL-SCHOOL GAP: the panel still offers "Show code" for a locker with no lock, and
-  // pressing it gives an error ("This lock has no code yet.") instead of hiding the button.
-  await expect(p.getByTestId('show-code')).toBeVisible()
-  await p.getByTestId('show-code').click()
-  await expect(p.getByTestId('error-message')).toContainText('no code')
-  await p.getByRole('button', { name: 'OK' }).click()
-  await expect(p.getByTestId('code-shown')).toHaveCount(0)
+  // A locker with no lock has no code, so the panel offers no Show code button.
+  await expect(p.getByTestId('show-code')).toHaveCount(0)
 
   // Allocate the other four with the plan the app offers, no edits.
   await p.getByTestId('nav-lockers').click()

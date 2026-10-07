@@ -15,6 +15,7 @@ import {
   useTerms
 } from '@renderer/lib/appContext'
 import { plural } from '@renderer/lib/format'
+import { LOCK_TYPE_INFO } from '@shared/locks'
 import { call, useRpc } from '@renderer/lib/rpc'
 
 export type LockerIntent = 'assign' | 'leave' | 'recode' | 'move' | 'swap' | 'moveOrSwap' | null
@@ -123,6 +124,10 @@ export function StudentLockerCard({
   const canEdit = useCanEdit()
   const act = useAction()
   const notify = useNotify()
+  const { data: allLockers } = useRpc('lockers.list', {})
+  // Show code only where the lock can hold a code (not keyed, no lock, or a lock-free locker).
+  const lockType = allLockers?.find((l) => l.id === s.locker?.id)?.lockType ?? null
+  const lockHasCode = lockType !== null && LOCK_TYPE_INFO[lockType].hasCode
   const [dialog, setDialog] = useState<LockerIntent>(intent)
   const [lockerId, setLockerId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
@@ -155,9 +160,11 @@ export function StudentLockerCard({
               <span className="stencil text-3xl leading-none">{s.locker.number}</span>
             </span>
           </div>
-          <div className="mt-3">
-            <CodeReveal lockerId={s.locker.id} />
-          </div>
+          {lockHasCode && (
+            <div className="mt-3">
+              <CodeReveal lockerId={s.locker.id} />
+            </div>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
             <Button
               size="sm"
