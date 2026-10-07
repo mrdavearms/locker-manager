@@ -12,6 +12,8 @@ export function buildMenu(): void {
   const isMac = process.platform === 'darwin'
 
   const helpItems: MenuItemConstructorOptions[] = [
+    { label: 'Take the tour again', click: () => sendToFocused(channels.openTour) },
+    { type: 'separator' },
     { label: 'Check for updates…', click: () => void checkForUpdates(true) },
     { label: 'Open the download page', click: () => void shell.openExternal(brand.releasesUrl) },
     { type: 'separator' },

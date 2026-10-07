@@ -39,12 +39,16 @@ function setupStatus(db: LockerDb): SetupStatus {
       "SELECT COUNT(*) AS n FROM locker l WHERE l.archived_at IS NULL AND NOT EXISTS (SELECT 1 FROM lock k WHERE k.locker_id = l.id AND k.status IN ('in_use','spare'))"
     )?.n ?? 0
   )
+  const printed = (kind: 'labels' | 'letters'): boolean =>
+    db.get('SELECT 1 AS x FROM print_job WHERE kind = $k LIMIT 1', { $k: kind }) !== undefined
   return {
     completed: getSetting(db, 'setup.completedAt', z.string(), '') !== '',
     hasSchoolDetails: school.hasLogo || school.colourPrimary !== null,
     hasTerms: getSetting(db, 'terminology.updated', z.string(), '') !== '',
     lockers,
-    lockersWithoutLock: without
+    lockersWithoutLock: without,
+    labelsPrinted: printed('labels'),
+    lettersPrinted: printed('letters')
   }
 }
 

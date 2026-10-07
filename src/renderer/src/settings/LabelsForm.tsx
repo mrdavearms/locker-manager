@@ -735,6 +735,13 @@ function DesignerCard({
   )
 }
 
+/** The set-up step: only the label sheet. Printers and layout stay in Settings. */
+export function LabelSheetForm(): React.JSX.Element {
+  const { data: template } = useRpc('labels.template.get', {})
+  if (!template) return <SectionCard title="Label sheets">Loading…</SectionCard>
+  return <StockCard template={template} />
+}
+
 export function LabelsForm(): React.JSX.Element {
   const { data: template } = useRpc('labels.template.get', {})
   const { data: stocks } = useRpc('labels.stocks', {})

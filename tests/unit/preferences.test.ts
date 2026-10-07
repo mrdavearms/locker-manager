@@ -26,6 +26,26 @@ describe('Preferences (this computer only)', () => {
     expect(new Set(recent).size).toBe(8)
   })
 
+  it('remember the welcome tour and hidden getting-started lists; older files read as not seen', async () => {
+    const dir = tempDir()
+    writeFileSync(
+      join(dir, 'preferences.json'),
+      JSON.stringify({ version: 1, operatorName: 'Hannah' })
+    )
+    const p = new Preferences(dir)
+    const before = await p.load()
+    expect(before.tourSeenAt).toBeNull()
+    expect(before.checklistHidden).toEqual([])
+    await p.update((x) => ({
+      ...x,
+      tourSeenAt: '2026-10-07T09:00:00.000Z',
+      checklistHidden: ['/a.lockers']
+    }))
+    const again = await new Preferences(dir).load()
+    expect(again.tourSeenAt).toBe('2026-10-07T09:00:00.000Z')
+    expect(again.checklistHidden).toEqual(['/a.lockers'])
+  })
+
   it('survive a damaged preferences file by starting fresh', async () => {
     const dir = tempDir()
     writeFileSync(join(dir, 'preferences.json'), '{ not json')

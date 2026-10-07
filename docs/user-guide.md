@@ -3,7 +3,31 @@
 This guide is for school office staff and year level leaders. Each section is one task.
 The same guide is inside the app: click **Guide** at the top.
 
-_Last updated: 7 October 2026 (version 0.8.0)._
+_Last updated: 7 October 2026 (after version 0.10.0)._
+
+## Getting started
+
+The first time you open a school file on a computer, a short tour shows you around. It
+takes about a minute. Click **Skip the tour** if you would rather start straight away. It
+does not appear again on that computer.
+
+To take the tour again at any time, click **Guide** at the top, then **Take the tour**. Or
+open the **Help** menu and choose **Take the tour again**.
+
+While a school is new, Home shows a **Getting started** list to whoever is editing the file:
+
+1. Set up your school.
+2. Import your students.
+3. Give out lockers.
+4. Print locker labels.
+5. Print the letters.
+
+Each step ticks itself off when it is done, and the list goes away when all five are done.
+To put it away sooner, click **Hide this list**. To bring it back, click **Guide**, then
+**Show the getting-started list**.
+
+The **Guide** button opens this guide at the help for the screen you are on. Search it for
+any task, and click **Show me** to go to the right screen.
 
 ## Install Locker Manager on Windows
 
@@ -159,11 +183,11 @@ and other staff can then edit.
 At the top of **Settings**, type in **Search settings** (for example `PIN` or `labels`). Only
 the tabs that cover it stay, and the first one opens.
 
-## Set up your school (first time only)
+## Set up your school
 
 When you start a new school file, Locker Manager opens **Set up your school**. Each step
-saves as you go, so you can stop at any time. Home shows **Finish setting up your school**
-until you are done.
+saves as you go, so you can stop at any time. Until you finish, **Set up your school** is
+the first step in the **Getting started** list on Home.
 
 1. **Your school**: the name, a short name for labels, colours, and the logo.
 2. **Words you use**: pick the closest set (for example **Victorian government school**),
@@ -171,9 +195,14 @@ until you are done.
    and every screen, label and letter follows.
 3. **Lockers**: add your areas, banks and lockers (see the next section).
 4. **Locks**: check the kind of lock for each bank.
-5. **Done**: click **Finish set-up**.
+5. **Codes**: the rules every lock code must follow. The defaults suit most schools.
+6. **Labels and letters**: choose the label sheets you buy. The standard letter is ready to
+   use.
+7. **Your file**: where the school's file is saved, and why it belongs in a shared folder.
+8. **Done**: click **Finish set-up**.
 
-You can change any of this later in **Settings**.
+To go back through these steps later, click **Guide**, then **Set-up steps**. You can also
+change any of this in **Settings**.
 
 ## Add your school's logo
 

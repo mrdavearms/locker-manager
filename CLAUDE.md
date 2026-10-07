@@ -148,6 +148,16 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
 19. **Staged rollout is a manual workflow** (`.github/workflows/rollout.yml`): it sets
     `stagingPercentage` in a release's latest.yml and latest-mac.yml. Releases go out at 100%
     unless someone runs it; the update proof runs before any share is set.
+20. **First-time help** (Dave, 7 Oct 2026). A six-card welcome tour (`src/renderer/src/onboarding/Tour.tsx`)
+    shows once per computer, the first time any school file is open (not over the set-up
+    steps or a conflict); `tourSeenAt` in preferences.json. Taken again from the Guide or
+    the Help menu. Home shows a getting-started list (set-up, import, allocate, labels,
+    letters) ticked from real data (`setup.status`); Hide is per computer and per file
+    (`checklistHidden`). The set-up steps gained Codes (rules only), Labels and letters, and
+    Your file, and reopen from the Guide. The Guide opens at the section for the current
+    screen (`src/shared/guideLinks.ts`; a unit test checks every slug exists, and that
+    Getting started stays the first section). e2e `launchApp` marks the tour seen unless
+    `tour: true`.
 15. **Anything with codes prints or exports only in edit mode** (Dave, 7 Oct 2026). Every
     code that leaves the app is written to `code_reveal_log`, which needs a write. The rule
     is stated next to every print button that can carry codes, in the user guide and in

@@ -9,7 +9,12 @@ import { formatWhen } from '@renderer/lib/format'
 import { call, useRpc } from '@renderer/lib/rpc'
 
 /** SPEC.md 4.6 and settings tab 6: code rules with a live preview, and code sets. */
-export function CodesForm(): React.JSX.Element {
+export function CodesForm({
+  rulesOnly = false
+}: {
+  /** The set-up step shows only the rules; code sets wait for Settings. */
+  rulesOnly?: boolean
+}): React.JSX.Element {
   const terms = useTerms()
   const canEdit = useCanEdit()
   const act = useAction()
@@ -187,71 +192,73 @@ export function CodesForm(): React.JSX.Element {
         )}
       </SectionCard>
 
-      <SectionCard
-        title="Code sets"
-        description={`Make next year's codes in advance: one for every ${terms.locker.one.toLowerCase()}, never the same as its code before, plus spares for changes during the year. A set made while ${terms.locker.many.toLowerCase()} are given out is kept for next year and used when you start next year.`}
-      >
-        {summary && lockers + r.sparePoolSize > summary.validCount / 2 && (
-          <div className="mb-4">
-            <Banner tone="warn" title="This would use more than half the codes the rules allow">
-              Codes become easier to guess. Allow longer codes or fewer spares.
-            </Banner>
+      {!rulesOnly && (
+        <SectionCard
+          title="Code sets"
+          description={`Make next year's codes in advance: one for every ${terms.locker.one.toLowerCase()}, never the same as its code before, plus spares for changes during the year. A set made while ${terms.locker.many.toLowerCase()} are given out is kept for next year and used when you start next year.`}
+        >
+          {summary && lockers + r.sparePoolSize > summary.validCount / 2 && (
+            <div className="mb-4">
+              <Banner tone="warn" title="This would use more than half the codes the rules allow">
+                Codes become easier to guess. Allow longer codes or fewer spares.
+              </Banner>
+            </div>
+          )}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-64">
+              <Field label="Name for the set" htmlFor="cs-name">
+                <TextInput
+                  id="cs-name"
+                  disabled={!canEdit}
+                  value={setName}
+                  maxLength={80}
+                  onChange={(e) => setSetName(e.target.value)}
+                />
+              </Field>
+            </div>
+            <Button
+              disabled={!canEdit || setName.trim() === ''}
+              onClick={() =>
+                void act(() => call('codes.sets.generate', { name: setName, seed: null }))
+              }
+              data-testid="generate-set"
+            >
+              Make the code set
+            </Button>
           </div>
-        )}
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="w-64">
-            <Field label="Name for the set" htmlFor="cs-name">
-              <TextInput
-                id="cs-name"
-                disabled={!canEdit}
-                value={setName}
-                maxLength={80}
-                onChange={(e) => setSetName(e.target.value)}
-              />
-            </Field>
-          </div>
-          <Button
-            disabled={!canEdit || setName.trim() === ''}
-            onClick={() =>
-              void act(() => call('codes.sets.generate', { name: setName, seed: null }))
-            }
-            data-testid="generate-set"
-          >
-            Make the code set
-          </Button>
-        </div>
-        {sets && sets.length > 0 && (
-          <table className="mt-5 w-full text-sm">
-            <thead className="text-left text-ink-muted">
-              <tr>
-                <th className="pb-2 font-semibold">Set</th>
-                <th className="pb-2 font-semibold">For</th>
-                <th className="pb-2 font-semibold">Codes</th>
-                <th className="pb-2 font-semibold">Not yet used</th>
-                <th className="pb-2 font-semibold">Made</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sets.map((s) => (
-                <tr key={s.id} className="border-t border-line">
-                  <td className="py-1.5 font-semibold">{s.name}</td>
-                  <td className="py-1.5">
-                    {s.purpose === 'year' ? `Each ${terms.locker.one.toLowerCase()}` : 'Spares'}
-                    {s.forNextYear && (
-                      <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 text-xs text-brand">
-                        Kept for next year
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-1.5 tabular-nums">{s.total}</td>
-                  <td className="py-1.5 tabular-nums">{s.available}</td>
-                  <td className="py-1.5">{formatWhen(s.createdAt)}</td>
+          {sets && sets.length > 0 && (
+            <table className="mt-5 w-full text-sm">
+              <thead className="text-left text-ink-muted">
+                <tr>
+                  <th className="pb-2 font-semibold">Set</th>
+                  <th className="pb-2 font-semibold">For</th>
+                  <th className="pb-2 font-semibold">Codes</th>
+                  <th className="pb-2 font-semibold">Not yet used</th>
+                  <th className="pb-2 font-semibold">Made</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </SectionCard>
+              </thead>
+              <tbody>
+                {sets.map((s) => (
+                  <tr key={s.id} className="border-t border-line">
+                    <td className="py-1.5 font-semibold">{s.name}</td>
+                    <td className="py-1.5">
+                      {s.purpose === 'year' ? `Each ${terms.locker.one.toLowerCase()}` : 'Spares'}
+                      {s.forNextYear && (
+                        <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 text-xs text-brand">
+                          Kept for next year
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1.5 tabular-nums">{s.total}</td>
+                    <td className="py-1.5 tabular-nums">{s.available}</td>
+                    <td className="py-1.5">{formatWhen(s.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </SectionCard>
+      )}
 
       <section className="flex gap-3 rounded-2xl border border-line p-5 text-sm text-ink-muted">
         <ShieldAlert size={20} className="shrink-0 text-ink-muted" aria-hidden />

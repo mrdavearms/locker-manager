@@ -52,7 +52,7 @@ export function TaskGrid({
                 disabled={!run}
                 aria-disabled={!run}
                 onClick={run}
-                title={run ? undefined : 'Coming in a later version'}
+                title={run ? undefined : 'The file is open read-only on this computer'}
                 data-testid={`task-${title.toLowerCase().replace(/[^a-z]+/g, '-')}`}
                 className={
                   run

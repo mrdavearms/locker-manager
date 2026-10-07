@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BookOpen, Info, Search, UserRound } from 'lucide-react'
+import { guideSectionFor } from '@shared/guideLinks'
 import type { QuickResult } from '@shared/history'
-import type { OperatorInfo } from '@shared/ipc'
+import type { OnboardingInfo, OperatorInfo } from '@shared/ipc'
 import { AboutDialog } from './components/AboutDialog'
 import { BackupsDialog } from './components/BackupsDialog'
 import { Button } from './components/Button'
@@ -29,6 +30,7 @@ import { ReportsScreen } from './reports/ReportsScreen'
 import { RolloverScreen } from './rollover/RolloverScreen'
 import type { LockerIntent } from './lockers/LockerActions'
 import { HelpScreen } from './help/HelpScreen'
+import { Tour } from './onboarding/Tour'
 import { HistoryScreen } from './screens/HistoryScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { LockersScreen } from './screens/LockersScreen'
@@ -71,6 +73,9 @@ export function App(): React.JSX.Element {
   const [operatorOpen, setOperatorOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [helpSection, setHelpSection] = useState<string | null>(null)
+  const [onboarding, setOnboarding] = useState<OnboardingInfo | null>(null)
+  const [tourAsked, setTourAsked] = useState(false)
   const [notice, setNotice] = useState<{ title: string; body: string } | null>(null)
   const [newOpen, setNewOpen] = useState(false)
   const [backupsOpen, setBackupsOpen] = useState(false)
@@ -95,6 +100,7 @@ export function App(): React.JSX.Element {
   }, [])
   useEffect(loadOperator, [loadOperator])
   useEffect(() => window.api.onOpenAbout(() => setAboutOpen(true)), [])
+  useEffect(() => window.api.onOpenTour(() => setTourAsked(true)), [])
 
   const open = file?.status === 'open' ? file : null
   const openPath = open?.path ?? null
@@ -104,6 +110,34 @@ export function App(): React.JSX.Element {
     (next: Screen) => setNav({ path: openPath, screen: next, focus: null }),
     [openPath]
   )
+
+  // The welcome tour shows by itself once per computer, the first time a school
+  // file is open (not over the set-up steps or a conflict), and whenever asked.
+  useEffect(() => {
+    void window.api.getOnboarding().then(setOnboarding)
+  }, [openPath])
+  const tourOpen =
+    tourAsked ||
+    (!!open &&
+      !!operator?.name &&
+      !operatorOpen &&
+      onboarding?.tourSeen === false &&
+      screen !== 'setup' &&
+      !open.conflict &&
+      !helpOpen)
+  const closeTour = (): void => {
+    setTourAsked(false)
+    if (onboarding && !onboarding.tourSeen) {
+      setOnboarding({ ...onboarding, tourSeen: true })
+      void window.api.setOnboarding({ tourSeen: true }).then(setOnboarding)
+    }
+  }
+  const setChecklistHidden = (hidden: boolean): void =>
+    void window.api.setOnboarding({ checklistHidden: hidden }).then(setOnboarding)
+  const openGuide = (): void => {
+    setHelpSection(guideSectionFor(open ? screen : null))
+    setHelpOpen(true)
+  }
 
   // A scanned label QR code opens its locker (SPEC.md 5.6).
   useEffect(
@@ -202,7 +236,8 @@ export function App(): React.JSX.Element {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setHelpOpen(true)}
+            onClick={openGuide}
+            title="Help for this screen"
             data-testid="open-help"
           >
             <BookOpen size={16} aria-hidden /> Guide
@@ -235,12 +270,35 @@ export function App(): React.JSX.Element {
                 )}
                 {helpOpen ? (
                   <HelpScreen
+                    key={helpSection}
+                    initialSection={helpSection}
                     onClose={() => setHelpOpen(false)}
                     onShowMe={
                       open
                         ? (target) => {
                             setHelpOpen(false)
                             setScreen(target)
+                          }
+                        : null
+                    }
+                    onTour={() => {
+                      setHelpOpen(false)
+                      setTourAsked(true)
+                    }}
+                    onSetup={
+                      open?.mode === 'edit' && !open.summary.demo
+                        ? () => {
+                            setHelpOpen(false)
+                            setScreen('setup')
+                          }
+                        : null
+                    }
+                    onShowChecklist={
+                      open && onboarding?.checklistHidden
+                        ? () => {
+                            setChecklistHidden(false)
+                            setHelpOpen(false)
+                            setScreen('home')
                           }
                         : null
                     }
@@ -295,6 +353,8 @@ export function App(): React.JSX.Element {
                       onFind={(intent) =>
                         setFinder({ title: FIND_TITLES[intent ?? 'find'], intent })
                       }
+                      checklistHidden={onboarding?.checklistHidden ?? false}
+                      onHideChecklist={() => setChecklistHidden(true)}
                     />
                   )
                 ) : (
@@ -317,6 +377,18 @@ export function App(): React.JSX.Element {
           {open && finder && (
             <QuickFind open title={finder.title} onClose={() => setFinder(null)} onPick={onFound} />
           )}
+          <Tour
+            open={tourOpen}
+            onClose={closeTour}
+            onShowMe={
+              open
+                ? (target) => {
+                    setHelpOpen(false)
+                    setScreen(target)
+                  }
+                : null
+            }
+          />
         </PinGateProvider>
       </AppContextProvider>
 

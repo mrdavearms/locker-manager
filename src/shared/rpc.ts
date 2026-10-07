@@ -323,6 +323,9 @@ export interface SetupStatus {
   hasTerms: boolean
   lockers: number
   lockersWithoutLock: number
+  /** For the getting-started list on Home. */
+  labelsPrinted: boolean
+  lettersPrinted: boolean
 }
 
 export interface PlannedLockerView {

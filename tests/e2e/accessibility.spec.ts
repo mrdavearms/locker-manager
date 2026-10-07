@@ -51,7 +51,9 @@ test('every main screen passes the automatic WCAG 2.1 AA checks', async () => {
   }
   await l.page.getByTestId('open-help').click()
   await check(l.page, 'Guide')
-  await l.page.getByTestId('help-close').click()
+  await l.page.getByTestId('help-tour').click()
+  await check(l.page, 'Tour')
+  await l.page.getByTestId('tour-skip').click()
   await l.page.getByTestId('nav-home').click()
   await l.page.getByTestId('task-start-next-year').click()
   await check(l.page, 'Start next year')

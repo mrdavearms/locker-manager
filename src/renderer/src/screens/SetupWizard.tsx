@@ -4,6 +4,10 @@ import { Button } from '@renderer/components/Button'
 import { useAction, useTerms } from '@renderer/lib/appContext'
 import { call, useRpc } from '@renderer/lib/rpc'
 import { cn } from '@renderer/lib/cn'
+import { FileStep } from '@renderer/onboarding/FileStep'
+import { CodesForm } from '@renderer/settings/CodesForm'
+import { LabelSheetForm } from '@renderer/settings/LabelsForm'
+import { HowLettersWork } from '@renderer/settings/LettersForm'
 import { LocationsEditor } from '@renderer/settings/LocationsEditor'
 import { LocksForm } from '@renderer/settings/LocksForm'
 import { SchoolForm } from '@renderer/settings/SchoolForm'
@@ -11,14 +15,15 @@ import { TermsForm } from '@renderer/settings/TermsForm'
 
 /**
  * SPEC.md 4.1: the first-run set-up. Each step saves as you go, so stopping half
- * way loses nothing; Home offers to carry on later.
+ * way loses nothing; Home offers to carry on later, and the Guide reopens it.
+ * Steps with no "done" (codes, labels, the file) have sensible defaults already.
  */
 export function SetupWizard({ onFinish }: { onFinish: () => void }): React.JSX.Element {
   const terms = useTerms()
   const act = useAction()
   const { data: status } = useRpc('setup.status', {})
   const [step, setStep] = useState(0)
-  const steps = [
+  const steps: { title: string; body: React.JSX.Element; done?: boolean }[] = [
     { title: 'Your school', body: <SchoolForm />, done: status?.hasSchoolDetails ?? false },
     { title: 'Words you use', body: <TermsForm />, done: status?.hasTerms ?? false },
     { title: terms.locker.many, body: <LocationsEditor />, done: (status?.lockers ?? 0) > 0 },
@@ -27,6 +32,24 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }): React.JSX.E
       body: <LocksForm />,
       done: (status?.lockers ?? 0) > 0 && status?.lockersWithoutLock === 0
     },
+    { title: 'Codes', body: <CodesForm rulesOnly /> },
+    {
+      title: 'Labels and letters',
+      body: (
+        <div className="space-y-6">
+          <LabelSheetForm />
+          <p className="text-sm text-ink-muted">
+            Line up your printer and change the label layout later, in Settings, Labels.
+          </p>
+          <HowLettersWork />
+          <p className="text-sm text-ink-muted">
+            A standard letter is ready to use. Change its words and pictures later, in Settings,
+            Letters.
+          </p>
+        </div>
+      )
+    },
+    { title: 'Your file', body: <FileStep /> },
     {
       title: 'Done',
       done: status?.completed ?? false,
@@ -36,7 +59,8 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }): React.JSX.E
           <h2 className="mt-3 text-2xl font-semibold">Your school is set up</h2>
           <p className="mx-auto mt-2 max-w-lg text-ink-muted">
             Next: import your students, allocate {terms.locker.many.toLowerCase()} and issue codes,
-            then print labels and letters. Those tasks arrive in the next updates of the app.
+            then print labels and letters. Home lists these steps and ticks each one off as you go.
+            You can come back to these set-up steps at any time from the Guide.
           </p>
           <ul className="mx-auto mt-6 max-w-sm space-y-2 text-left">
             {[

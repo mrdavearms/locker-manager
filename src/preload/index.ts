@@ -12,6 +12,8 @@ import type {
   ActionResult,
   AppInfo,
   InstallResult,
+  OnboardingInfo,
+  OnboardingSet,
   OperatorInfo,
   RecentFile,
   UpdateStatus
@@ -44,6 +46,7 @@ const api = {
   onUpdateStatus: (listener: (status: UpdateStatus) => void) =>
     subscribe(channels.updateStatus, listener),
   onOpenAbout: (listener: () => void) => subscribe<void>(channels.openAbout, () => listener()),
+  onOpenTour: (listener: () => void) => subscribe<void>(channels.openTour, () => listener()),
   getComputer: (): Promise<ComputerView> => ipcRenderer.invoke(channels.computerGet),
   setComputer: (patch: Partial<ComputerSettings>): Promise<ComputerView> =>
     ipcRenderer.invoke(channels.computerSet, patch),
@@ -55,6 +58,9 @@ const api = {
   // who is using this computer
   getOperator: (): Promise<OperatorInfo> => ipcRenderer.invoke(channels.operatorGet),
   setOperator: (name: string): Promise<void> => ipcRenderer.invoke(channels.operatorSet, { name }),
+  getOnboarding: (): Promise<OnboardingInfo> => ipcRenderer.invoke(channels.onboardingGet),
+  setOnboarding: (patch: OnboardingSet): Promise<OnboardingInfo> =>
+    ipcRenderer.invoke(channels.onboardingSet, patch),
 
   // the data file
   getFileState: (): Promise<FileState> => ipcRenderer.invoke(channels.fileGetState),

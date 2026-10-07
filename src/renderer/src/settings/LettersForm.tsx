@@ -97,7 +97,7 @@ async function readPicture(file: File): Promise<{
 }
 
 /** The two rules every school should know before changing the letter. */
-function HowLettersWork(): React.JSX.Element {
+export function HowLettersWork(): React.JSX.Element {
   return (
     <section className="card flex gap-4 p-6" data-testid="letters-how">
       <Info size={22} className="mt-0.5 shrink-0 text-brand" aria-hidden />

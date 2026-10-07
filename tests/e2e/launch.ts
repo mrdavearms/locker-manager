@@ -13,18 +13,27 @@ export interface Launched {
 /**
  * Starts the BUILT app with its own settings folder, so tests never touch the
  * real one and two copies can run side by side (each has its own single-instance
- * lock). operator: a name to pre-set, or null for a first run.
+ * lock). operator: a name to pre-set, or null for a first run. The welcome tour
+ * is marked as seen unless tour is true (or operator is null), so it does not
+ * cover the screens other tests use. keepPrefs: start with the preferences a
+ * previous launch on the same userData left behind.
  */
 export async function launchApp(
-  opts: { operator?: string | null; userData?: string } = {}
+  opts: { operator?: string | null; userData?: string; tour?: boolean; keepPrefs?: boolean } = {}
 ): Promise<Launched> {
   const userData = opts.userData ?? mkdtempSync(join(tmpdir(), 'lockers-e2e-ud-'))
   const operator = opts.operator === undefined ? 'Test Operator' : opts.operator
-  if (operator !== null) {
+  if (operator !== null && !opts.keepPrefs) {
     mkdirSync(userData, { recursive: true })
     writeFileSync(
       join(userData, 'preferences.json'),
-      JSON.stringify({ version: 1, operatorName: operator, recentFiles: [], ignoredCopies: {} })
+      JSON.stringify({
+        version: 1,
+        operatorName: operator,
+        recentFiles: [],
+        ignoredCopies: {},
+        tourSeenAt: opts.tour ? null : '2026-10-07T09:00:00.000Z'
+      })
     )
   }
   const app = await electron.launch({

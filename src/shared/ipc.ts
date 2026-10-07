@@ -92,6 +92,19 @@ export const OperatorInfoSchema = z.object({
 })
 export type OperatorInfo = z.infer<typeof OperatorInfoSchema>
 
+/** First-time help remembered on this computer (not in the school's file). */
+export interface OnboardingInfo {
+  tourSeen: boolean
+  /** True when the getting-started list was hidden for the open file. */
+  checklistHidden: boolean
+}
+
+export const OnboardingSetSchema = z.object({
+  tourSeen: z.boolean().optional(),
+  checklistHidden: z.boolean().optional()
+})
+export type OnboardingSet = z.infer<typeof OnboardingSetSchema>
+
 export const FilePathSchema = z.object({
   path: z
     .string()

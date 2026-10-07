@@ -22,7 +22,11 @@ export const PrefsSchema = z.object({
   computer: ComputerSettingsSchema.default(ComputerSettingsSchema.parse({})),
   /** Starts that did not reach a working window, for the recovery screen (SPEC.md 9.3). */
   failedStarts: z.number().int().min(0).default(0),
-  lastStartedVersion: z.string().nullable().default(null)
+  lastStartedVersion: z.string().nullable().default(null),
+  /** When this computer's person finished or skipped the welcome tour. */
+  tourSeenAt: z.string().nullable().default(null),
+  /** Data files whose getting-started list was hidden on this computer. */
+  checklistHidden: z.array(z.string()).default([])
 })
 export type Prefs = z.infer<typeof PrefsSchema>
 

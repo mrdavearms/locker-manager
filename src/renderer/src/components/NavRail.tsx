@@ -1,26 +1,9 @@
 import { DoorClosed, FileText, History, Home, Mail, Printer, Settings, Users } from 'lucide-react'
 import { cn } from '@renderer/lib/cn'
 import { useTerms } from '@renderer/lib/appContext'
+import type { Screen } from '@shared/screens'
 
-export type Screen =
-  | 'home'
-  | 'students'
-  | 'import'
-  | 'lockers'
-  | 'allocate'
-  | 'print'
-  | 'letters'
-  | 'reports'
-  | 'history'
-  | 'settings'
-  | 'settings-labels'
-  | 'settings-letters'
-  | 'settings-codes'
-  | 'settings-privacy'
-  | 'settings-storage'
-  | 'settings-computer'
-  | 'setup'
-  | 'rollover'
+export type { Screen }
 
 /** The left-hand menu while a file is open. Every item has a text label. */
 export function NavRail({

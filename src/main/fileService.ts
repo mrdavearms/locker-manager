@@ -14,11 +14,13 @@ import {
   FilePathSchema,
   MergeConflictSchema,
   NewFileSchema,
+  OnboardingSetSchema,
   OperatorSetSchema,
   RenameSchoolSchema,
   ResolveConflictSchema,
   ResolveCopySchema,
   type ActionResult,
+  type OnboardingInfo,
   type OperatorInfo,
   type RecentFile
 } from '@shared/ipc'
@@ -146,6 +148,38 @@ export function registerFileHandlers(): void {
   ipcMain.handle(channels.operatorSet, async (_e, raw: unknown) => {
     const { name } = OperatorSetSchema.parse(raw)
     await prefs.update((p) => ({ ...p, operatorName: name }))
+  })
+
+  // The welcome tour and the getting-started list, remembered on this computer.
+  const openPath = (): string | null =>
+    session.state.status === 'open' ? session.state.path : null
+  const onboarding = (): OnboardingInfo => {
+    const path = openPath()
+    return {
+      tourSeen: prefs.get().tourSeenAt !== null,
+      checklistHidden: path !== null && prefs.get().checklistHidden.includes(path)
+    }
+  }
+  ipcMain.handle(channels.onboardingGet, onboarding)
+  ipcMain.handle(channels.onboardingSet, async (_e, raw: unknown): Promise<OnboardingInfo> => {
+    const patch = OnboardingSetSchema.parse(raw)
+    const path = openPath()
+    await prefs.update((p) => ({
+      ...p,
+      tourSeenAt:
+        patch.tourSeen === undefined
+          ? p.tourSeenAt
+          : patch.tourSeen
+            ? new Date().toISOString()
+            : null,
+      checklistHidden:
+        patch.checklistHidden === undefined || path === null
+          ? p.checklistHidden
+          : patch.checklistHidden
+            ? [...new Set([...p.checklistHidden, path])]
+            : p.checklistHidden.filter((x) => x !== path)
+    }))
+    return onboarding()
   })
 
   ipcMain.handle(channels.fileGetState, () => session.state)

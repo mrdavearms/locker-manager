@@ -53,10 +53,13 @@ export const channels = {
   fileRedo: 'file:redo',
   computerGet: 'computer:get',
   computerSet: 'computer:set',
+  onboardingGet: 'onboarding:get',
+  onboardingSet: 'onboarding:set',
   // main -> renderer events
   computerChanged: 'computer:changed',
   openLocker: 'event:ui:openLocker',
   updateStatus: 'event:update:status',
   openAbout: 'event:ui:openAbout',
+  openTour: 'event:ui:openTour',
   fileState: 'event:file:state'
 } as const
