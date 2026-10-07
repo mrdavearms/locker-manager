@@ -286,10 +286,18 @@ export function markNeedsNewCode(db: LockerDb, ctx: OperatorContext, lockId: str
   }
 }
 
-/** "Reset done" for every ticked lock, in one change and one history line. */
+/**
+ * "Reset done" for every ticked lock, in one change and one history line. Returns how many
+ * of them were really waiting for a reset (a lock ticked twice counts once).
+ */
 export function markResetDoneMany(db: LockerDb, ctx: OperatorContext, lockIds: string[]): number {
-  for (const id of lockIds) markResetDone(db, ctx, id)
-  return lockIds.length
+  let waiting = 0
+  for (const id of new Set(lockIds)) {
+    const before = lockRow(db, id).code_status
+    if (before === 'needs_new_code' || before === 'awaiting_physical_reset') waiting++
+    markResetDone(db, ctx, id)
+  }
+  return waiting
 }
 
 /** An operator ticks that the physical lock has been reset (SPEC.md 4.5). */

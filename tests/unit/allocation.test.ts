@@ -466,8 +466,11 @@ describe('committing, codes and the manual tools (SPEC.md 4.4, 4.5)', () => {
     )
     for (const h of held) releaseStudent(db, ctx, h.student_id, { left: true })
     const ids = resetTasks(db).map((t) => t.lockId)
-    expect(markResetDoneMany(db, ctx, ids)).toBe(3)
+    // A lock ticked twice counts once.
+    expect(markResetDoneMany(db, ctx, [...ids, ids[0]!])).toBe(3)
     expect(resetTasks(db)).toEqual([])
+    // Already reset: nothing was waiting, so nothing is counted.
+    expect(markResetDoneMany(db, ctx, ids)).toBe(0)
   })
 
   it('a new student gets the first spare in their area and a code', async () => {

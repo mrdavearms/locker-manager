@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { brand } from '@shared/brand'
 import { DEFAULT_TERMS, type Terminology } from '@shared/terminology'
 
 interface AppContextValue {
@@ -70,7 +71,7 @@ export const useEditingBy = (): string | null => useContext(Ctx).editingBy
 export function useLockedReason(): string {
   const { editingBy, needsNewerApp, inConflict } = useContext(Ctx)
   if (needsNewerApp)
-    return 'Codes and letters are locked because this file needs a newer Locker Manager. Update it (Help, Check for updates) to use them.'
+    return `Codes and letters are locked because this file needs a newer ${brand.name}. Update it (Help, Check for updates) to use them.`
   if (inConflict)
     return 'Codes and letters are locked until the two versions of this file are sorted out.'
   if (editingBy)
