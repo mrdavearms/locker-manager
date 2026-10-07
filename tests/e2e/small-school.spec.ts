@@ -16,33 +16,19 @@ test('a small school with no locks, no import and no labels', async () => {
   await p.getByRole('button', { name: 'Choose where to save…' }).click()
   await expect(p.getByText('Set up your school')).toBeVisible()
 
-  // Lockers: one area, one bank, 40 lockers in one tier.
+  // Lockers: the quick start makes one area, one bank and 40 lockers with no lock.
   await p
     .getByRole('list', { name: 'Steps' })
     .getByRole('button', { name: /Lockers/ })
     .click()
-  await p.getByTestId('add-area').click()
-  await p.getByLabel('Name').fill('Hallway')
-  await p.getByRole('button', { name: 'Save' }).click()
-  await p.getByTestId('add-bank').click()
-  await p.getByLabel('Name').fill('Wall')
-  await p.getByRole('button', { name: 'Save' }).click()
-  await p.getByTestId('add-lockers').click()
-  // SMALL-SCHOOL GAP: the bulk-add form starts at 114 lockers in 3 tiers (a big
-  // secondary school); a small school must change the last number and the tiers.
-  await p.locator('#ba-to').fill('40')
-  await p.locator('#ba-tiers').selectOption('1')
-  await expect(p.getByText('40 lockers in 40 columns and 1 row')).toBeVisible()
-  await p.getByTestId('bulk-add-confirm').click()
+  await p.getByLabel('How many lockers?').fill('40')
+  await p.getByLabel('Kind of lock').selectOption({ label: 'No lock' })
+  await p.getByTestId('quick-start-add').click()
+  await expect(p.getByTestId('quick-start-add')).toHaveCount(0)
 
-  // Locks: set "No lock" for the bank.
+  // Locks: the bank already says "No lock".
   await p.getByTestId('setup-next').click()
   await expect(p.getByText('Lock for each bank')).toBeVisible()
-  // SMALL-SCHOOL GAP: every locker is built with a combination lock by default, so
-  // students who bring their own padlocks must change the bank to "No lock" by hand.
-  await p.getByRole('button', { name: /Change the lock for this bank/ }).click()
-  await p.locator('[id^="lock-"][id$="-type"]').last().selectOption('none')
-  await p.getByRole('button', { name: /^Apply to 40 lockers/ }).click()
   await expect(p.getByText('now: No lock')).toBeVisible()
 
   // Click through the remaining steps and finish.
@@ -119,10 +105,10 @@ test('a small school with no locks, no import and no labels', async () => {
   const gs = p.getByTestId('getting-started')
   await expect(gs).toBeVisible()
   await expect(gs).toContainText('3 of 5 done')
-  // SMALL-SCHOOL GAP: Home still lists "Print locker labels" and "Print the letters" as
-  // jobs to do, with no way to say this school does not use them. ("Import your students"
-  // ticks itself only because students were added by hand.)
-  await expect(gs).toContainText('Print locker labels')
-  await expect(gs).toContainText('Print the letters')
+  await p.getByTestId('not-used-labels').click()
+  await expect(gs).toContainText('4 of 5 done')
+  await p.getByTestId('not-used-letters').click()
+  // All five steps are done, so the list goes.
+  await expect(p.getByTestId('getting-started')).toHaveCount(0)
   await l.close()
 })
