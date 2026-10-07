@@ -14,6 +14,7 @@ import {
   existingLockerNumbers,
   listAreas,
   listLockers,
+  quickStartLockers,
   renumberLocker,
   setBankLocks,
   updateArea,
@@ -29,6 +30,8 @@ import { rolloverHandlers } from './rolloverHandlers'
 import { lockerHandlers } from './lockerHandlers'
 import { studentHandlers } from './studentHandlers'
 
+const NotUsedSchema = z.array(z.enum(['labels', 'letters']))
+
 function setupStatus(db: LockerDb): SetupStatus {
   const school = getSchoolProfile(db)
   const lockers = Number(
@@ -43,12 +46,13 @@ function setupStatus(db: LockerDb): SetupStatus {
     db.get('SELECT 1 AS x FROM print_job WHERE kind = $k LIMIT 1', { $k: kind }) !== undefined
   return {
     completed: getSetting(db, 'setup.completedAt', z.string(), '') !== '',
-    hasSchoolDetails: school.hasLogo || school.colourPrimary !== null,
+    hasSchoolDetails: school.name.trim().length > 0,
     hasTerms: getSetting(db, 'terminology.updated', z.string(), '') !== '',
     lockers,
     lockersWithoutLock: without,
     labelsPrinted: printed('labels'),
-    lettersPrinted: printed('letters')
+    lettersPrinted: printed('letters'),
+    notUsed: getSetting(db, 'setup.notUsed', NotUsedSchema, [])
   }
 }
 
@@ -162,6 +166,26 @@ export const handlers: Handlers = {
         lock: p.lock
       })
   },
+  'lockers.quickStart': {
+    kind: 'write',
+    audit: (p, n) => ({
+      action: 'lockers.quick_start',
+      entity: 'bank',
+      after: { firstNumber: p.firstNumber, count: n, lock: p.lockType }
+    }),
+    run: (db, ctx, p) => {
+      const terms = getTerms(db)
+      const lock = { ...lockDefaults(db), type: p.lockType }
+      setSetting(db, ctx, 'locks.defaults', lock)
+      return quickStartLockers(db, ctx, {
+        areaName: `All ${terms.locker.many.toLowerCase()}`,
+        bankName: `${terms.bank.one} 1`,
+        count: p.count,
+        firstNumber: p.firstNumber,
+        lock
+      })
+    }
+  },
   'locker.update': {
     kind: 'write',
     audit: (p) => ({ action: 'locker.updated', entity: 'locker', entityId: p.id, after: p }),
@@ -220,6 +244,19 @@ export const handlers: Handlers = {
     audit: (p) => ({ action: p.done ? 'setup.completed' : 'setup.reopened', entity: 'settings' }),
     run: (db, ctx: OperatorContext, p) => {
       setSetting(db, ctx, 'setup.completedAt', p.done ? ctx.now().toISOString() : '')
+      return setupStatus(db)
+    }
+  },
+  'setup.notUsed': {
+    kind: 'write',
+    audit: (p) => ({
+      action: p.notUsed ? 'setup.item_not_used' : 'setup.item_used',
+      entity: 'settings',
+      after: p.item
+    }),
+    run: (db, ctx: OperatorContext, p) => {
+      const rest = getSetting(db, 'setup.notUsed', NotUsedSchema, []).filter((i) => i !== p.item)
+      setSetting(db, ctx, 'setup.notUsed', p.notUsed ? [...rest, p.item] : rest)
       return setupStatus(db)
     }
   }

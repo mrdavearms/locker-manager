@@ -64,7 +64,12 @@ type Dialog =
   | null
 
 /** SPEC.md 4.1 step 4 and settings tab 4: areas, banks and their lockers. */
-export function LocationsEditor(): React.JSX.Element {
+export function LocationsEditor({
+  hideEmptyHint = false
+}: {
+  /** Set-up shows the quick start card instead of the empty-state paragraph. */
+  hideEmptyHint?: boolean
+}): React.JSX.Element {
   const { data: areas } = useRpc('locations.list', {})
   const { data: lockers } = useRpc('lockers.list', {})
   const terms = useTerms()
@@ -87,7 +92,7 @@ export function LocationsEditor(): React.JSX.Element {
         </Button>
       }
     >
-      {areas?.length === 0 && (
+      {areas?.length === 0 && !hideEmptyHint && (
         <p className="rounded-xl bg-surface-muted p-5 text-sm text-ink-muted">
           Nothing yet. Start by adding an {terms.area.one.toLowerCase()}, such as “Year 7 side”.
         </p>

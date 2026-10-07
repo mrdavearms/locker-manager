@@ -83,6 +83,34 @@ test('the getting-started list hides, comes back, and the Guide reopens set-up',
   await l.close()
 })
 
+test('labels and letters can be set aside as not used, and brought back', async () => {
+  const share = sharedFolder()
+  const l = await launchApp()
+  await answerNextDialog(l.app, 'save', join(share, 'Locker data.lockers'))
+  await l.page.getByTestId('new-file').click()
+  await l.page.getByLabel('School name').fill('SYNTHETIC Not Used College')
+  await l.page.getByRole('button', { name: 'Choose where to save…' }).click()
+  await expect(l.page.getByText('Set up your school')).toBeVisible()
+  await l.page.getByTestId('nav-home').click()
+
+  const list = l.page.getByTestId('getting-started')
+  await expect(list).toContainText('0 of 5 done')
+  await l.page.getByTestId('not-used-labels').click()
+  await expect(list).toContainText('1 of 5 done')
+  await l.page.getByTestId('not-used-letters').click()
+  await expect(list).toContainText('2 of 5 done')
+  await expect(l.page.getByTestId('getting-started-labels')).toContainText('Not used')
+  await expect(l.page.getByTestId('getting-started-letters')).toContainText('Not used')
+  await expect(l.page.getByTestId('start-labels')).toHaveCount(0)
+
+  await l.page.getByTestId('use-after-all-labels').click()
+  await expect(list).toContainText('1 of 5 done')
+  await expect(l.page.getByTestId('start-labels')).toBeVisible()
+  await l.page.getByTestId('use-after-all-letters').click()
+  await expect(list).toContainText('0 of 5 done')
+  await l.close()
+})
+
 test('the Guide opens at the help for the screen you are on', async () => {
   const share = sharedFolder()
   const l = await launchApp()

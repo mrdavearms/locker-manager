@@ -26,6 +26,8 @@ Each step ticks itself off when it is done, and the list goes away when all five
 To put it away sooner, click **Hide this list**. To bring it back, click **Guide**, then
 **Show the getting-started list**.
 
+A school that does not print labels or letters can click **We don't use this** on that step, and it counts as done. Click **Use it after all** to change your mind.
+
 The **Guide** button opens this guide at the help for the screen you are on. Search it for
 any task, and click **Show me** to go to the right screen.
 
@@ -225,6 +227,12 @@ that would vanish on white labels. The app has made a dark version: check it loo
 If it does not, click **Use my own one-colour logo…** and choose a black-and-white version.
 
 ## Add lockers
+
+If all your lockers are in one place and numbered 1, 2, 3 and so on, use **Add all your
+lockers at once** in the **Lockers** set-up step. Type **How many lockers?**, the **First
+number** and the **Kind of lock**, then click **Add lockers**. The app puts them in one area
+called "All lockers" with one bank called "Bank 1"; click **Rename** to change either name.
+Lockers you add later start with the same kind of lock.
 
 Lockers belong to a **bank** (a row or wall), and banks belong to an **area** (a group with
 a purpose, such as "Year 7 side").

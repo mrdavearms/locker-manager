@@ -130,6 +130,11 @@ export const rpcParams = {
     capacity: z.number().int().min(1).max(6),
     lock: LockDefaultsSchema.nullable()
   }),
+  'lockers.quickStart': z.object({
+    count: z.number().int().min(1).max(2000),
+    firstNumber: z.number().int().min(0).max(999_999),
+    lockType: z.enum(LOCK_TYPES)
+  }),
   'locker.update': z.object({
     id,
     capacity: z.number().int().min(1).max(6).optional(),
@@ -150,6 +155,7 @@ export const rpcParams = {
   'locks.defaults.set': z.object({ lock: LockDefaultsSchema }),
   'setup.status': z.object({}),
   'setup.complete': z.object({ done: z.boolean() }),
+  'setup.notUsed': z.object({ item: z.enum(['labels', 'letters']), notUsed: z.boolean() }),
   'import.load': z.object({
     files: z
       .array(z.object({ name: z.string().min(1).max(260), bytes: z.instanceof(Uint8Array) }))
@@ -338,6 +344,8 @@ export interface SetupStatus {
   /** For the getting-started list on Home. */
   labelsPrinted: boolean
   lettersPrinted: boolean
+  /** Steps the school has said it does not use. They count as done. */
+  notUsed: ('labels' | 'letters')[]
 }
 
 export interface PlannedLockerView {
@@ -363,6 +371,7 @@ export interface RpcResults {
   'lockers.list': LockerView[]
   'lockers.planBulk': { planned: PlannedLockerView[]; duplicates: string[] }
   'lockers.addBulk': number
+  'lockers.quickStart': number
   'locker.update': null
   'locker.renumber': { from: string; to: string }
   'locker.archive': null
@@ -371,6 +380,7 @@ export interface RpcResults {
   'locks.defaults.set': LockDefaults
   'setup.status': SetupStatus
   'setup.complete': SetupStatus
+  'setup.notUsed': SetupStatus
   'import.load': { importId: string; previews: FilePreview[] }
   'import.options.get': ImportOptions
   'import.analyse': ImportAnalysis

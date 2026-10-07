@@ -6,6 +6,7 @@ import {
   compareLockerNumbers,
   duplicateNumbers,
   lockerSortKey,
+  planBulkLockers,
   qrIdentifier,
   type PlannedLocker
 } from '../locations/lockerNumbers'
@@ -318,6 +319,39 @@ export function addLockers(
     $b: input.bankId
   })
   return input.planned.length
+}
+
+/**
+ * Set-up's quick start for a school with one run of lockers: one area, one bank and
+ * every locker numbered from `firstNumber`, one high, each with the given lock.
+ */
+export function quickStartLockers(
+  db: LockerDb,
+  ctx: OperatorContext,
+  input: {
+    areaName: string
+    bankName: string
+    count: number
+    firstNumber: number
+    lock: LockDefaults
+  }
+): number {
+  if (db.get('SELECT 1 FROM area WHERE archived_at IS NULL'))
+    throw new Error('This file already has lockers set up. Use the full editor to add more.')
+  const areaId = createArea(db, ctx, { name: input.areaName })
+  const bankId = createBank(db, ctx, { areaId, name: input.bankName })
+  return addLockers(db, ctx, {
+    bankId,
+    planned: planBulkLockers({
+      prefix: '',
+      from: input.firstNumber,
+      to: input.firstNumber + input.count - 1,
+      padTo: 0,
+      tiers: 1,
+      order: 'down_then_across'
+    }),
+    lock: input.lock
+  })
 }
 
 type LockerRow = {

@@ -10,6 +10,7 @@ import { LabelSheetForm } from '@renderer/settings/LabelsForm'
 import { HowLettersWork } from '@renderer/settings/LettersForm'
 import { LocationsEditor } from '@renderer/settings/LocationsEditor'
 import { LocksForm } from '@renderer/settings/LocksForm'
+import { QuickStartLockers } from '@renderer/settings/QuickStartLockers'
 import { SchoolForm } from '@renderer/settings/SchoolForm'
 import { TermsForm } from '@renderer/settings/TermsForm'
 
@@ -26,7 +27,16 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }): React.JSX.E
   const steps: { title: string; body: React.JSX.Element; done?: boolean }[] = [
     { title: 'Your school', body: <SchoolForm />, done: status?.hasSchoolDetails ?? false },
     { title: 'Words you use', body: <TermsForm />, done: status?.hasTerms ?? false },
-    { title: terms.locker.many, body: <LocationsEditor />, done: (status?.lockers ?? 0) > 0 },
+    {
+      title: terms.locker.many,
+      body: (
+        <div className="space-y-6">
+          <QuickStartLockers />
+          <LocationsEditor hideEmptyHint />
+        </div>
+      ),
+      done: (status?.lockers ?? 0) > 0
+    },
     {
       title: 'Locks',
       body: <LocksForm />,
