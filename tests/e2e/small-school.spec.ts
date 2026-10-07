@@ -105,9 +105,8 @@ test('a small school with no locks, no import and no labels', async () => {
   await p.getByTestId('make-draft').click()
   await expect(p.getByText('4 students placed')).toBeVisible()
   await expect(p.getByTestId('unplaced')).toHaveCount(0)
-  // SMALL-SCHOOL GAP: "Issue a code to each locker now" is ticked by default even
-  // though no locker has a lock. Harmless, but confusing for a school with no codes.
-  await expect(p.getByRole('checkbox', { name: /Issue a code/ })).toBeChecked()
+  // No locker has a lock with a code, so the tick box is not offered.
+  await expect(p.getByRole('checkbox', { name: /Issue a code/ })).toHaveCount(0)
   await p.getByTestId('commit-allocation').click()
   await expect(p.getByTestId('allocation-done')).toContainText('4 lockers given out')
   await p.getByRole('button', { name: /See the lockers/ }).click()

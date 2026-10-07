@@ -8,6 +8,7 @@ import {
   type DraftView,
   type RuleOrder
 } from '@shared/allocation'
+import { LOCK_TYPE_INFO } from '@shared/locks'
 import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, Select, TextInput } from '@renderer/components/Field'
@@ -435,12 +436,21 @@ export function AllocateScreen({
   const [view, setView] = useState<DraftView | null>(null)
   const [assignments, setAssignments] = useState<DraftAssignment[]>([])
   const [issueCodes, setIssueCodes] = useState(true)
+  const { data: allLockers } = useRpc('lockers.list', {})
   const [result, setResult] = useState<{ assigned: number; codes: number } | null>(null)
   const p = plan ?? saved
 
   if (!p) return <div className="px-6 py-8">Loading…</div>
   const excluded = view?.draft.skipped.filter((s) => s.reason === 'excluded').length ?? 0
   const noRule = view?.draft.skipped.filter((s) => s.reason === 'no_rule').length ?? 0
+  // The tick box only means something when a locker in the draft takes a code.
+  // While the list is still loading, keep showing it.
+  const draftLockerIds = new Set(assignments.map((a) => a.lockerId))
+  const anyTakesCode =
+    !allLockers ||
+    allLockers.some(
+      (l) => draftLockerIds.has(l.id) && l.lockType !== null && LOCK_TYPE_INFO[l.lockType].hasCode
+    )
 
   if (result) {
     return (
@@ -554,16 +564,20 @@ export function AllocateScreen({
           )}
           <DraftPreview view={view} assignments={assignments} onAssignments={setAssignments} />
           <div className="card flex flex-wrap items-center justify-between gap-4 p-5">
-            <label className="flex items-center gap-3 text-sm">
-              <input
-                type="checkbox"
-                className="size-4"
-                checked={issueCodes}
-                onChange={(e) => setIssueCodes(e.target.checked)}
-              />
-              Issue a code to each {terms.locker.one.toLowerCase()} now (from this year’s code set
-              when there is one)
-            </label>
+            {anyTakesCode ? (
+              <label className="flex items-center gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4"
+                  checked={issueCodes}
+                  onChange={(e) => setIssueCodes(e.target.checked)}
+                />
+                Issue a code to each {terms.locker.one.toLowerCase()} now (from this year’s code set
+                when there is one)
+              </label>
+            ) : (
+              <span />
+            )}
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => setAssignments(view.draft.assignments)}>
                 <Shuffle size={16} aria-hidden /> Back to the draft as made
@@ -576,7 +590,12 @@ export function AllocateScreen({
                 onClick={() =>
                   void act(async () => {
                     await call('allocation.plan.set', { plan: p })
-                    setResult(await call('allocation.commit', { assignments, issueCodes }))
+                    setResult(
+                      await call('allocation.commit', {
+                        assignments,
+                        issueCodes: anyTakesCode && issueCodes
+                      })
+                    )
                   })
                 }
               >
