@@ -6,6 +6,7 @@ interface AppContextValue {
   canEdit: boolean
   editingBy: string | null
   needsNewerApp: boolean
+  inConflict: boolean
   terms: Terminology
   showError: (message: string) => void
   notify: (text: string, opts?: { undo?: boolean }) => void
@@ -16,6 +17,7 @@ const Ctx = createContext<AppContextValue>({
   canEdit: false,
   editingBy: null,
   needsNewerApp: false,
+  inConflict: false,
   terms: DEFAULT_TERMS,
   showError: () => undefined,
   notify: () => undefined
@@ -26,6 +28,7 @@ export function AppContextProvider({
   canEdit,
   editingBy,
   needsNewerApp = false,
+  inConflict = false,
   showError,
   notify,
   children
@@ -34,6 +37,7 @@ export function AppContextProvider({
   canEdit: boolean
   editingBy: string | null
   needsNewerApp?: boolean
+  inConflict?: boolean
   showError: (message: string) => void
   notify: (text: string, opts?: { undo?: boolean }) => void
   children: ReactNode
@@ -49,7 +53,9 @@ export function AppContextProvider({
     }
   }, [revision])
   return (
-    <Ctx.Provider value={{ revision, canEdit, editingBy, needsNewerApp, terms, showError, notify }}>
+    <Ctx.Provider
+      value={{ revision, canEdit, editingBy, needsNewerApp, inConflict, terms, showError, notify }}
+    >
       {children}
     </Ctx.Provider>
   )
@@ -62,10 +68,14 @@ export const useEditingBy = (): string | null => useContext(Ctx).editingBy
 
 /** Why codes and letters are unavailable, for the line under their buttons. */
 export function useLockedReason(): string {
-  const { editingBy, needsNewerApp } = useContext(Ctx)
-  return needsNewerApp
-    ? 'Codes and letters are locked because this file needs a newer Locker Manager. Update it (Help, Check for updates) to use them.'
-    : `Codes and letters are locked while ${editingBy ?? 'someone else'} edits the file. Ask them to look it up, or wait until they close it.`
+  const { editingBy, needsNewerApp, inConflict } = useContext(Ctx)
+  if (needsNewerApp)
+    return 'Codes and letters are locked because this file needs a newer Locker Manager. Update it (Help, Check for updates) to use them.'
+  if (inConflict)
+    return 'Codes and letters are locked until the two versions of this file are sorted out.'
+  if (editingBy)
+    return `Codes and letters are locked while ${editingBy} edits the file. Ask them to look it up, or wait until they close it.`
+  return 'Codes and letters are locked while this file is read-only.'
 }
 export const useTerms = (): Terminology => useContext(Ctx).terms
 export const useNotify = (): ((text: string, opts?: { undo?: boolean }) => void) =>

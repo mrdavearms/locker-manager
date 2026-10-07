@@ -294,6 +294,7 @@ export function App(): React.JSX.Element {
         canEdit={open?.mode === 'edit' && !open.conflict}
         editingBy={editingBy}
         needsNewerApp={open?.readOnly?.reason === 'newer_version'}
+        inConflict={!!open?.conflict}
         showError={setError}
         notify={notify}
       >

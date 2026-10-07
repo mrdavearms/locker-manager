@@ -63,7 +63,7 @@ export function CodeReveal({ lockerId }: { lockerId: string }): React.JSX.Elemen
       size="sm"
       variant="secondary"
       disabled={!canEdit}
-      title={'Shows the code; this is recorded'}
+      title="Shows the code; this is recorded"
       onClick={() =>
         void act(async () => {
           if (!(await gate())) return
