@@ -33,6 +33,13 @@ export function IssuedDialog({
   onClose: () => void
 }): React.JSX.Element {
   const terms = useTerms()
+  const { data: allLockers } = useRpc('lockers.list', {})
+  // The PIN sentence points at Show code, which only a locker with a code has.
+  // While the list loads, or if the locker is not found, keep the sentence.
+  const matches = allLockers?.filter((l) => l.number === lockerNumber) ?? []
+  const lockTakesCode =
+    matches.length === 0 ||
+    matches.some((l) => l.lockType !== null && LOCK_TYPE_INFO[l.lockType].hasCode)
   return (
     <Modal
       open
@@ -53,8 +60,8 @@ export function IssuedDialog({
         </>
       ) : (
         <p className="text-sm text-ink-muted">
-          No code to show here. Keyed locks and lockers without a lock have none. If your school
-          protects codes with a PIN, use Show code.
+          No code to show here. Keyed locks and lockers without a lock have none.
+          {lockTakesCode && ' If your school protects codes with a PIN, use Show code.'}
         </p>
       )}
       <div className="mt-6 flex justify-end">

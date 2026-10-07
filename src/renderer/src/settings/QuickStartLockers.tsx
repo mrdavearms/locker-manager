@@ -91,8 +91,8 @@ export function QuickStartLockers(): React.JSX.Element | null {
         </div>
       </form>
       <p className="mt-4 text-sm text-ink-muted">
-        {terms.locker.many} in more than one place, or numbered with letters? Use the full editor
-        below.
+        New {lockers} you add later start with this kind of lock too. {terms.locker.many} in more
+        than one place, or numbered with letters? Use the full editor below.
       </p>
     </SectionCard>
   )

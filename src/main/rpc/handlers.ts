@@ -175,12 +175,14 @@ export const handlers: Handlers = {
     }),
     run: (db, ctx, p) => {
       const terms = getTerms(db)
+      const lock = { ...lockDefaults(db), type: p.lockType }
+      setSetting(db, ctx, 'locks.defaults', lock)
       return quickStartLockers(db, ctx, {
         areaName: `All ${terms.locker.many.toLowerCase()}`,
         bankName: `${terms.bank.one} 1`,
         count: p.count,
         firstNumber: p.firstNumber,
-        lock: { ...lockDefaults(db), type: p.lockType }
+        lock
       })
     }
   },

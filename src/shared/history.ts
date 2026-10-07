@@ -60,6 +60,8 @@ export function describeAction(action: string): string {
     'locks.set_for_bank': 'Changed the locks for a bank',
     'locks.defaults_set': 'Changed the usual lock',
     'setup.completed': 'Finished set-up',
+    'setup.item_not_used': 'Set aside a getting-started item',
+    'setup.item_used': 'Brought back a getting-started item',
     'students.imported': 'Imported students',
     'student.added': 'Added a student by hand',
     'student.updated': 'Changed a student',

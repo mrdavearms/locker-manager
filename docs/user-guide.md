@@ -232,6 +232,7 @@ If all your lockers are in one place and numbered 1, 2, 3 and so on, use **Add a
 lockers at once** in the **Lockers** set-up step. Type **How many lockers?**, the **First
 number** and the **Kind of lock**, then click **Add lockers**. The app puts them in one area
 called "All lockers" with one bank called "Bank 1"; click **Rename** to change either name.
+Lockers you add later start with the same kind of lock.
 
 Lockers belong to a **bank** (a row or wall), and banks belong to an **area** (a group with
 a purpose, such as "Year 7 side").

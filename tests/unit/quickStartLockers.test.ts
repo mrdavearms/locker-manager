@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { createNewDatabase } from '../../src/main/db/newFile'
 import { handlers } from '../../src/main/rpc/handlers'
 import { createArea, listAreas, listLockers } from '../../src/main/repos/locations'
-import { setSetting } from '../../src/main/repos/settings'
+import { getSetting, setSetting } from '../../src/main/repos/settings'
 import { setTerms } from '../../src/main/repos/school'
-import { DEFAULT_LOCK } from '../../src/shared/locks'
+import { DEFAULT_LOCK, LockDefaultsSchema } from '../../src/shared/locks'
 import { DEFAULT_TERMS } from '../../src/shared/terminology'
 import { testContext } from './helpers'
 
@@ -95,6 +95,13 @@ describe('lockers.quickStart', () => {
         manufacturer: 'SYNTHETIC Locks'
       })
     }
+  })
+
+  it('saves the chosen lock kind as the usual lock for lockers added later', async () => {
+    const ctx = testContext()
+    const db = await freshDb()
+    quickStart().run(db, ctx, { count: 3, firstNumber: 1, lockType: 'none' })
+    expect(getSetting(db, 'locks.defaults', LockDefaultsSchema, DEFAULT_LOCK).type).toBe('none')
   })
 
   it("names the area and bank with the school's own words", async () => {

@@ -32,7 +32,7 @@ export function SetupWizard({ onFinish }: { onFinish: () => void }): React.JSX.E
       body: (
         <div className="space-y-6">
           <QuickStartLockers />
-          <LocationsEditor />
+          <LocationsEditor hideEmptyHint />
         </div>
       ),
       done: (status?.lockers ?? 0) > 0
