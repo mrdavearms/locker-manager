@@ -190,6 +190,14 @@ export const rpcParams = {
     needsAccessible: z.boolean().optional(),
     confirmName: z.boolean().optional()
   }),
+  'student.create': z.object({
+    externalId: z.string().trim().min(1).max(40),
+    firstName: z.string().trim().min(1).max(80),
+    lastName: z.string().trim().min(1).max(80),
+    preferredName: z.string().max(80).nullable(),
+    yearLevel: z.string().max(20).nullable(),
+    groupCode: z.string().max(40).nullable()
+  }),
   'student.stillHere': z.object({ id }),
   'student.confirmLeft': z.object({ id }),
   'exclusions.list': z.object({}),
@@ -368,6 +376,7 @@ export interface RpcResults {
   'students.counts': StudentCounts
   'student.get': StudentView | null
   'student.update': StudentView
+  'student.create': StudentView
   'student.stillHere': null
   'student.confirmLeft': null
   'exclusions.list': ExclusionView[]

@@ -15,6 +15,7 @@ import { NavRail, type Screen } from './components/NavRail'
 import { NewFileDialog } from './components/NewFileDialog'
 import { OperatorDialog } from './components/OperatorDialog'
 import { PinGateProvider } from './components/PinGate'
+import { AddStudentDialog } from './components/AddStudentDialog'
 import { QuickFind } from './components/QuickFind'
 import { StatusBar } from './components/StatusBar'
 import { UpdateBanner } from './components/UpdateBanner'
@@ -98,6 +99,8 @@ export function App(): React.JSX.Element {
     })
   }, [])
   const [finder, setFinder] = useState<Finder | null>(null)
+  // The typed name when Add a student was opened from the find box for a new student.
+  const [addingStudent, setAddingStudent] = useState<string | null>(null)
   // The screen belongs to the open file: a different (or no) file starts on Home.
   const [nav, setNav] = useState<{
     path: string | null
@@ -401,7 +404,35 @@ export function App(): React.JSX.Element {
             </main>
           </div>
           {open && finder && (
-            <QuickFind open title={finder.title} onClose={() => setFinder(null)} onPick={onFound} />
+            <QuickFind
+              open
+              title={finder.title}
+              onClose={() => setFinder(null)}
+              onPick={onFound}
+              {...(finder.intent === 'assign'
+                ? {
+                    onAddStudent: (typed: string) => {
+                      setFinder(null)
+                      setAddingStudent(typed)
+                    }
+                  }
+                : {})}
+            />
+          )}
+          {open && (
+            <AddStudentDialog
+              open={addingStudent !== null}
+              initialName={addingStudent ?? ''}
+              onClose={() => setAddingStudent(null)}
+              onAdded={(s) => {
+                setAddingStudent(null)
+                setNav({
+                  path: openPath,
+                  screen: 'students',
+                  focus: { studentId: s.id, intent: 'assign', n: Date.now() }
+                })
+              }}
+            />
           )}
           <Tour
             open={tourOpen}

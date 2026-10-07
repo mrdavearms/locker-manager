@@ -60,6 +60,7 @@ export function describeAction(action: string): string {
     'locks.defaults_set': 'Changed the usual lock',
     'setup.completed': 'Finished set-up',
     'students.imported': 'Imported students',
+    'student.added': 'Added a student by hand',
     'student.updated': 'Changed a student',
     'student.name_confirmed': 'Confirmed a name',
     'student.still_enrolled': 'Confirmed a student is still enrolled',

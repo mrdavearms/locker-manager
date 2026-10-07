@@ -14,6 +14,7 @@ import { getSetting, setSetting } from '../repos/settings'
 import {
   addExclusion,
   confirmLeft,
+  createStudent,
   getStudent,
   groupMap,
   listExclusions,
@@ -75,6 +76,7 @@ type StudentKeys =
   | 'students.list'
   | 'students.counts'
   | 'student.get'
+  | 'student.create'
   | 'student.update'
   | 'student.stillHere'
   | 'student.confirmLeft'
@@ -141,6 +143,11 @@ export const studentHandlers: Pick<Handlers, StudentKeys> = {
   'students.list': { kind: 'read', run: (db, p) => listStudents(db, strip(p)) },
   'students.counts': { kind: 'read', run: (db) => studentCounts(db) },
   'student.get': { kind: 'read', run: (db, p) => getStudent(db, p.id) },
+  'student.create': {
+    kind: 'write',
+    audit: (p, s) => ({ action: 'student.added', entity: 'student', entityId: s.id, after: p }),
+    run: (db, ctx, p) => getStudent(db, createStudent(db, ctx, p))!
+  },
   'student.update': {
     kind: 'write',
     audit: (p) => ({

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Accessibility, Ban, FileInput, Search, SpellCheck, UserX } from 'lucide-react'
+import { Accessibility, Ban, FileInput, Search, SpellCheck, UserPlus, UserX } from 'lucide-react'
 import type { StudentFilter, StudentView } from '@shared/students'
+import { AddStudentDialog } from '@renderer/components/AddStudentDialog'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, TextInput } from '@renderer/components/Field'
 import { Modal } from '@renderer/components/Modal'
@@ -439,6 +440,7 @@ export function StudentsScreen({
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(focus?.studentId ?? null)
   const [intent, setIntent] = useState<LockerIntent>(focus?.intent ?? null)
+  const [adding, setAdding] = useState(false)
   const { data: counts } = useRpc('students.counts', {})
   const { data: students } = useRpc('students.list', {
     filter,
@@ -473,10 +475,31 @@ export function StudentsScreen({
             with each import.
           </p>
         </div>
-        <Button size="lg" disabled={!canEdit} onClick={onImport} data-testid="start-import">
-          <FileInput size={20} aria-hidden /> Import students
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="lg"
+            variant="secondary"
+            disabled={!canEdit}
+            onClick={() => setAdding(true)}
+            data-testid="add-student-open"
+          >
+            <UserPlus size={20} aria-hidden /> Add a student…
+          </Button>
+          <Button size="lg" disabled={!canEdit} onClick={onImport} data-testid="start-import">
+            <FileInput size={20} aria-hidden /> Import students
+          </Button>
+        </div>
       </header>
+      <AddStudentDialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        onAdded={(s) => (
+          setAdding(false),
+          setFilter('current'),
+          setSearch(''),
+          setSelectedId(s.id)
+        )}
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <div
