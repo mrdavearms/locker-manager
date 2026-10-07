@@ -407,11 +407,15 @@ uses. Their year level and group are then replaced by the student system's value
 Find the student and change **Year level** and **Group** in their panel. The next import
 replaces these with the student system's values.
 
-If their locker is no longer on the right side for their year level, the app offers to
-move them: click **Move to** and the locker number, or leave them where they are.
+Click **Save** to keep the change, or **Put back** to go back to what is stored.
 
-**Settings, Year levels and homerooms** (the tab name follows your own words) sets the names shown for each year level and group, and
-which ones are **Placed last** when lockers are given out.
+If their locker is no longer on the right side for their year level, the app offers to
+move them: click **Move to** and the locker number, or leave them where they are. After a
+move the app shows the new code, as **Move…** does. If there is no spare locker on their
+side, the message says so: use **Move…** when one is free.
+
+**Settings, Year levels and homerooms** (the tab name follows your own words) sets the name
+shown for each group, and which groups are **Placed last** when lockers are given out.
 
 ## A new student arrives
 
@@ -453,7 +457,7 @@ To do many at once:
 - Click **Mark N as reset** (N is how many are ticked).
 - Click **Print this list** to take a paper copy round the lockers.
 
-On the Lockers screen the list is folded to one line. Click it to open it.
+On the Lockers screen the list is folded to one line. Click **Show** to open it.
 
 ## Undo a mistake
 

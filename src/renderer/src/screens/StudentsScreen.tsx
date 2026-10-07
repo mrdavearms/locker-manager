@@ -10,7 +10,7 @@ import { useAction, useCanEdit, useNotify, useTerms } from '@renderer/lib/appCon
 import { cn } from '@renderer/lib/cn'
 import { formatWhen } from '@renderer/lib/format'
 import { call, useRpc } from '@renderer/lib/rpc'
-import { StudentLockerCard, type LockerIntent } from '@renderer/lockers/LockerActions'
+import { IssuedDialog, StudentLockerCard, type LockerIntent } from '@renderer/lockers/LockerActions'
 
 const NAME_CHECK_TEXT: Record<string, string> = {
   mac: 'Mac name: MacDonald or Macdonald?',
@@ -41,6 +41,15 @@ function StudentPanel({
   const [yearLevel, setYearLevel] = useState(s.yearLevel ?? '')
   const [groupCode, setGroupCode] = useState(s.groupCode ?? '')
   const [offer, setOffer] = useState<{ lockerId: string; number: string } | null>(null)
+  const [issued, setIssued] = useState<{ code: string | null; number: string } | null>(null)
+  // The fields follow the stored year level and group when they change (Undo, another
+  // computer, or the save itself), without remounting the panel and losing the move offer.
+  const [seen, setSeen] = useState({ year: s.yearLevel ?? '', group: s.groupCode ?? '' })
+  if (seen.year !== (s.yearLevel ?? '') || seen.group !== (s.groupCode ?? '')) {
+    setSeen({ year: s.yearLevel ?? '', group: s.groupCode ?? '' })
+    setYearLevel(s.yearLevel ?? '')
+    setGroupCode(s.groupCode ?? '')
+  }
   const placementDirty = yearLevel !== (s.yearLevel ?? '') || groupCode !== (s.groupCode ?? '')
   const dirty =
     first !== s.firstName || last !== s.lastName || preferred !== (s.preferredName ?? '')
@@ -134,7 +143,7 @@ function StudentPanel({
                 setPreferred(s.preferredName ?? '')
               )}
             >
-              Undo
+              Put back
             </Button>
             <Button
               size="sm"
@@ -163,6 +172,7 @@ function StudentPanel({
 
       <div className="mt-5 grid gap-3">
         <YearGroupFields
+          key={`${seen.year}-${seen.group}`}
           idPrefix="st"
           disabled={!canEdit}
           year={yearLevel}
@@ -180,7 +190,7 @@ function StudentPanel({
               size="sm"
               onClick={() => (setYearLevel(s.yearLevel ?? ''), setGroupCode(s.groupCode ?? ''))}
             >
-              Undo
+              Put back
             </Button>
             <Button
               size="sm"
@@ -188,17 +198,30 @@ function StudentPanel({
               data-testid="student-placement-save"
               onClick={() =>
                 void act(async () => {
-                  await call('student.update', {
+                  const saved = await call('student.update', {
                     id: s.id,
                     yearLevel: yearLevel.trim() || null,
                     groupCode: groupCode || null
                   })
+                  // Show what was stored ("Year 8" typed is stored as "8"), so Save goes away.
+                  setYearLevel(saved.yearLevel ?? '')
+                  setGroupCode(saved.groupCode ?? '')
                   notify(
-                    `${s.displayName} is now in ${terms.yearLevel.one.toLowerCase()} ${yearLevel.trim() || 'not set'}, ${terms.group.one.toLowerCase()} ${groupCode || 'none'}.`
+                    `${s.displayName} is now in ${terms.yearLevel.one.toLowerCase()} ${saved.yearLevel ?? 'not set'}, ${terms.group.one.toLowerCase()} ${saved.groupDisplay ?? 'none'}.`
                   )
                   if (s.locker) {
                     const r = await call('student.lockerFits', { studentId: s.id })
                     if (!r.fits && r.suggestion) setOffer(r.suggestion)
+                    else if (!r.fits) {
+                      const place =
+                        saved.groupDisplay ??
+                        (saved.yearLevel
+                          ? `${terms.yearLevel.one} ${saved.yearLevel}`
+                          : `no ${terms.group.one.toLowerCase()}`)
+                      notify(
+                        `${s.displayName} is now in ${place}, but there is no spare ${terms.locker.one.toLowerCase()} on their side. Use Move… when one is free.`
+                      )
+                    }
                   }
                 })
               }
@@ -236,6 +259,8 @@ function StudentPanel({
                       undo: true
                     }
                   )
+                  // The new code was recorded as shown, so it must be shown.
+                  setIssued({ code: r.code, number: r.lockerNumber })
                 })
               }
             >
@@ -243,6 +268,15 @@ function StudentPanel({
             </Button>
           </div>
         </Modal>
+      )}
+
+      {issued && (
+        <IssuedDialog
+          title={`${s.displayName} moved to ${terms.locker.one.toLowerCase()} ${issued.number}`}
+          code={issued.code}
+          lockerNumber={issued.number}
+          onClose={() => setIssued(null)}
+        />
       )}
 
       <StudentLockerCard s={s} intent={intent} onIntentDone={onIntentDone} />

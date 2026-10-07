@@ -19,7 +19,8 @@ import { call, useRpc } from '@renderer/lib/rpc'
 
 export type LockerIntent = 'assign' | 'leave' | 'recode' | 'move' | 'swap' | 'moveOrSwap' | null
 
-function IssuedDialog({
+/** Shows the code a student was just given; the code is already recorded as shown. */
+export function IssuedDialog({
   title,
   code,
   lockerNumber,
@@ -542,7 +543,7 @@ export function ResetList({
             })
           }
         >
-          Mark {chosen.length} as reset
+          {chosen.length === 0 ? 'Mark as reset' : `Mark ${chosen.length} as reset`}
         </Button>
         {onPrint && (
           <Button size="sm" variant="ghost" onClick={onPrint}>
