@@ -1,8 +1,13 @@
 import { join } from 'node:path'
-import { BrowserWindow, session, shell } from 'electron'
+import { app, BrowserWindow, session, shell } from 'electron'
 import { brand } from '@shared/brand'
 
 const isDev = !!process.env['ELECTRON_RENDERER_URL']
+
+// The end-to-end tests start the app dozens of times. With this set, the window
+// opens without taking focus from whoever is using the computer, and on a Mac
+// the app stays out of the Dock and never comes to the front.
+const background = process.env['LOCKER_MANAGER_BACKGROUND'] === '1'
 
 /**
  * Content Security Policy for the renderer. Inline styles are allowed because
@@ -37,6 +42,7 @@ export function installContentSecurityPolicy(): void {
 }
 
 export function createMainWindow(): BrowserWindow {
+  if (background && process.platform === 'darwin') app.setActivationPolicy('accessory')
   const win = new BrowserWindow({
     title: brand.name,
     width: 1200,
@@ -56,7 +62,7 @@ export function createMainWindow(): BrowserWindow {
     }
   })
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => (background ? win.showInactive() : win.show()))
 
   // Links open in the operator's browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
