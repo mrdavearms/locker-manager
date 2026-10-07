@@ -225,6 +225,7 @@ export const rpcParams = {
   }),
   'codes.resetTasks': z.object({}),
   'codes.resetDone': z.object({ lockId: id }),
+  'codes.resetDoneMany': z.object({ lockIds: z.array(id).min(1).max(10_000) }),
   'codes.reveal': z.object({ lockerId: id }),
   'codes.recode': z.object({ lockerId: id, reason: z.string().trim().min(3).max(200) }),
   'codes.setFixed': z.object({
@@ -395,6 +396,7 @@ export interface RpcResults {
   'codes.sets.generate': { codes: number; spares: number; validCount: number; overHalf: boolean }
   'codes.resetTasks': ResetTask[]
   'codes.resetDone': null
+  'codes.resetDoneMany': number
   'codes.reveal': { code: string | null }
   'codes.recode': { code: string | null }
   'codes.setFixed': null

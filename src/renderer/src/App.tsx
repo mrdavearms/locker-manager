@@ -34,6 +34,7 @@ import type { LockerIntent } from './lockers/LockerActions'
 import { HelpScreen } from './help/HelpScreen'
 import { Tour } from './onboarding/Tour'
 import { HistoryScreen } from './screens/HistoryScreen'
+import type { ReportId } from '@shared/reports'
 import { HomeScreen } from './screens/HomeScreen'
 import { LockersScreen } from './screens/LockersScreen'
 import { SettingsScreen, type SettingsTab } from './screens/SettingsScreen'
@@ -107,6 +108,7 @@ export function App(): React.JSX.Element {
     path: string | null
     screen: Screen
     focus: { studentId?: string; lockerId?: string; intent: LockerIntent; n: number } | null
+    report?: ReportId
   }>({
     path: null,
     screen: 'home',
@@ -133,6 +135,8 @@ export function App(): React.JSX.Element {
   }
   const screen: Screen = nav.path === openPath ? nav.screen : 'home'
   const focus = nav.path === openPath ? nav.focus : null
+  const printResets = (): void =>
+    setNav({ path: openPath, screen: 'reports', focus: null, report: 'reset_checklist' })
   const setScreen = useCallback(
     (next: Screen) => setNav({ path: openPath, screen: next, focus: null }),
     [openPath]
@@ -358,6 +362,7 @@ export function App(): React.JSX.Element {
                           focus: { studentId, intent, n: Date.now() }
                         })
                       }
+                      onPrintResets={printResets}
                       focusLockerId={focus?.lockerId ?? null}
                     />
                   ) : screen === 'allocate' ? (
@@ -369,7 +374,7 @@ export function App(): React.JSX.Element {
                   ) : screen === 'letters' ? (
                     <LettersScreen onDesign={() => setScreen('settings-letters')} />
                   ) : screen === 'reports' ? (
-                    <ReportsScreen />
+                    <ReportsScreen key={nav.report ?? 'reports'} initialReport={nav.report} />
                   ) : screen === 'rollover' ? (
                     <RolloverScreen onNavigate={setScreen} />
                   ) : screen === 'settings' ? (
@@ -387,6 +392,7 @@ export function App(): React.JSX.Element {
                       state={open}
                       onError={setError}
                       onNavigate={setScreen}
+                      onPrintResets={printResets}
                       onFind={(intent) =>
                         setFinder({ title: FIND_TITLES[intent ?? 'find'], intent })
                       }

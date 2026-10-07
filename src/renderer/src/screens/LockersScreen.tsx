@@ -396,11 +396,13 @@ export function LockersScreen({
   onSetUp,
   onAllocate,
   onOpenStudent,
+  onPrintResets,
   focusLockerId
 }: {
   onSetUp: () => void
   onAllocate: () => void
   onOpenStudent: (studentId: string, intent: LockerIntent) => void
+  onPrintResets: () => void
   focusLockerId: string | null
 }): React.JSX.Element {
   const terms = useTerms()
@@ -452,7 +454,7 @@ export function LockersScreen({
         </div>
       </header>
 
-      <ResetList />
+      <ResetList collapsed onPrint={onPrintResets} />
 
       {areas?.length === 0 && (
         <div className="card p-8 text-center">

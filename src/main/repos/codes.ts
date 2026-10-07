@@ -286,6 +286,12 @@ export function markNeedsNewCode(db: LockerDb, ctx: OperatorContext, lockId: str
   }
 }
 
+/** "Reset done" for every ticked lock, in one change and one history line. */
+export function markResetDoneMany(db: LockerDb, ctx: OperatorContext, lockIds: string[]): number {
+  for (const id of lockIds) markResetDone(db, ctx, id)
+  return lockIds.length
+}
+
 /** An operator ticks that the physical lock has been reset (SPEC.md 4.5). */
 export function markResetDone(db: LockerDb, ctx: OperatorContext, lockId: string): CodeStatus {
   const lock = lockRow(db, lockId)

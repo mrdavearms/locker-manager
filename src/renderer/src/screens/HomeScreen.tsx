@@ -153,11 +153,13 @@ export function HomeScreen({
   onError,
   onNavigate,
   onFind,
+  onPrintResets,
   checklistHidden,
   onHideChecklist
 }: Props & {
   onNavigate: (s: Screen) => void
   onFind: (intent: LockerIntent) => void
+  onPrintResets: () => void
   /** The getting-started list was hidden on this computer. */
   checklistHidden: boolean
   onHideChecklist: () => void
@@ -293,7 +295,7 @@ export function HomeScreen({
 
       <ProblemsPanel onNavigate={onNavigate} />
 
-      <ResetList />
+      <ResetList onPrint={onPrintResets} />
 
       {!state.summary.demo && !state.summary.practice && (
         <section className="card flex flex-wrap items-center gap-4 p-5">

@@ -8,6 +8,7 @@ import { Modal } from '@renderer/components/Modal'
 import { QuickFind } from '@renderer/components/QuickFind'
 import { useCodeGate } from '@renderer/components/PinGate'
 import { useAction, useCanEdit, useNotify, useTerms } from '@renderer/lib/appContext'
+import { plural } from '@renderer/lib/format'
 import { call, useRpc } from '@renderer/lib/rpc'
 
 export type LockerIntent = 'assign' | 'leave' | 'recode' | 'move' | 'swap' | 'moveOrSwap' | null
@@ -458,13 +459,48 @@ export function StudentLockerCard({
   )
 }
 
-export function ResetList(): React.JSX.Element | null {
+export function ResetList({
+  collapsed = false,
+  onPrint
+}: {
+  /** Show only the count until opened (the Lockers screen). */
+  collapsed?: boolean
+  /** Open the Locks to reset report, to print the list. */
+  onPrint?: () => void
+}): React.JSX.Element | null {
   const terms = useTerms()
   const canEdit = useCanEdit()
   const act = useAction()
   const notify = useNotify()
   const { data: tasks } = useRpc('codes.resetTasks', {})
+  const [ticked, setTicked] = useState<Set<string>>(new Set())
+  const [shown, setShown] = useState(false)
   if (!tasks || tasks.length === 0) return null
+  // A lock that was reset elsewhere is no longer on the list, so it cannot stay ticked.
+  const chosen = tasks.filter((t) => ticked.has(t.lockId)).map((t) => t.lockId)
+  const toggle = (lockId: string, on: boolean): void =>
+    setTicked((prev) => {
+      const next = new Set(prev)
+      if (on) next.add(lockId)
+      else next.delete(lockId)
+      return next
+    })
+  if (collapsed && !shown) {
+    return (
+      <section
+        className="card flex flex-wrap items-center gap-3 p-4 animate-rise"
+        aria-labelledby="reset-heading"
+        data-testid="reset-list"
+      >
+        <h2 id="reset-heading" className="flex-1 text-base font-semibold">
+          {plural(tasks.length, 'lock')} to reset
+        </h2>
+        <Button size="sm" variant="secondary" onClick={() => setShown(true)}>
+          Show
+        </Button>
+      </section>
+    )
+  }
   return (
     <section
       className="card p-6 animate-rise"
@@ -478,9 +514,46 @@ export function ResetList(): React.JSX.Element | null {
         Reset each lock to 0 0 0 0 with the master key, then tick it off. Letters for these wait
         until the lock is reset.
       </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => setTicked(new Set(tasks.map((t) => t.lockId)))}
+        >
+          Tick all
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => setTicked(new Set())}>
+          Untick all
+        </Button>
+        <Button
+          size="sm"
+          disabled={!canEdit || chosen.length === 0}
+          onClick={() =>
+            void act(async () => {
+              const n = await call('codes.resetDoneMany', { lockIds: chosen })
+              setTicked(new Set())
+              notify(`${plural(n, 'lock')} marked as reset.`)
+            })
+          }
+        >
+          Mark {chosen.length} as reset
+        </Button>
+        {onPrint && (
+          <Button size="sm" variant="ghost" onClick={onPrint}>
+            Print this list
+          </Button>
+        )}
+      </div>
       <ul className="mt-4 divide-y divide-line">
         {tasks.map((t) => (
           <li key={t.lockId} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
+            <input
+              type="checkbox"
+              className="size-4"
+              aria-label={`${terms.locker.one} ${t.lockerNumber ?? 'spare'} is reset`}
+              checked={ticked.has(t.lockId)}
+              onChange={(e) => toggle(t.lockId, e.target.checked)}
+            />
             <span className="stencil w-16 text-2xl leading-none">{t.lockerNumber ?? '?'}</span>
             <span className="flex-1">
               {t.holder ?? `Spare ${terms.locker.one.toLowerCase()}`}

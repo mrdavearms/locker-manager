@@ -76,6 +76,7 @@ export function describeAction(action: string): string {
     'codes.rules_set': 'Changed the code rules',
     'codes.set_generated': 'Made a code set',
     'lock.reset_done': 'Reset a lock',
+    'codes.reset_done_many': 'Marked locks as reset',
     'code.shown': 'Showed a code',
     'code.changed': 'Issued a new code',
     'code.fixed_recorded': 'Recorded a padlock code',

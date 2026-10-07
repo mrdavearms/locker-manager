@@ -7,6 +7,7 @@ import {
   listCodeSets,
   resetTasks,
   markResetDone,
+  markResetDoneMany,
   revealCode,
   issueCode,
   lockForLocker,
@@ -38,6 +39,7 @@ type Keys =
   | 'codes.sets.generate'
   | 'codes.resetTasks'
   | 'codes.resetDone'
+  | 'codes.resetDoneMany'
   | 'codes.reveal'
   | 'codes.recode'
   | 'codes.setFixed'
@@ -108,6 +110,11 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
       markResetDone(db, ctx, p.lockId)
       return null
     }
+  },
+  'codes.resetDoneMany': {
+    kind: 'write',
+    audit: (_p, n) => ({ action: 'codes.reset_done_many', entity: 'lock', after: { locks: n } }),
+    run: (db, ctx, p) => markResetDoneMany(db, ctx, p.lockIds)
   },
   'codes.reveal': {
     kind: 'write',

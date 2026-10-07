@@ -27,6 +27,7 @@ import {
   generateYearSet,
   issueCode,
   markResetDone,
+  markResetDoneMany,
   resetTasks,
   revealCode
 } from '../../src/main/repos/codes'
@@ -455,6 +456,17 @@ describe('committing, codes and the manual tools (SPEC.md 4.4, 4.5)', () => {
     expect(tasks[0]).toMatchObject({ lockerId: s.locker_id, status: 'needs_new_code' })
     // Staff reset it to 0 0 0 0: off the list, ready for a new code.
     markResetDone(db, ctx, tasks[0]!.lockId)
+    expect(resetTasks(db)).toEqual([])
+  })
+
+  it('marks many locks as reset in one change', async () => {
+    const { db, ctx } = await allocated()
+    const held = db.all<{ student_id: string }>(
+      "SELECT student_id FROM assignment WHERE status = 'current' LIMIT 3"
+    )
+    for (const h of held) releaseStudent(db, ctx, h.student_id, { left: true })
+    const ids = resetTasks(db).map((t) => t.lockId)
+    expect(markResetDoneMany(db, ctx, ids)).toBe(3)
     expect(resetTasks(db)).toEqual([])
   })
 
