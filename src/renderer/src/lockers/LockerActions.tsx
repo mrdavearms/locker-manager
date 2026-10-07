@@ -42,8 +42,8 @@ function IssuedDialog({
       {code ? (
         <>
           <p className="text-sm text-ink-muted">
-            The code for the student to set. It is also on their letter: print it from Letters, or
-            with Save their letter below.
+            The code for the student to set. Their letter has it too: use Save their letter as PDF
+            in their panel, or Letters, New lockers and codes since the last letters.
           </p>
           <div className="mt-3">
             <CodeBoxes code={code} />

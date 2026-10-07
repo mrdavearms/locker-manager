@@ -250,7 +250,7 @@ it and its lock.
 
 Locker numbers cannot be typed over, because that once left a school with one locker missing
 and another listed twice. Use this only when the number plate on the door really changes.
-To give a student a different locker, use **Move** instead (arriving in a later update).
+To give a student a different locker, use **Move** instead.
 
 1. Click **Lockers** on the left, then click the locker.
 2. Click **Renumber…**, type the new number and why, and click **Renumber**.
@@ -382,7 +382,7 @@ during the year never use it, and it becomes next year's codes when you start ne
 1. On Home, click **New student**, and find the student (import them first if they are not
    there yet).
 2. The app suggests the first spare locker in their area. Click **Give this locker**.
-3. The code shows straight away. Their letter comes in the next update.
+3. The code shows straight away. Their letter has it too: use Save their letter as PDF in their panel, or Letters, New lockers and codes since the last letters.
 
 ## A student has left
 

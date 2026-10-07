@@ -40,6 +40,7 @@ test('import two Compass exports, check, compare and apply', async () => {
   await expect(l.page.getByTestId('import-new')).toContainText("O'Brien, Mia")
   await l.page.getByTestId('import-apply').click()
   await expect(l.page.getByTestId('import-done')).toContainText('12 students added')
+  await expect(l.page.getByRole('button', { name: 'Give out lockers now' })).toBeVisible()
   await l.page.getByRole('button', { name: 'See the students' }).click()
 
   await expect(l.page.getByRole('tab', { name: /Names to check/ })).toContainText('4')

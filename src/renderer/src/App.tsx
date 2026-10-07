@@ -360,7 +360,7 @@ export function App(): React.JSX.Element {
                       }
                     />
                   ) : screen === 'import' ? (
-                    <ImportWizard onClose={() => setScreen('students')} />
+                    <ImportWizard onClose={() => setScreen('students')} onNavigate={setScreen} />
                   ) : screen === 'lockers' ? (
                     <LockersScreen
                       key={focus?.n ?? 'lockers'}
@@ -377,7 +377,7 @@ export function App(): React.JSX.Element {
                       focusLockerId={focus?.lockerId ?? null}
                     />
                   ) : screen === 'allocate' ? (
-                    <AllocateScreen onDone={() => setScreen('lockers')} />
+                    <AllocateScreen onDone={() => setScreen('lockers')} onNavigate={setScreen} />
                   ) : screen === 'history' ? (
                     <HistoryScreen state={open} />
                   ) : screen === 'print' ? (

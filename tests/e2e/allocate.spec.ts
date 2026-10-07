@@ -18,6 +18,13 @@ test('allocate the demo school, show a code, a student leaves, undo', async () =
   await expect(l.page.getByTestId('unplaced')).toHaveCount(0)
   await l.page.getByTestId('commit-allocation').click()
   await expect(l.page.getByTestId('allocation-done')).toContainText('given out')
+  await expect(l.page.getByTestId('allocation-done')).not.toContainText('next update')
+  await expect(
+    l.page.getByTestId('allocation-done').getByRole('button', { name: 'Print labels' })
+  ).toBeVisible()
+  await expect(
+    l.page.getByTestId('allocation-done').getByRole('button', { name: 'Print letters' })
+  ).toBeVisible()
   await l.page.getByRole('button', { name: /See the lockers/ }).click()
 
   // Find the student in locker 1 and show their code.

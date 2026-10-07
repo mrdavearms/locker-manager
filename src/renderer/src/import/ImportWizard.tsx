@@ -24,6 +24,7 @@ import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, Select, TextInput } from '@renderer/components/Field'
 import { useAction, useTerms } from '@renderer/lib/appContext'
+import type { Screen } from '@renderer/components/NavRail'
 import { cn } from '@renderer/lib/cn'
 import { plural } from '@renderer/lib/format'
 import { call } from '@renderer/lib/rpc'
@@ -645,7 +646,14 @@ function CompareStep({
   )
 }
 
-export function ImportWizard({ onClose }: { onClose: () => void }): React.JSX.Element {
+export function ImportWizard({
+  onClose,
+  onNavigate
+}: {
+  onClose: () => void
+  onNavigate: (s: Screen) => void
+}): React.JSX.Element {
+  const terms = useTerms()
   const act = useAction()
   const [step, setStep] = useState<Step>('choose')
   const [importId, setImportId] = useState<string | null>(null)
@@ -796,9 +804,20 @@ export function ImportWizard({ onClose }: { onClose: () => void }): React.JSX.El
             {plural(result.markedMissing, 'possible leaver')} to check. A backup was kept before the
             change.
           </p>
-          <Button className="mt-6" size="lg" onClick={onClose}>
-            See the students
-          </Button>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            {result.added > 0 && (
+              <Button size="lg" onClick={() => onNavigate('allocate')}>
+                Give out {terms.locker.many.toLowerCase()} now
+              </Button>
+            )}
+            <Button
+              size="lg"
+              variant={result.added > 0 ? 'secondary' : 'primary'}
+              onClick={onClose}
+            >
+              See the students
+            </Button>
+          </div>
         </section>
       )}
 
