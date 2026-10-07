@@ -147,8 +147,13 @@ export function registerRenderHandlers(): void {
     async (_e, raw: unknown): Promise<ActionResult & { path?: string }> => {
       return await whileBusy('printing', async () => {
         const job = CalibrationJob.parse(raw)
-        const { html } = fileSession().read((db) => prepareCalibration(db, job.stockId, job.printer))
-        const path = await savePdf(`Label calibration page ${stampDate()}.pdf`, await htmlToPdf(html))
+        const { html } = fileSession().read((db) =>
+          prepareCalibration(db, job.stockId, job.printer)
+        )
+        const path = await savePdf(
+          `Label calibration page ${stampDate()}.pdf`,
+          await htmlToPdf(html)
+        )
         return path ? { ok: true, path } : { ok: false, cancelled: true, message: '' }
       })
     }

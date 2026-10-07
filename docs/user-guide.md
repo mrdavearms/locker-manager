@@ -116,13 +116,23 @@ Only one person can change the file at a time. If someone else has it open, an o
 says, for example, **Being edited by Hannah on OFFICE-PC since 9:12 am**, and the bottom
 bar says **Read-only**.
 
-- You can still look things up and print.
+- You can still look things up, and print labels and lists that carry no codes.
+- Codes and letters are locked on a read-only computer. Every code that is shown is
+  recorded in the file, and only the computer that is editing can write to the file. The
+  screen says this where a code would be.
+- Every screen shows who is editing.
 - Your screen updates by itself when they save.
 - When they close the file, a **Start editing** button appears. Click it to make changes.
 
 If their computer has gone quiet for more than 10 minutes (for example it crashed or was
 put to sleep), the box offers **Take over editing**. Only click it if you are sure they are
 not working on the file. Anything they had not saved is kept as a backup.
+
+## The message strip and Undo
+
+After most changes a strip at the bottom of the screen says what happened. It stays for 8
+seconds and has an **Undo** button. Click it straight away if the change was a mistake. For
+older changes, see **Undo a mistake**.
 
 ## Saving
 
@@ -377,6 +387,28 @@ examples.
 is never the same as its old one, plus spare codes for changes during the year. A set made while lockers are given out is marked **Kept for next year**: new students
 during the year never use it, and it becomes next year's codes when you start next year.
 
+## Add a student by hand
+
+If a student is not in your import yet:
+
+1. Click **Students**, then **Add a student…**. Or, on Home, click **New student**; when
+   **Find** has nothing, it offers to add them.
+2. Type their name, student ID, year level and group, then click **Add**.
+
+The next import matches them by **student ID**, so use the same ID your student system
+uses. Their year level and group are then replaced by the student system's values.
+
+## Change a student's year level or group
+
+Find the student and change **Year level** and **Group** in their panel. The next import
+replaces these with the student system's values.
+
+If their locker is no longer on the right side for their year level, the app offers to
+**Move** them. Choose a new locker, or leave them where they are.
+
+**Settings, Year levels and groups** sets the names shown for each year level and group, and
+which ones are **Placed last** when lockers are given out.
+
 ## A new student arrives
 
 1. On Home, click **New student**, and find the student (import them first if they are not
@@ -393,9 +425,12 @@ Their locker becomes a spare. Because they know its code, the lock goes on **Loc
 
 ## Move or swap students
 
-Find the student, then in their panel click **Move…** (choose the new locker) or **Swap…**
-(find the other student). Whole student records move, never just names. The codes change,
+On Home, click **Move or swap** and choose which one. Or find the student and, in their
+panel, click **Move…** (choose the new locker) or **Swap…** (find the other student). A swap
+shows both lockers before anything changes. Whole student records move, never just names. The codes change,
 because each student knows their old locker's code, and the locks go on **Locks to reset**.
+
+Marking a locker **Out of service** while a student holds it offers to move the student.
 
 ## A code has been shared, or forgotten
 
@@ -407,6 +442,14 @@ because each student knows their old locker's code, and the locks go on **Locks 
 
 Home and the Lockers screen list every lock that needs a physical reset. Reset each lock to
 0 0 0 0 with the master key, then click **Reset done**.
+
+To do many at once:
+
+- Tick each lock you have reset, or click **Tick all**.
+- Click **Mark N as reset** (N is how many are ticked).
+- Click **Print this list** to take a paper copy round the lockers.
+
+On the Lockers screen the list is folded to one line. Click it to open it.
 
 ## Undo a mistake
 
@@ -496,6 +539,12 @@ Each student with a locker gets a one-page letter with their locker number and c
    as dots on screen; the real codes are in the PDF.
 4. Wait for **Every letter fits on one page.**
 5. Click **Save as PDF…** (best) or **Print…**. Print at **Actual size** (100%).
+
+Letters are made 25 at a time. A progress bar shows how far along they are, and **Cancel**
+stops it.
+
+After you allocate lockers, **Print labels** and **Print letters** buttons take you here. After an
+import that added students, **Give out lockers now** takes you to Allocate.
 
 **Letters print only while the file is open for editing.** Every code that is printed is
 recorded in the history with your name. If someone else is editing, wait until they close

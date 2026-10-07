@@ -14,7 +14,10 @@ export function setBusy(partial: Partial<BusyState>): void {
 }
 
 /** Marks a print or import as running so an update never restarts in the middle of it. */
-export async function whileBusy<T>(what: 'printing' | 'importing', fn: () => Promise<T>): Promise<T> {
+export async function whileBusy<T>(
+  what: 'printing' | 'importing',
+  fn: () => Promise<T>
+): Promise<T> {
   counts[what]++
   state[what] = true
   try {
