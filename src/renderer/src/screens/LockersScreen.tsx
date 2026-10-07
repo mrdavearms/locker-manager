@@ -9,7 +9,7 @@ import { Modal } from '@renderer/components/Modal'
 import { useAction, useCanEdit, useNotify, useTerms } from '@renderer/lib/appContext'
 import { call, useRpc } from '@renderer/lib/rpc'
 import { CodeReveal } from '@renderer/components/CodeReveal'
-import { ResetList } from '@renderer/lockers/LockerActions'
+import { ResetList, type LockerIntent } from '@renderer/lockers/LockerActions'
 import { cn } from '@renderer/lib/cn'
 
 const CODE_STATUS_TEXT: Record<string, string> = {
@@ -65,11 +65,20 @@ function LockerTile({
   )
 }
 
-function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): React.JSX.Element {
+function LockerPanel({
+  l,
+  onClose,
+  onOpenStudent
+}: {
+  l: LockerView
+  onClose: () => void
+  onOpenStudent: (studentId: string, intent: LockerIntent) => void
+}): React.JSX.Element {
   const terms = useTerms()
   const notify = useNotify()
   const canEdit = useCanEdit()
   const act = useAction()
+  const only = l.holders.length === 1 ? l.holders[0] : undefined
   const [dialog, setDialog] = useState<'renumber' | 'out' | 'remove' | null>(null)
   const [text, setText] = useState('')
   const [reason, setReason] = useState('')
@@ -102,7 +111,20 @@ function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): Re
             <dd>
               {l.holders.length === 0
                 ? 'Spare'
-                : l.holders.map((h) => `${h.name}${h.group ? ` (${h.group})` : ''}`).join(', ')}
+                : l.holders.map((h, i) => (
+                    <span key={h.studentId}>
+                      {i > 0 && ', '}
+                      <button
+                        className="underline decoration-dotted underline-offset-2 hover:text-brand"
+                        title="Open this student to move them"
+                        disabled={!canEdit}
+                        onClick={() => onOpenStudent(h.studentId, 'move')}
+                      >
+                        {h.name}
+                      </button>
+                      {h.group ? ` (${h.group})` : ''}
+                    </span>
+                  ))}
             </dd>
           </div>
         </div>
@@ -235,6 +257,13 @@ function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): Re
           title={`${terms.locker.one} ${l.number} out of service`}
           description="It will be kept out of allocation until it is back in service."
         >
+          {l.holders.length > 0 && (
+            <p className="mb-4 text-sm">
+              {l.holders.map((h) => h.name).join(' and ')} {l.holders.length === 1 ? 'has' : 'have'}{' '}
+              this {terms.locker.one.toLowerCase()} now. After you mark it out of service, move{' '}
+              {l.holders.length === 1 ? 'them' : 'each of them'} to a spare.
+            </p>
+          )}
           <Field label="Why?" htmlFor="oos-reason">
             <TextInput
               id="oos-reason"
@@ -260,12 +289,15 @@ function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): Re
                       outOfServiceReason: reason
                     }),
                     setDialog(null),
-                    notify(`${terms.locker.one} ${l.number} is out of service.`)
+                    notify(`${terms.locker.one} ${l.number} is out of service.`),
+                    only && onOpenStudent(only.studentId, 'move')
                   )
                 )
               }
             >
-              Mark out of service
+              {only
+                ? `Mark out of service and move ${only.name.split(' ')[0]}`
+                : 'Mark out of service'}
             </Button>
           </div>
         </Modal>
@@ -363,10 +395,12 @@ function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): Re
 export function LockersScreen({
   onSetUp,
   onAllocate,
+  onOpenStudent,
   focusLockerId
 }: {
   onSetUp: () => void
   onAllocate: () => void
+  onOpenStudent: (studentId: string, intent: LockerIntent) => void
   focusLockerId: string | null
 }): React.JSX.Element {
   const terms = useTerms()
@@ -469,7 +503,12 @@ export function LockersScreen({
           ))}
         </div>
         {selected && (
-          <LockerPanel key={selected.id} l={selected} onClose={() => setSelectedId(null)} />
+          <LockerPanel
+            key={selected.id}
+            l={selected}
+            onClose={() => setSelectedId(null)}
+            onOpenStudent={onOpenStudent}
+          />
         )}
       </div>
     </div>

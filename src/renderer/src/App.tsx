@@ -351,6 +351,13 @@ export function App(): React.JSX.Element {
                       key={focus?.n ?? 'lockers'}
                       onSetUp={() => setScreen('setup')}
                       onAllocate={() => setScreen('allocate')}
+                      onOpenStudent={(studentId, intent) =>
+                        setNav({
+                          path: openPath,
+                          screen: 'students',
+                          focus: { studentId, intent, n: Date.now() }
+                        })
+                      }
                       focusLockerId={focus?.lockerId ?? null}
                     />
                   ) : screen === 'allocate' ? (
