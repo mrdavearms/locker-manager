@@ -3,6 +3,7 @@ import log from 'electron-log/main'
 import type { z } from 'zod'
 import { channels } from '@shared/channels'
 import { isRpcMethod, rpcParams, type RpcMethod, type RpcResults } from '@shared/rpc'
+import { whileBusy } from '../busy'
 import type { LockerDb } from '../db/db'
 import type { AuditEntry, OperatorContext } from '../db/context'
 import type { DataFileSession, Replayable } from '../file/session'
@@ -53,21 +54,29 @@ export function registerRpc(session: () => DataFileSession, handlers: Handlers):
       }
     }
     const h = handlers[method] as Handler<RpcMethod>
-    try {
-      if (h.kind === 'pure') return { ok: true, value: await h.run(parsed.data as never) }
-      const s = session()
-      if (h.kind === 'read')
-        return { ok: true, value: s.read((db) => h.run(db, parsed.data as never)) }
-      const value = s.write<RpcResults[RpcMethod]>(
-        (result) => h.audit(parsed.data as never, result),
-        (db, ctx) => h.run(db, ctx, parsed.data as never),
-        { method, params: parsed.data }
-      )
-      return { ok: true, value }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      log.info(`rpc ${method} refused`)
-      return { ok: false, message }
+
+    const execute = async () => {
+      try {
+        if (h.kind === 'pure') return { ok: true, value: await h.run(parsed.data as never) }
+        const s = session()
+        if (h.kind === 'read')
+          return { ok: true, value: s.read((db) => h.run(db, parsed.data as never)) }
+        const value = s.write<RpcResults[RpcMethod]>(
+          (result) => h.audit(parsed.data as never, result),
+          (db, ctx) => h.run(db, ctx, parsed.data as never),
+          { method, params: parsed.data }
+        )
+        return { ok: true, value }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        log.info(`rpc ${method} refused`)
+        return { ok: false, message }
+      }
     }
+
+    if (method === 'import.load' || method === 'import.apply') {
+      return await whileBusy('importing', execute)
+    }
+    return await execute()
   })
 }

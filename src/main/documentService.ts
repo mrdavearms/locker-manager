@@ -5,6 +5,7 @@ import { channels } from '@shared/channels'
 import type { ActionResult } from '@shared/ipc'
 import { LetterLanguageSchema, LetterSelectionSchema, LetterTemplateSchema } from '@shared/letters'
 import { EXPORT_FORMATS, ReportRequestSchema } from '@shared/reports'
+import { whileBusy } from './busy'
 import { fileSession } from './fileService'
 import { codesLocked } from './privacy'
 import { revealCode } from './repos/codes'
@@ -173,97 +174,107 @@ export function registerDocumentHandlers(): void {
   })
 
   ipcMain.handle(channels.renderLettersPdf, async (_e, raw: unknown): Promise<Saved> => {
-    const ready = await readyLetters(LettersJob.parse(raw))
-    if (!ready.ok) return ready
-    const bytes = await htmlToPdf(ready.p.html)
-    const pages = await pdfPageCount(bytes)
-    if (pages !== ready.p.items.length) {
-      log.warn('letter page count mismatch', pages, ready.p.items.length)
-      return {
-        ok: false,
-        message: `The PDF came out with ${pages} pages for ${ready.p.items.length} letters, so a letter must have spilled over. Nothing was saved.`
+    return await whileBusy('printing', async () => {
+      const ready = await readyLetters(LettersJob.parse(raw))
+      if (!ready.ok) return ready
+      const bytes = await htmlToPdf(ready.p.html)
+      const pages = await pdfPageCount(bytes)
+      if (pages !== ready.p.items.length) {
+        log.warn('letter page count mismatch', pages, ready.p.items.length)
+        return {
+          ok: false,
+          message: `The PDF came out with ${pages} pages for ${ready.p.items.length} letters, so a letter must have spilled over. Nothing was saved.`
+        }
       }
-    }
-    const path = await pickOutputPath(`Locker letters ${stampDate()}.pdf`)
-    if (!path) return { ok: false, cancelled: true, message: '' }
-    const refused = recordLetters(ready.p, 'pdf')
-    if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
-    await writeOutput(path, bytes)
-    return { ok: true, path }
+      const path = await pickOutputPath(`Locker letters ${stampDate()}.pdf`)
+      if (!path) return { ok: false, cancelled: true, message: '' }
+      const refused = recordLetters(ready.p, 'pdf')
+      if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
+      await writeOutput(path, bytes)
+      return { ok: true, path }
+    })
   })
 
   ipcMain.handle(channels.renderLettersPrint, async (_e, raw: unknown): Promise<ActionResult> => {
-    const ready = await readyLetters(LettersJob.parse(raw))
-    if (!ready.ok) return ready
-    const r = await printHtml(ready.p.html, {
-      widthMm: ready.p.page.width,
-      heightMm: ready.p.page.height
+    return await whileBusy('printing', async () => {
+      const ready = await readyLetters(LettersJob.parse(raw))
+      if (!ready.ok) return ready
+      const r = await printHtml(ready.p.html, {
+        widthMm: ready.p.page.width,
+        heightMm: ready.p.page.height
+      })
+      if (!r.printed)
+        return {
+          ok: false,
+          cancelled: r.reason === 'cancelled',
+          message:
+            r.reason === 'cancelled' ? '' : `Printing did not finish: ${r.reason ?? 'unknown'}.`
+        }
+      const notRecorded = recordLetters(ready.p, 'printer')
+      if (notRecorded) log.warn('printed letters could not be recorded', notRecorded)
+      return { ok: true }
     })
-    if (!r.printed)
-      return {
-        ok: false,
-        cancelled: r.reason === 'cancelled',
-        message:
-          r.reason === 'cancelled' ? '' : `Printing did not finish: ${r.reason ?? 'unknown'}.`
-      }
-    const notRecorded = recordLetters(ready.p, 'printer')
-    if (notRecorded) log.warn('printed letters could not be recorded', notRecorded)
-    return { ok: true }
   })
 
   ipcMain.handle(channels.renderReportPdf, async (_e, raw: unknown): Promise<Saved> => {
-    const ready = readyReport(ReportJob.parse(raw))
-    if (!ready.ok) return ready
-    const page = { school: ready.school, printedAt: new Date(), preview: false }
-    const bytes = await reportToPdf(
-      buildReportHtml(ready.report, page),
-      reportFooter(ready.report, page)
-    )
-    const path = await pickOutputPath(fileName(ready.report, 'pdf'))
-    if (!path) return { ok: false, cancelled: true, message: '' }
-    const refused = recordReport(ready.report, 'printed', 'pdf')
-    if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
-    await writeOutput(path, bytes)
-    return { ok: true, path }
+    return await whileBusy('printing', async () => {
+      const ready = readyReport(ReportJob.parse(raw))
+      if (!ready.ok) return ready
+      const page = { school: ready.school, printedAt: new Date(), preview: false }
+      const bytes = await reportToPdf(
+        buildReportHtml(ready.report, page),
+        reportFooter(ready.report, page)
+      )
+      const path = await pickOutputPath(fileName(ready.report, 'pdf'))
+      if (!path) return { ok: false, cancelled: true, message: '' }
+      const refused = recordReport(ready.report, 'printed', 'pdf')
+      if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
+      await writeOutput(path, bytes)
+      return { ok: true, path }
+    })
   })
 
   ipcMain.handle(channels.renderReportPrint, async (_e, raw: unknown): Promise<ActionResult> => {
-    const ready = readyReport(ReportJob.parse(raw))
-    if (!ready.ok) return ready
-    const page = { school: ready.school, printedAt: new Date(), preview: false }
-    const r = await printReport(buildReportHtml(ready.report, page), {
-      landscape: ready.report.landscape,
-      footer: `${ready.school} · ${ready.report.title}${ready.report.confidential ? ' · CONFIDENTIAL' : ''} · Printed ${reportDate(page.printedAt)}`
+    return await whileBusy('printing', async () => {
+      const ready = readyReport(ReportJob.parse(raw))
+      if (!ready.ok) return ready
+      const page = { school: ready.school, printedAt: new Date(), preview: false }
+      const r = await printReport(buildReportHtml(ready.report, page), {
+        landscape: ready.report.landscape,
+        footer: `${ready.school} · ${ready.report.title}${ready.report.confidential ? ' · CONFIDENTIAL' : ''} · Printed ${reportDate(page.printedAt)}`
+      })
+      if (!r.printed)
+        return {
+          ok: false,
+          cancelled: r.reason === 'cancelled',
+          message:
+            r.reason === 'cancelled' ? '' : `Printing did not finish: ${r.reason ?? 'unknown'}.`
+        }
+      const notRecorded = recordReport(ready.report, 'printed', 'printer')
+      if (notRecorded) log.warn('printed report could not be recorded', notRecorded)
+      return { ok: true }
     })
-    if (!r.printed)
-      return {
-        ok: false,
-        cancelled: r.reason === 'cancelled',
-        message:
-          r.reason === 'cancelled' ? '' : `Printing did not finish: ${r.reason ?? 'unknown'}.`
-      }
-    const notRecorded = recordReport(ready.report, 'printed', 'printer')
-    if (notRecorded) log.warn('printed report could not be recorded', notRecorded)
-    return { ok: true }
   })
 
   ipcMain.handle(channels.renderReportExport, async (_e, raw: unknown): Promise<Saved> => {
-    const job = ExportJob.parse(raw)
-    const ready = readyReport(job)
-    if (!ready.ok) return ready
-    // Codes are only in the report when its request asked for them.
-    const report = ready.report
-    const bytes = job.format === 'csv' ? reportCsv(report) : await reportXlsx(report, ready.school)
-    const path = await pickOutputPath(
-      fileName(report, job.format),
-      job.format === 'csv'
-        ? { name: 'CSV file', extension: 'csv' }
-        : { name: 'Excel workbook', extension: 'xlsx' }
-    )
-    if (!path) return { ok: false, cancelled: true, message: '' }
-    const refused = recordReport(ready.report, 'exported', job.format)
-    if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
-    await writeOutput(path, bytes)
-    return { ok: true, path }
+    return await whileBusy('printing', async () => {
+      const job = ExportJob.parse(raw)
+      const ready = readyReport(job)
+      if (!ready.ok) return ready
+      // Codes are only in the report when its request asked for them.
+      const report = ready.report
+      const bytes = job.format === 'csv' ? reportCsv(report) : await reportXlsx(report, ready.school)
+      const path = await pickOutputPath(
+        fileName(report, job.format),
+        job.format === 'csv'
+          ? { name: 'CSV file', extension: 'csv' }
+          : { name: 'Excel workbook', extension: 'xlsx' }
+      )
+      if (!path) return { ok: false, cancelled: true, message: '' }
+      const refused = recordReport(ready.report, 'exported', job.format)
+      if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
+      await writeOutput(path, bytes)
+      return { ok: true, path }
+    })
   })
 }

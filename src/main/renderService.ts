@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { channels } from '@shared/channels'
 import { LabelSelectionSchema } from '@shared/labels'
 import type { ActionResult } from '@shared/ipc'
+import { whileBusy } from './busy'
 import { fileSession } from './fileService'
 import { recordPrintJob } from './repos/labels'
 import { pdfPageCount, htmlToPdf, printHtml } from './render/pdf'
@@ -75,75 +76,81 @@ export function registerRenderHandlers(): void {
   ipcMain.handle(
     channels.renderLabelsPdf,
     async (_e, raw: unknown): Promise<ActionResult & { path?: string }> => {
+      return await whileBusy('printing', async () => {
+        const job = LabelsJob.parse(raw)
+        const s = fileSession()
+        const prepared = s.read((db) => prepareLabels(db, { ...job, outlines: false }))
+        if (prepared.placed.length === 0)
+          return { ok: false, message: 'There are no labels to print for that choice.' }
+        const bytes = await htmlToPdf(prepared.html)
+        const pages = await pdfPageCount(bytes)
+        if (pages !== prepared.sheets) {
+          log.warn('label page count mismatch', pages, prepared.sheets)
+          return {
+            ok: false,
+            message: `The PDF came out with ${pages} pages instead of ${prepared.sheets}. Nothing was saved.`
+          }
+        }
+        const path = await savePdf(`Locker labels ${stampDate()}.pdf`, bytes)
+        if (!path) return { ok: false, cancelled: true, message: '' }
+        if (s.state.status === 'open' && s.state.mode === 'edit') {
+          s.write(
+            {
+              action: 'labels.printed',
+              entity: 'print_job',
+              after: { labels: prepared.lockerIds.length, to: 'pdf' }
+            },
+            (db, ctx) => recordPrintJob(db, ctx, 'labels', prepared.lockerIds)
+          )
+        }
+        return { ok: true, path }
+      })
+    }
+  )
+
+  ipcMain.handle(channels.renderLabelsPrint, async (_e, raw: unknown): Promise<ActionResult> => {
+    return await whileBusy('printing', async () => {
       const job = LabelsJob.parse(raw)
       const s = fileSession()
       const prepared = s.read((db) => prepareLabels(db, { ...job, outlines: false }))
       if (prepared.placed.length === 0)
         return { ok: false, message: 'There are no labels to print for that choice.' }
-      const bytes = await htmlToPdf(prepared.html)
-      const pages = await pdfPageCount(bytes)
-      if (pages !== prepared.sheets) {
-        log.warn('label page count mismatch', pages, prepared.sheets)
+      const r = await printHtml(prepared.html, {
+        widthMm: prepared.stock.pageWidth,
+        heightMm: prepared.stock.pageHeight
+      })
+      if (!r.printed)
         return {
           ok: false,
-          message: `The PDF came out with ${pages} pages instead of ${prepared.sheets}. Nothing was saved.`
+          cancelled: r.reason === 'cancelled',
+          message:
+            r.reason === 'cancelled'
+              ? ''
+              : `Printing did not finish: ${r.reason ?? 'unknown reason'}.`
         }
-      }
-      const path = await savePdf(`Locker labels ${stampDate()}.pdf`, bytes)
-      if (!path) return { ok: false, cancelled: true, message: '' }
       if (s.state.status === 'open' && s.state.mode === 'edit') {
         s.write(
           {
             action: 'labels.printed',
             entity: 'print_job',
-            after: { labels: prepared.lockerIds.length, to: 'pdf' }
+            after: { labels: prepared.lockerIds.length, to: 'printer' }
           },
           (db, ctx) => recordPrintJob(db, ctx, 'labels', prepared.lockerIds)
         )
       }
-      return { ok: true, path }
-    }
-  )
-
-  ipcMain.handle(channels.renderLabelsPrint, async (_e, raw: unknown): Promise<ActionResult> => {
-    const job = LabelsJob.parse(raw)
-    const s = fileSession()
-    const prepared = s.read((db) => prepareLabels(db, { ...job, outlines: false }))
-    if (prepared.placed.length === 0)
-      return { ok: false, message: 'There are no labels to print for that choice.' }
-    const r = await printHtml(prepared.html, {
-      widthMm: prepared.stock.pageWidth,
-      heightMm: prepared.stock.pageHeight
+      return { ok: true }
     })
-    if (!r.printed)
-      return {
-        ok: false,
-        cancelled: r.reason === 'cancelled',
-        message:
-          r.reason === 'cancelled'
-            ? ''
-            : `Printing did not finish: ${r.reason ?? 'unknown reason'}.`
-      }
-    if (s.state.status === 'open' && s.state.mode === 'edit') {
-      s.write(
-        {
-          action: 'labels.printed',
-          entity: 'print_job',
-          after: { labels: prepared.lockerIds.length, to: 'printer' }
-        },
-        (db, ctx) => recordPrintJob(db, ctx, 'labels', prepared.lockerIds)
-      )
-    }
-    return { ok: true }
   })
 
   ipcMain.handle(
     channels.renderCalibrationPdf,
     async (_e, raw: unknown): Promise<ActionResult & { path?: string }> => {
-      const job = CalibrationJob.parse(raw)
-      const { html } = fileSession().read((db) => prepareCalibration(db, job.stockId, job.printer))
-      const path = await savePdf(`Label calibration page ${stampDate()}.pdf`, await htmlToPdf(html))
-      return path ? { ok: true, path } : { ok: false, cancelled: true, message: '' }
+      return await whileBusy('printing', async () => {
+        const job = CalibrationJob.parse(raw)
+        const { html } = fileSession().read((db) => prepareCalibration(db, job.stockId, job.printer))
+        const path = await savePdf(`Label calibration page ${stampDate()}.pdf`, await htmlToPdf(html))
+        return path ? { ok: true, path } : { ok: false, cancelled: true, message: '' }
+      })
     }
   )
 
