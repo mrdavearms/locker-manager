@@ -4,7 +4,7 @@ import type { StudentFilter, StudentView } from '@shared/students'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, TextInput } from '@renderer/components/Field'
 import { Modal } from '@renderer/components/Modal'
-import { useAction, useCanEdit, useTerms } from '@renderer/lib/appContext'
+import { useAction, useCanEdit, useNotify, useTerms } from '@renderer/lib/appContext'
 import { cn } from '@renderer/lib/cn'
 import { formatWhen } from '@renderer/lib/format'
 import { call, useRpc } from '@renderer/lib/rpc'
@@ -30,6 +30,7 @@ function StudentPanel({
   const terms = useTerms()
   const canEdit = useCanEdit()
   const act = useAction()
+  const notify = useNotify()
   const [first, setFirst] = useState(s.firstName)
   const [last, setLast] = useState(s.lastName)
   const [preferred, setPreferred] = useState(s.preferredName ?? '')
@@ -76,7 +77,12 @@ function StudentPanel({
             className="mt-2"
             size="sm"
             disabled={!canEdit}
-            onClick={() => void act(() => call('student.update', { id: s.id, confirmName: true }))}
+            onClick={() =>
+              void act(async () => {
+                await call('student.update', { id: s.id, confirmName: true })
+                notify('Name spelling confirmed.')
+              })
+            }
           >
             The spelling is right
           </Button>
@@ -127,14 +133,15 @@ function StudentPanel({
             <Button
               size="sm"
               onClick={() =>
-                void act(() =>
-                  call('student.update', {
+                void act(async () => {
+                  await call('student.update', {
                     id: s.id,
                     firstName: first,
                     lastName: last,
                     preferredName: preferred || null
                   })
-                )
+                  notify('Name saved.')
+                })
               }
             >
               Save name
@@ -190,7 +197,12 @@ function StudentPanel({
               <Button
                 size="sm"
                 disabled={!canEdit}
-                onClick={() => void act(() => call('student.stillHere', { id: s.id }))}
+                onClick={() =>
+                  void act(async () => {
+                    await call('student.stillHere', { id: s.id })
+                    notify(`${s.displayName} is still enrolled.`)
+                  })
+                }
               >
                 Still enrolled
               </Button>
@@ -198,7 +210,12 @@ function StudentPanel({
                 size="sm"
                 variant="secondary"
                 disabled={!canEdit}
-                onClick={() => void act(() => call('student.confirmLeft', { id: s.id }))}
+                onClick={() =>
+                  void act(async () => {
+                    await call('student.confirmLeft', { id: s.id })
+                    notify(`${s.displayName} has left.`)
+                  })
+                }
               >
                 Has left
               </Button>
@@ -239,7 +256,8 @@ function StudentPanel({
                 void act(
                   async () => (
                     await call('exclusion.add', { kind: 'student', value: s.externalId, reason }),
-                    setExcluding(false)
+                    setExcluding(false),
+                    notify(`${s.displayName} is excluded from imports.`)
                   )
                 )
               }

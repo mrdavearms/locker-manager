@@ -6,7 +6,7 @@ import { LOCK_TYPE_INFO } from '@shared/locks'
 import { Button } from '@renderer/components/Button'
 import { Field, TextInput } from '@renderer/components/Field'
 import { Modal } from '@renderer/components/Modal'
-import { useAction, useCanEdit, useTerms } from '@renderer/lib/appContext'
+import { useAction, useCanEdit, useNotify, useTerms } from '@renderer/lib/appContext'
 import { call, useRpc } from '@renderer/lib/rpc'
 import { CodeReveal } from '@renderer/components/CodeReveal'
 import { ResetList } from '@renderer/lockers/LockerActions'
@@ -67,6 +67,7 @@ function LockerTile({
 
 function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): React.JSX.Element {
   const terms = useTerms()
+  const notify = useNotify()
   const canEdit = useCanEdit()
   const act = useAction()
   const [dialog, setDialog] = useState<'renumber' | 'out' | 'remove' | null>(null)
@@ -186,7 +187,10 @@ function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): Re
               variant="secondary"
               disabled={!canEdit}
               onClick={() =>
-                void act(() => call('locker.update', { id: l.id, status: 'reserved' }))
+                void act(async () => {
+                  await call('locker.update', { id: l.id, status: 'reserved' })
+                  notify(`${terms.locker.one} ${l.number} reserved.`)
+                })
               }
             >
               Reserve
@@ -197,7 +201,10 @@ function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): Re
             size="sm"
             disabled={!canEdit}
             onClick={() =>
-              void act(() => call('locker.update', { id: l.id, status: 'in_service' }))
+              void act(async () => {
+                await call('locker.update', { id: l.id, status: 'in_service' })
+                notify(`${terms.locker.one} ${l.number} is back in service.`)
+              })
             }
           >
             Back in service
@@ -252,7 +259,8 @@ function LockerPanel({ l, onClose }: { l: LockerView; onClose: () => void }): Re
                       status: 'out_of_service',
                       outOfServiceReason: reason
                     }),
-                    setDialog(null)
+                    setDialog(null),
+                    notify(`${terms.locker.one} ${l.number} is out of service.`)
                   )
                 )
               }

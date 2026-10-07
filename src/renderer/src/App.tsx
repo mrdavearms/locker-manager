@@ -9,6 +9,7 @@ import { Button } from './components/Button'
 import { ConflictDialog } from './components/ConflictDialog'
 import { DemoBadge, PracticeBadge } from './components/DemoBadge'
 import { LockerMark } from './components/LockerMark'
+import { MessageStrip, type Message } from './components/MessageStrip'
 import { Modal } from './components/Modal'
 import { NavRail, type Screen } from './components/NavRail'
 import { NewFileDialog } from './components/NewFileDialog'
@@ -80,6 +81,20 @@ export function App(): React.JSX.Element {
   const [newOpen, setNewOpen] = useState(false)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<Message | null>(null)
+  const notify = useCallback(
+    (text: string, opts?: { undo?: boolean }) =>
+      setMessage({ text, undo: opts?.undo ?? true, n: Date.now() }),
+    []
+  )
+  const closeMessage = useCallback(() => setMessage(null), [])
+  const undoFromMessage = useCallback(() => {
+    void window.api
+      .undo()
+      .then((r) =>
+        r.ok ? setMessage({ text: 'Undone.', undo: false, n: Date.now() }) : setError(r.message)
+      )
+  }, [])
   const [finder, setFinder] = useState<Finder | null>(null)
   // The screen belongs to the open file: a different (or no) file starts on Home.
   const [nav, setNav] = useState<{
@@ -165,17 +180,19 @@ export function App(): React.JSX.Element {
         setFinder({ title: FIND_TITLES.find, intent: null })
       } else if (k === 'z' && !isTyping(e.target)) {
         e.preventDefault()
-        void (e.shiftKey ? window.api.redo() : window.api.undo()).then(
-          (r) => !r.ok && setError(r.message)
+        void (e.shiftKey ? window.api.redo() : window.api.undo()).then((r) =>
+          r.ok ? notify(e.shiftKey ? 'Redone.' : 'Undone.', { undo: false }) : setError(r.message)
         )
       } else if (k === 'y' && !isTyping(e.target)) {
         e.preventDefault()
-        void window.api.redo().then((r) => !r.ok && setError(r.message))
+        void window.api
+          .redo()
+          .then((r) => (r.ok ? notify('Redone.', { undo: false }) : setError(r.message)))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [openPath])
+  }, [openPath, notify])
 
   const onFound = (r: QuickResult): void => {
     const intent = finder?.intent ?? null
@@ -257,6 +274,7 @@ export function App(): React.JSX.Element {
         revision={open?.revision ?? 0}
         canEdit={open?.mode === 'edit' && !open.conflict}
         showError={setError}
+        notify={notify}
       >
         <PinGateProvider showError={setError}>
           <div className="flex flex-1 flex-col md:flex-row">
@@ -391,6 +409,8 @@ export function App(): React.JSX.Element {
           />
         </PinGateProvider>
       </AppContextProvider>
+
+      <MessageStrip message={message} onUndo={undoFromMessage} onClose={closeMessage} />
 
       {open && (
         <StatusBar

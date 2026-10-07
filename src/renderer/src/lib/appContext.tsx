@@ -6,24 +6,28 @@ interface AppContextValue {
   canEdit: boolean
   terms: Terminology
   showError: (message: string) => void
+  notify: (text: string, opts?: { undo?: boolean }) => void
 }
 
 const Ctx = createContext<AppContextValue>({
   revision: 0,
   canEdit: false,
   terms: DEFAULT_TERMS,
-  showError: () => undefined
+  showError: () => undefined,
+  notify: () => undefined
 })
 
 export function AppContextProvider({
   revision,
   canEdit,
   showError,
+  notify,
   children
 }: {
   revision: number
   canEdit: boolean
   showError: (message: string) => void
+  notify: (text: string, opts?: { undo?: boolean }) => void
   children: ReactNode
 }): React.JSX.Element {
   const [terms, setTerms] = useState<Terminology>(DEFAULT_TERMS)
@@ -36,12 +40,16 @@ export function AppContextProvider({
       cancelled = true
     }
   }, [revision])
-  return <Ctx.Provider value={{ revision, canEdit, terms, showError }}>{children}</Ctx.Provider>
+  return (
+    <Ctx.Provider value={{ revision, canEdit, terms, showError, notify }}>{children}</Ctx.Provider>
+  )
 }
 
 export const useRevision = (): number => useContext(Ctx).revision
 export const useCanEdit = (): boolean => useContext(Ctx).canEdit
 export const useTerms = (): Terminology => useContext(Ctx).terms
+export const useNotify = (): ((text: string, opts?: { undo?: boolean }) => void) =>
+  useContext(Ctx).notify
 export const useShowError = (): ((message: string) => void) => useContext(Ctx).showError
 
 /** Runs a change; reports a refusal through the app's error dialog. Resolves true on success. */

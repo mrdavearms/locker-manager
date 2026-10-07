@@ -7,7 +7,7 @@ import { Field, Select, TextInput } from '@renderer/components/Field'
 import { Modal } from '@renderer/components/Modal'
 import { QuickFind } from '@renderer/components/QuickFind'
 import { useCodeGate } from '@renderer/components/PinGate'
-import { useAction, useCanEdit, useTerms } from '@renderer/lib/appContext'
+import { useAction, useCanEdit, useNotify, useTerms } from '@renderer/lib/appContext'
 import { call, useRpc } from '@renderer/lib/rpc'
 
 export type LockerIntent = 'assign' | 'leave' | 'recode' | 'move' | 'swap' | null
@@ -114,6 +114,7 @@ export function StudentLockerCard({
   const terms = useTerms()
   const canEdit = useCanEdit()
   const act = useAction()
+  const notify = useNotify()
   const [dialog, setDialog] = useState<LockerIntent>(intent)
   const [lockerId, setLockerId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
@@ -287,6 +288,7 @@ export function StudentLockerCard({
               if (!r.studentId || r.studentId === s.id)
                 throw new Error('Choose another student who has a locker.')
               await call('student.swap', { studentId: s.id, otherStudentId: r.studentId })
+              notify(`Swapped ${s.displayName} and ${r.title}.`)
               close()
             })
           }
@@ -363,7 +365,10 @@ export function StudentLockerCard({
                       left: true,
                       ...(reason ? { reason } : {})
                     }),
-                    close()
+                    close(),
+                    notify(
+                      `${s.displayName} has left. ${terms.locker.one} ${s.locker!.number} is spare and on the reset list.`
+                    )
                   )
                 )
               }
@@ -389,6 +394,7 @@ export function ResetList(): React.JSX.Element | null {
   const terms = useTerms()
   const canEdit = useCanEdit()
   const act = useAction()
+  const notify = useNotify()
   const { data: tasks } = useRpc('codes.resetTasks', {})
   if (!tasks || tasks.length === 0) return null
   return (
@@ -419,7 +425,12 @@ export function ResetList(): React.JSX.Element | null {
             <Button
               size="sm"
               disabled={!canEdit}
-              onClick={() => void act(() => call('codes.resetDone', { lockId: t.lockId }))}
+              onClick={() =>
+                void act(async () => {
+                  await call('codes.resetDone', { lockId: t.lockId })
+                  notify(`${terms.locker.one} ${t.lockerNumber ?? ''} marked as reset.`)
+                })
+              }
             >
               Reset done
             </Button>
