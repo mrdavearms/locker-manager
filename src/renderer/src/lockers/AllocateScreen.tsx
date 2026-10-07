@@ -1,6 +1,13 @@
 import { useMemo, useState } from 'react'
 import { CheckCircle2, Plus, Shuffle, Trash2, Wand2 } from 'lucide-react'
-import type { AllocationPlan, AllocationRule, DraftAssignment, DraftView } from '@shared/allocation'
+import {
+  usualOrder,
+  type AllocationPlan,
+  type AllocationRule,
+  type DraftAssignment,
+  type DraftView,
+  type RuleOrder
+} from '@shared/allocation'
 import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, Select, TextInput } from '@renderer/components/Field'
@@ -24,6 +31,90 @@ const GROUP_COLOURS = [
   '#f0e3d2'
 ]
 
+/** The four order settings, for the usual order and for a line's own order. */
+function OrderFields({
+  idPrefix,
+  value,
+  onChange
+}: {
+  idPrefix: string
+  value: RuleOrder
+  onChange: (o: RuleOrder) => void
+}): React.JSX.Element {
+  const terms = useTerms()
+  return (
+    <>
+      <Field label="Students in order of" htmlFor={`${idPrefix}-sorder`}>
+        <Select
+          id={`${idPrefix}-sorder`}
+          value={value.studentOrder}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              studentOrder: e.target.value as RuleOrder['studentOrder']
+            })
+          }
+        >
+          <option value="group_then_name">{terms.group.one}, then surname</option>
+          <option value="name">Surname only</option>
+          <option value="house_then_name">{terms.house.one}, then surname</option>
+          <option value="keep_last_year">
+            Keep last year’s {terms.locker.one.toLowerCase()} where possible
+          </option>
+          <option value="random">Random</option>
+        </Select>
+      </Field>
+      <Field label={`${terms.locker.many} in order of`} htmlFor={`${idPrefix}-lorder`}>
+        <Select
+          id={`${idPrefix}-lorder`}
+          value={value.lockerOrder}
+          onChange={(e) =>
+            onChange({ ...value, lockerOrder: e.target.value as RuleOrder['lockerOrder'] })
+          }
+        >
+          <option value="number">Number</option>
+          <option value="bank_then_number">{terms.bank.one}, then number</option>
+          <option value="column">Column by column (top to bottom)</option>
+          <option value="tier_preference">Middle and bottom first</option>
+        </Select>
+      </Field>
+      <Field
+        label={`Spare ${terms.locker.many.toLowerCase()} after each ${terms.group.one.toLowerCase()}`}
+        hint="So late enrolments land near their group"
+        htmlFor={`${idPrefix}-gapg`}
+      >
+        <Select
+          id={`${idPrefix}-gapg`}
+          value={value.gapAfterGroup}
+          onChange={(e) => onChange({ ...value, gapAfterGroup: Number(e.target.value) })}
+        >
+          {[0, 1, 2, 3, 4, 5].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field
+        label={`Spare ${terms.locker.many.toLowerCase()} at the end of each ${terms.bank.one.toLowerCase()}`}
+        htmlFor={`${idPrefix}-gapb`}
+      >
+        <Select
+          id={`${idPrefix}-gapb`}
+          value={value.gapAfterBank}
+          onChange={(e) => onChange({ ...value, gapAfterBank: Number(e.target.value) })}
+        >
+          {[0, 1, 2, 3, 5, 10].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </>
+  )
+}
+
 function PlanEditor({
   plan,
   onChange
@@ -35,6 +126,16 @@ function PlanEditor({
   const { data: areas } = useRpc('locations.list', {})
   const setRule = (i: number, patch: Partial<AllocationRule>): void =>
     onChange({ ...plan, rules: plan.rules.map((r, j) => (j === i ? { ...r, ...patch } : r)) })
+  const clearOrder = (i: number): void =>
+    onChange({
+      ...plan,
+      rules: plan.rules.map((r, j) => {
+        if (j !== i) return r
+        const rest = { ...r }
+        delete rest.order
+        return rest
+      })
+    })
   const csv = (t: string): string[] =>
     t
       .split(',')
@@ -44,7 +145,7 @@ function PlanEditor({
     <div className="space-y-6">
       <SectionCard
         title="Who goes where"
-        description={`Each line sends some students to an ${terms.area.one.toLowerCase()}. Lines run in order; a student is placed by the first line that fits them.`}
+        description={`Each line sends some students to an ${terms.area.one.toLowerCase()}. Lines run in order; a student is placed by the first line that fits them. Every line uses the usual order below, unless you give it its own: for example the youngest students in the middle and bottom tiers, or the oldest keeping last year’s ${terms.locker.many.toLowerCase()}.`}
         actions={
           <Button
             size="sm"
@@ -78,85 +179,105 @@ function PlanEditor({
         )}
         <ul className="space-y-3">
           {plan.rules.map((r, i) => (
-            <li
-              key={r.id}
-              className="grid items-end gap-3 rounded-2xl border border-line p-4 md:grid-cols-[1fr_1fr_1fr_1.4fr_auto]"
-            >
-              <Field label="Name" htmlFor={`rule-label-${i}`}>
-                <TextInput
-                  id={`rule-label-${i}`}
-                  value={r.label}
-                  maxLength={80}
-                  onChange={(e) => setRule(i, { label: e.target.value })}
-                />
-              </Field>
-              <Field label={`${terms.yearLevel.many} (blank for all)`} htmlFor={`rule-years-${i}`}>
-                <TextInput
-                  id={`rule-years-${i}`}
-                  value={r.yearLevels.join(', ')}
-                  placeholder="7"
-                  onChange={(e) => setRule(i, { yearLevels: csv(e.target.value) })}
-                />
-              </Field>
-              <Field label={`${terms.group.many} (blank for all)`} htmlFor={`rule-groups-${i}`}>
-                <TextInput
-                  id={`rule-groups-${i}`}
-                  value={r.groups.join(', ')}
-                  placeholder="07A, 07B"
-                  onChange={(e) => setRule(i, { groups: csv(e.target.value) })}
-                />
-              </Field>
-              <Field label={`Into ${terms.area.one.toLowerCase()}`} htmlFor={`rule-area-${i}`}>
-                <Select
-                  id={`rule-area-${i}`}
-                  value={r.areaIds[0] ?? ''}
-                  onChange={(e) => setRule(i, { areaIds: e.target.value ? [e.target.value] : [] })}
+            <li key={r.id} className="space-y-3 rounded-2xl border border-line p-4">
+              <div className="grid items-end gap-3 md:grid-cols-[1fr_1fr_1fr_1.4fr_auto]">
+                <Field label="Name" htmlFor={`rule-label-${i}`}>
+                  <TextInput
+                    id={`rule-label-${i}`}
+                    value={r.label}
+                    maxLength={80}
+                    onChange={(e) => setRule(i, { label: e.target.value })}
+                  />
+                </Field>
+                <Field
+                  label={`${terms.yearLevel.many} (blank for all)`}
+                  htmlFor={`rule-years-${i}`}
                 >
-                  <option value="">Any {terms.area.one.toLowerCase()}</option>
-                  {areas?.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <button
-                className="mb-2 rounded-lg p-2 text-ink-muted hover:bg-surface-muted"
-                aria-label={`Remove ${r.label}`}
-                onClick={() => onChange({ ...plan, rules: plan.rules.filter((_, j) => j !== i) })}
-              >
-                <Trash2 size={17} />
-              </button>
+                  <TextInput
+                    id={`rule-years-${i}`}
+                    value={r.yearLevels.join(', ')}
+                    placeholder="7"
+                    onChange={(e) => setRule(i, { yearLevels: csv(e.target.value) })}
+                  />
+                </Field>
+                <Field label={`${terms.group.many} (blank for all)`} htmlFor={`rule-groups-${i}`}>
+                  <TextInput
+                    id={`rule-groups-${i}`}
+                    value={r.groups.join(', ')}
+                    placeholder="07A, 07B"
+                    onChange={(e) => setRule(i, { groups: csv(e.target.value) })}
+                  />
+                </Field>
+                <Field label={`Into ${terms.area.one.toLowerCase()}`} htmlFor={`rule-area-${i}`}>
+                  <Select
+                    id={`rule-area-${i}`}
+                    value={r.areaIds[0] ?? ''}
+                    onChange={(e) =>
+                      setRule(i, { areaIds: e.target.value ? [e.target.value] : [] })
+                    }
+                  >
+                    <option value="">Any {terms.area.one.toLowerCase()}</option>
+                    {areas?.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <button
+                  className="mb-2 rounded-lg p-2 text-ink-muted hover:bg-surface-muted"
+                  aria-label={`Remove ${r.label}`}
+                  onClick={() => onChange({ ...plan, rules: plan.rules.filter((_, j) => j !== i) })}
+                >
+                  <Trash2 size={17} />
+                </button>
+              </div>
+              {r.order ? (
+                <div className="space-y-3 rounded-xl bg-surface-muted p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">{r.label}: its own order</p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${r.label}: use the usual order`}
+                      onClick={() => clearOrder(i)}
+                    >
+                      Use the usual order
+                    </Button>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <OrderFields
+                      idPrefix={`rule-${i}`}
+                      value={r.order}
+                      onChange={(order) => setRule(i, { order })}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Give ${r.label} its own order`}
+                  onClick={() => setRule(i, { order: usualOrder(plan) })}
+                >
+                  Give this line its own order
+                </Button>
+              )}
             </li>
           ))}
         </ul>
       </SectionCard>
 
       <SectionCard
-        title="Order"
-        description="How students and lockers are lined up before they are matched, first to first."
+        title="Usual order"
+        description="How students and lockers are lined up before they are matched, first to first. Every line uses this unless it has its own order."
       >
         <div className="grid gap-4 md:grid-cols-3">
-          <Field label="Students in order of" htmlFor="plan-sorder">
-            <Select
-              id="plan-sorder"
-              value={plan.studentOrder}
-              onChange={(e) =>
-                onChange({
-                  ...plan,
-                  studentOrder: e.target.value as AllocationPlan['studentOrder']
-                })
-              }
-            >
-              <option value="group_then_name">{terms.group.one}, then surname</option>
-              <option value="name">Surname only</option>
-              <option value="house_then_name">{terms.house.one}, then surname</option>
-              <option value="keep_last_year">
-                Keep last year’s {terms.locker.one.toLowerCase()} where possible
-              </option>
-              <option value="random">Random</option>
-            </Select>
-          </Field>
+          <OrderFields
+            idPrefix="plan"
+            value={usualOrder(plan)}
+            onChange={(o) => onChange({ ...plan, ...o })}
+          />
           <Field
             label={`${terms.group.many} placed last`}
             hint="For example HUB"
@@ -167,53 +288,6 @@ function PlanEditor({
               value={plan.groupsLast.join(', ')}
               onChange={(e) => onChange({ ...plan, groupsLast: csv(e.target.value) })}
             />
-          </Field>
-          <Field label={`${terms.locker.many} in order of`} htmlFor="plan-lorder">
-            <Select
-              id="plan-lorder"
-              value={plan.lockerOrder}
-              onChange={(e) =>
-                onChange({ ...plan, lockerOrder: e.target.value as AllocationPlan['lockerOrder'] })
-              }
-            >
-              <option value="number">Number</option>
-              <option value="bank_then_number">{terms.bank.one}, then number</option>
-              <option value="column">Column by column (top to bottom)</option>
-              <option value="tier_preference">Middle and bottom first</option>
-            </Select>
-          </Field>
-          <Field
-            label={`Spare ${terms.locker.many.toLowerCase()} after each ${terms.group.one.toLowerCase()}`}
-            hint="So late enrolments land near their group"
-            htmlFor="plan-gapg"
-          >
-            <Select
-              id="plan-gapg"
-              value={plan.gapAfterGroup}
-              onChange={(e) => onChange({ ...plan, gapAfterGroup: Number(e.target.value) })}
-            >
-              {[0, 1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field
-            label={`Spare ${terms.locker.many.toLowerCase()} at the end of each ${terms.bank.one.toLowerCase()}`}
-            htmlFor="plan-gapb"
-          >
-            <Select
-              id="plan-gapb"
-              value={plan.gapAfterBank}
-              onChange={(e) => onChange({ ...plan, gapAfterBank: Number(e.target.value) })}
-            >
-              {[0, 1, 2, 3, 5, 10].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </Select>
           </Field>
           <label className="flex items-center gap-3 self-end pb-2 text-sm">
             <input

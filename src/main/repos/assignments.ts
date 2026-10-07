@@ -1,6 +1,7 @@
 import {
   AllocationPlanSchema,
   DEFAULT_PLAN,
+  planForRule,
   type AllocationDraft,
   type AllocationPlan,
   type DraftView
@@ -335,7 +336,7 @@ export function suggestLocker(
         ((rule.areaIds.length === 0 || rule.areaIds.includes(l.areaId)) &&
           (rule.bankIds.length === 0 || rule.bankIds.includes(l.bankId))))
   )
-  const ordered = orderLockers(candidates, plan)
+  const ordered = orderLockers(candidates, rule ? planForRule(plan, rule) : plan)
   const pick = (s.needsAccessible ? ordered.find((l) => l.accessible) : undefined) ?? ordered[0]
   if (!pick) return null
   const n = db.get<{ number: string }>('SELECT number FROM locker WHERE id = $id', { $id: pick.id })

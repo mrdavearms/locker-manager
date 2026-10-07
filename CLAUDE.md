@@ -158,6 +158,12 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     screen (`src/shared/guideLinks.ts`; a unit test checks every slug exists, and that
     Getting started stays the first section). e2e `launchApp` marks the tour seen unless
     `tour: true`.
+21. **Each allocation line can have its own order** (Dave, 7 Oct 2026). Optional `order` on
+    an `AllocationRule` (student order, locker order, gap after group, gap after bank);
+    `planForRule` combines it with the plan's usual order, in the engine and in
+    `suggestLocker`. Accessible-first and groups placed last stay school-wide. No migration:
+    a plan without `order` reads as before, and the golden snapshot is unchanged. An older
+    app that saves the plan drops the lines' own orders (Zod strips unknown keys); accepted.
 15. **Anything with codes prints or exports only in edit mode** (Dave, 7 Oct 2026). Every
     code that leaves the app is written to `code_reveal_log`, which needs a write. The rule
     is stated next to every print button that can carry codes, in the user guide and in

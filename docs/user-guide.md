@@ -345,13 +345,23 @@ Do this after importing students.
 2. **Who goes where**: each line sends some students to an area. The app starts with one
    line per area, using the year levels set on that area (for example Year 7 to the Year 7
    side). Change or add lines if you need to.
-3. **Order**: the usual choice is **Homeroom, then surname**, with **HUB** placed last.
+3. **Usual order**: the usual choice is **Homeroom, then surname**, with **HUB** placed last.
+   Every line uses it unless you give that line its own order (see below).
 4. Click **Make a draft**. Check the summary: if any students did not fit, they are listed.
 5. Look at the draft. To change two students' places, click one locker, then the other.
 6. Leave **Issue a code to each locker now** ticked, and click **Give out … lockers**.
 
 Students on the **Who never gets a locker** list are skipped. If you change your mind straight
 away, **Undo** (Ctrl+Z, or the History screen) puts everything back.
+
+**Different areas, different orders.** Many schools keep lockers in more than one place: one
+area for Year 7, one for Year 8, and a senior area for Years 10 to 12. Give each its own line.
+If one area works differently, click **Give this line its own order** under its line. You can
+then choose, for that line only, the order of students, the order of lockers, and the spare
+lockers after each homeroom and at the end of each bank. For example, Year 7 can fill the
+middle and bottom tiers first while the senior line keeps last year's lockers. **Use the usual
+order** puts the line back. Accessible lockers first, and the homerooms placed last, stay the
+same for the whole school. The app keeps each line's order for next year.
 
 ## Lock codes and their rules
 

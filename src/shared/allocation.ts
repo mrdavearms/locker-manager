@@ -3,6 +3,30 @@ import { z } from 'zod'
 // Allocation plans (SPEC.md 4.4). A plan is a list of rules, each sending some
 // students to some lockers, plus how to order both. Saved and reused each year.
 
+const StudentOrderSchema = z.enum([
+  'group_then_name',
+  'name',
+  'house_then_name',
+  'random',
+  'keep_last_year'
+])
+const LockerOrderSchema = z.enum(['number', 'bank_then_number', 'column', 'tier_preference'])
+const GapAfterGroupSchema = z.number().int().min(0).max(20)
+const GapAfterBankSchema = z.number().int().min(0).max(50)
+
+/**
+ * A line's own order, used instead of the plan's usual order (for example Year 7 in
+ * middle and bottom tiers, Year 12 keeping last year's locker). Accessible-first and
+ * the groups placed last stay school-wide.
+ */
+export const RuleOrderSchema = z.object({
+  studentOrder: StudentOrderSchema,
+  lockerOrder: LockerOrderSchema,
+  gapAfterGroup: GapAfterGroupSchema,
+  gapAfterBank: GapAfterBankSchema
+})
+export type RuleOrder = z.infer<typeof RuleOrderSchema>
+
 export const AllocationRuleSchema = z.object({
   id: z.string().min(1).max(64),
   label: z.string().max(80),
@@ -12,21 +36,23 @@ export const AllocationRuleSchema = z.object({
   groups: z.array(z.string().max(40)).max(200),
   /** Empty means any area. */
   areaIds: z.array(z.string().max(64)).max(50),
-  bankIds: z.array(z.string().max(64)).max(200)
+  bankIds: z.array(z.string().max(64)).max(200),
+  /** Absent means the line uses the plan's usual order. Plans saved by 0.10 and earlier have none. */
+  order: RuleOrderSchema.optional()
 })
 export type AllocationRule = z.infer<typeof AllocationRuleSchema>
 
 export const AllocationPlanSchema = z.object({
   rules: z.array(AllocationRuleSchema).max(30),
-  studentOrder: z.enum(['group_then_name', 'name', 'house_then_name', 'random', 'keep_last_year']),
+  studentOrder: StudentOrderSchema,
   /** Groups placed after all the others, in this order (WHS: HUB). */
   groupsLast: z.array(z.string().max(40)).max(50),
-  lockerOrder: z.enum(['number', 'bank_then_number', 'column', 'tier_preference']),
+  lockerOrder: LockerOrderSchema,
   tierPreference: z.array(z.enum(['top', 'middle', 'bottom'])).max(3),
   /** Spare lockers left after each group, so late enrolments land near their group. */
-  gapAfterGroup: z.number().int().min(0).max(20),
+  gapAfterGroup: GapAfterGroupSchema,
   /** Spare lockers kept at the end of each bank. */
-  gapAfterBank: z.number().int().min(0).max(50),
+  gapAfterBank: GapAfterBankSchema,
   accessibleFirst: z.boolean(),
   seed: z.string().max(64).nullable()
 })
@@ -42,6 +68,17 @@ export const DEFAULT_PLAN: AllocationPlan = {
   gapAfterBank: 0,
   accessibleFirst: true,
   seed: null
+}
+
+/** The plan's usual order, from the plan, for filling in a line's own order. */
+export function usualOrder(plan: AllocationPlan): RuleOrder {
+  const { studentOrder, lockerOrder, gapAfterGroup, gapAfterBank } = plan
+  return { studentOrder, lockerOrder, gapAfterGroup, gapAfterBank }
+}
+
+/** The plan as one line sees it: its own order where it has one, the usual order otherwise. */
+export function planForRule(plan: AllocationPlan, rule: AllocationRule): AllocationPlan {
+  return rule.order ? { ...plan, ...rule.order } : plan
 }
 
 export interface DraftAssignment {

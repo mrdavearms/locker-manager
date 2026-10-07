@@ -46,3 +46,36 @@ test('allocate the demo school, show a code, a student leaves, undo', async () =
   await expect(l.page.getByTestId('reset-list')).toHaveCount(0)
   await l.close()
 })
+
+test('a line with its own order: Year 7 middle and bottom first, kept for next time', async () => {
+  const share = sharedFolder()
+  const l = await launchApp()
+  await answerNextDialog(l.app, 'open', placeFixture(share))
+  await l.page.getByTestId('open-file').click()
+
+  await l.page.getByTestId('nav-lockers').click()
+  await l.page.getByTestId('open-allocate').click()
+  await l.page.getByRole('button', { name: 'Give Year 7 side its own order' }).click()
+  await l.page.locator('#rule-0-lorder').selectOption('tier_preference')
+  // The Year 8 line and the usual order are untouched.
+  await expect(l.page.locator('#plan-lorder')).toHaveValue('number')
+  await expect(l.page.getByRole('button', { name: 'Give Year 8 side its own order' })).toBeVisible()
+
+  await l.page.getByTestId('make-draft').click()
+  await expect(l.page.getByTestId('unplaced')).toHaveCount(0)
+  // Bottom locker 114 is filled before top locker 112 (the demo has under 114 Year 7s).
+  await expect(l.page.getByLabel(/^Locker 114: /)).not.toHaveAccessibleName('Locker 114: spare')
+  await expect(l.page.getByLabel('Locker 112: spare', { exact: true })).toBeVisible()
+  // Year 8 still fills by number from 115.
+  await expect(l.page.getByLabel(/^Locker 115: /)).not.toHaveAccessibleName('Locker 115: spare')
+
+  await l.page.getByTestId('commit-allocation').click()
+  await expect(l.page.getByTestId('allocation-done')).toContainText('given out')
+
+  // The line's own order is saved with the plan for next year.
+  await l.page.getByTestId('nav-home').click()
+  await l.page.getByTestId('nav-lockers').click()
+  await l.page.getByTestId('open-allocate').click()
+  await expect(l.page.locator('#rule-0-lorder')).toHaveValue('tier_preference')
+  await l.close()
+})

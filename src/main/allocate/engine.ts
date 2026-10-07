@@ -1,4 +1,9 @@
-import type { AllocationDraft, AllocationPlan, DraftAssignment } from '@shared/allocation'
+import {
+  planForRule,
+  type AllocationDraft,
+  type AllocationPlan,
+  type DraftAssignment
+} from '@shared/allocation'
 import { seededSource } from '../codes/random'
 
 // The allocation engine (SPEC.md 4.4). Pure: students, lockers and a plan in; a
@@ -165,8 +170,10 @@ export function allocate(
     )
     // Lockers in this rule's range are this rule's alone, so two rules never interleave.
     for (const l of ruleLockers) usedByRule.add(l.id)
-    const sequence = orderLockers(dropBankGaps(ruleLockers, plan.gapAfterBank), plan)
-    const ordered = orderStudents(mine, plan)
+    // The line's own order where it has one (Year 7 low tiers, Year 12 keep last year's).
+    const p = planForRule(plan, rule)
+    const sequence = orderLockers(dropBankGaps(ruleLockers, p.gapAfterBank), p)
+    const ordered = orderStudents(mine, p)
     let placedHere = 0
     const place = (s: EngineStudent, l: EngineLocker): void => {
       assignments.push({ studentId: s.id, lockerId: l.id })
@@ -176,7 +183,7 @@ export function allocate(
     }
 
     // Keep last year's locker where possible.
-    if (plan.studentOrder === 'keep_last_year') {
+    if (p.studentOrder === 'keep_last_year') {
       for (const s of ordered) {
         const l = s.lastYearLockerId ? sequence.find((x) => x.id === s.lastYearLockerId) : undefined
         if (l && (free.get(l.id) ?? 0) > 0) place(s, l)
@@ -194,9 +201,9 @@ export function allocate(
     let previousGroup: string | null | undefined
     for (const s of ordered) {
       if (placed.has(s.id)) continue
-      if (previousGroup !== undefined && s.group !== previousGroup && plan.gapAfterGroup > 0) {
+      if (previousGroup !== undefined && s.group !== previousGroup && p.gapAfterGroup > 0) {
         let skippedSpaces = 0
-        while (cursor < sequence.length && skippedSpaces < plan.gapAfterGroup) {
+        while (cursor < sequence.length && skippedSpaces < p.gapAfterGroup) {
           if ((free.get(sequence[cursor]!.id) ?? 0) > 0) skippedSpaces++
           cursor++
         }

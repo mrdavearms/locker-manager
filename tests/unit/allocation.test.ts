@@ -1,6 +1,13 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PLAN, type AllocationPlan } from '../../src/shared/allocation'
+import {
+  AllocationPlanSchema,
+  DEFAULT_PLAN,
+  usualOrder,
+  type AllocationPlan,
+  type AllocationRule,
+  type RuleOrder
+} from '../../src/shared/allocation'
 import { allocate, type EngineLocker, type EngineStudent } from '../../src/main/allocate/engine'
 import { createDemoDatabase, generateDemoSchool } from '../../src/main/demo/demoSchool'
 import { decryptCode, codeKey } from '../../src/main/codes/cipher'
@@ -10,6 +17,7 @@ import {
   draftAllocation,
   moveStudent,
   releaseStudent,
+  savePlan,
   savedPlan,
   suggestLocker,
   swapStudents
@@ -227,6 +235,166 @@ describe('the allocation engine (properties)', () => {
   })
 })
 
+// A Year 7 side (l0 to l29) and a Year 8 side (ml0 to ml29), each 3 tiers, numbered in order.
+function twoSides(): EngineLocker[] {
+  return [
+    ...lockers(30).map((l) => ({ ...l, areaId: 'a7' })),
+    ...lockers(30).map((l) => ({
+      ...l,
+      id: `m${l.id}`,
+      sortKey: `1${l.sortKey}`,
+      areaId: 'a8',
+      areaOrder: 1
+    }))
+  ]
+}
+
+function line(id: string, years: string[], areaId: string, order?: RuleOrder): AllocationRule {
+  return {
+    id,
+    label: id,
+    yearLevels: years,
+    groups: [],
+    areaIds: [areaId],
+    bankIds: [],
+    ...(order ? { order } : {})
+  }
+}
+
+function yearStudents(year: string, n: number, prefix: string): EngineStudent[] {
+  return students(n, Number(year)).map((x) => ({ ...x, id: `${prefix}${x.id}`, yearLevel: year }))
+}
+
+describe('each line can have its own order (Year 7 low tiers, Year 12 keeps last year’s)', () => {
+  const usual = { ...DEFAULT_PLAN, accessibleFirst: false }
+  const tierOf = (id: string) => twoSides().find((l) => l.id === id)!.tier
+
+  it('a plan saved by an earlier version, with no order on its lines, still reads', () => {
+    const old = JSON.parse(
+      JSON.stringify({
+        ...DEFAULT_PLAN,
+        rules: [{ id: 'r', label: 'All', yearLevels: [], groups: [], areaIds: [], bankIds: [] }]
+      })
+    ) as unknown
+    const parsed = AllocationPlanSchema.parse(old)
+    expect(parsed.rules[0]!.order).toBeUndefined()
+    const own = { ...usualOrder(DEFAULT_PLAN), lockerOrder: 'column' as const }
+    const withOrder = AllocationPlanSchema.parse({
+      ...parsed,
+      rules: [{ ...parsed.rules[0]!, order: own }]
+    })
+    expect(withOrder.rules[0]!.order).toEqual(own)
+  })
+
+  it('Year 7 fills middle and bottom first while Year 8 fills by number, in one run', () => {
+    const plan: AllocationPlan = {
+      ...usual,
+      lockerOrder: 'number',
+      rules: [
+        line('y7', ['7'], 'a7', { ...usualOrder(usual), lockerOrder: 'tier_preference' }),
+        line('y8', ['8'], 'a8')
+      ]
+    }
+    const d = allocate(
+      [...yearStudents('7', 12, 'p'), ...yearStudents('8', 12, 'q')],
+      twoSides(),
+      plan
+    )
+    expect(d.unplaced).toEqual([])
+    const y7 = d.assignments.filter((a) => a.studentId.startsWith('p')).map((a) => a.lockerId)
+    const y8 = d.assignments.filter((a) => a.studentId.startsWith('q')).map((a) => a.lockerId)
+    expect(y7.map(tierOf).filter((t) => t === 'middle')).toHaveLength(10)
+    expect(y7.map(tierOf).every((t) => t !== 'top')).toBe(true)
+    expect([...y8].sort()).toEqual(Array.from({ length: 12 }, (_, i) => `ml${i}`).sort())
+  })
+
+  it('Year 12 keeps last year’s lockers while Year 11 is filled fresh', () => {
+    const y11 = yearStudents('11', 5, 'p').map((x, i) => ({ ...x, lastYearLockerId: `l${29 - i}` }))
+    const y12 = yearStudents('12', 5, 'q').map((x, i) => ({
+      ...x,
+      lastYearLockerId: `ml${29 - i}`
+    }))
+    const plan: AllocationPlan = {
+      ...usual,
+      rules: [
+        line('y11', ['11'], 'a7'),
+        line('y12', ['12'], 'a8', { ...usualOrder(usual), studentOrder: 'keep_last_year' })
+      ]
+    }
+    const d = allocate([...y11, ...y12], twoSides(), plan)
+    const got = new Map(d.assignments.map((a) => [a.studentId, a.lockerId]))
+    for (const s of y12) expect(got.get(s.id)).toBe(s.lastYearLockerId)
+    for (const s of y11) expect(got.get(s.id)).not.toBe(s.lastYearLockerId)
+  })
+
+  it('a line whose own order matches the usual order gives exactly the same draft', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom('group_then_name', 'name', 'house_then_name', 'random', 'keep_last_year'),
+        fc.constantFrom('number', 'bank_then_number', 'column', 'tier_preference'),
+        fc.integer({ min: 0, max: 3 }),
+        fc.integer({ min: 0, max: 3 }),
+        (so, lo, gapG, gapB) => {
+          const p: AllocationPlan = {
+            ...DEFAULT_PLAN,
+            seed: 'same',
+            studentOrder: so as AllocationPlan['studentOrder'],
+            lockerOrder: lo as AllocationPlan['lockerOrder'],
+            gapAfterGroup: gapG,
+            gapAfterBank: gapB,
+            rules: [line('y7', ['7'], 'a7'), line('y8', ['8'], 'a8')]
+          }
+          const withOwn = { ...p, rules: p.rules.map((r) => ({ ...r, order: usualOrder(p) })) }
+          const people = [...yearStudents('7', 25, 'p'), ...yearStudents('8', 25, 'q')]
+          expect(allocate(people, twoSides(), withOwn)).toEqual(allocate(people, twoSides(), p))
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  it('with a different order on every line, nobody is placed twice and everyone stays on their side', () => {
+    const order = fc.record({
+      studentOrder: fc.constantFrom(
+        'group_then_name',
+        'name',
+        'house_then_name',
+        'random',
+        'keep_last_year'
+      ),
+      lockerOrder: fc.constantFrom('number', 'bank_then_number', 'column', 'tier_preference'),
+      gapAfterGroup: fc.integer({ min: 0, max: 3 }),
+      gapAfterBank: fc.integer({ min: 0, max: 3 })
+    })
+    fc.assert(
+      fc.property(
+        fc.option(order, { nil: undefined }),
+        fc.option(order, { nil: undefined }),
+        fc.integer({ min: 0, max: 40 }),
+        fc.integer({ min: 0, max: 40 }),
+        (o7, o8, n7, n8) => {
+          const plan: AllocationPlan = {
+            ...DEFAULT_PLAN,
+            seed: 'lines',
+            rules: [line('y7', ['7'], 'a7', o7), line('y8', ['8'], 'a8', o8)]
+          }
+          const people = [
+            ...yearStudents('7', n7, 'p').map((x, i) => ({ ...x, lastYearLockerId: `l${i}` })),
+            ...yearStudents('8', n8, 'q')
+          ]
+          const d = allocate(people, twoSides(), plan)
+          expect(new Set(d.assignments.map((a) => a.lockerId)).size).toBe(d.assignments.length)
+          expect(new Set(d.assignments.map((a) => a.studentId)).size).toBe(d.assignments.length)
+          expect(d.assignments.length + d.unplaced.length).toBe(n7 + n8)
+          for (const a of d.assignments)
+            expect(a.lockerId.startsWith('m')).toBe(a.studentId.startsWith('q'))
+        }
+      ),
+      { numRuns: 150 }
+    )
+  })
+})
+
 describe('committing, codes and the manual tools (SPEC.md 4.4, 4.5)', () => {
   async function allocated() {
     const db = await demo()
@@ -287,6 +455,27 @@ describe('committing, codes and the manual tools (SPEC.md 4.4, 4.5)', () => {
     const { code } = assignStudent(db, ctx, y7.id, suggestion.lockerId)
     expect(code).toMatch(/^\d{4}$/)
     expect(() => assignStudent(db, ctx, y7.id, suggestion.lockerId)).toThrow(/already has a locker/)
+  })
+
+  it('a new student’s suggestion follows their line’s own locker order', async () => {
+    const db = await demo()
+    const ctx = testContext()
+    const y7 = db.get<{ id: string }>(
+      "SELECT id FROM student WHERE year_level = '7' AND group_code <> 'ZZZ' LIMIT 1"
+    )!
+    const tierOf = (id: string) =>
+      db.get<{ tier: string }>('SELECT tier FROM locker WHERE id = $id', { $id: id })?.tier
+    expect(tierOf(suggestLocker(db, y7.id)!.lockerId)).toBe('top')
+    const plan = savedPlan(db)
+    savePlan(db, ctx, {
+      ...plan,
+      rules: plan.rules.map((r) =>
+        r.yearLevels.includes('7')
+          ? { ...r, order: { ...usualOrder(plan), lockerOrder: 'tier_preference' as const } }
+          : r
+      )
+    })
+    expect(tierOf(suggestLocker(db, y7.id)!.lockerId)).toBe('middle')
   })
 
   it('a move flags the old lock and gives the new one a code', async () => {
