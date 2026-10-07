@@ -78,10 +78,13 @@ test('a small school with no locks, no import and no labels', async () => {
     await p.locator('#add-st-id').fill(id)
     await p.locator('#add-st-first').fill(first)
     await p.locator('#add-st-last').fill(last)
-    // SMALL-SCHOOL GAP: the Year level list only offers year levels already in the
-    // file (none, for a hand-built school), so "Other…" must be chosen and 5 typed.
-    await p.locator('#add-st-year').selectOption('__other')
-    await p.getByRole('dialog').getByLabel('Other year level').fill('5')
+    // The first student types 5 under "Other…"; the rest pick it from the list.
+    if (id === names[0][0]) {
+      await p.locator('#add-st-year').selectOption('__other')
+      await p.getByRole('dialog').getByLabel('Other year level').fill('5')
+    } else {
+      await p.locator('#add-st-year').selectOption('5')
+    }
     await p.getByTestId('add-student-save').click()
     await expect(p.getByTestId('message-strip')).toContainText(`${first} ${last} added`)
   }

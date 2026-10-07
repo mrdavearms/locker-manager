@@ -26,11 +26,20 @@ export function YearGroupFields({
 }): React.JSX.Element {
   const terms = useTerms()
   const { data: groups } = useRpc('groups.list', {})
+  // Year levels in use by current students too, so a school with no groups still gets a list.
+  const { data: students } = useRpc('students.list', { filter: 'current' })
   const [otherMode, setOtherMode] = useState(false)
   const years = [
-    ...new Set((groups ?? []).map((g) => g.yearLevel).filter((y): y is string => y !== null))
+    ...new Set(
+      [
+        ...(groups ?? []).map((g) => g.yearLevel),
+        ...(students ?? []).map((s) => s.yearLevel)
+      ].filter((y): y is string => y !== null && y !== '')
+    )
   ].sort((a, b) => Number(a) - Number(b) || a.localeCompare(b))
-  const isOther = otherMode || (year !== '' && groups !== undefined && !years.includes(year))
+  const isOther =
+    otherMode ||
+    (year !== '' && groups !== undefined && students !== undefined && !years.includes(year))
   const yearWord = terms.yearLevel.one
   const groupWord = terms.group.one
   const known = (groups ?? []).some((g) => g.code === group)
