@@ -15,6 +15,7 @@ import { NavRail, type Screen } from './components/NavRail'
 import { NewFileDialog } from './components/NewFileDialog'
 import { OperatorDialog } from './components/OperatorDialog'
 import { PinGateProvider } from './components/PinGate'
+import { ReadOnlyBanner } from './components/ReadOnlyBanner'
 import { AddStudentDialog } from './components/AddStudentDialog'
 import { QuickFind } from './components/QuickFind'
 import { StatusBar } from './components/StatusBar'
@@ -133,6 +134,8 @@ export function App(): React.JSX.Element {
     setMessagePath(openPath)
     setMessage(null)
   }
+  const holder = open?.readOnly?.holder
+  const editingBy = holder ? `${holder.operator} on ${holder.computer}` : null
   const screen: Screen = nav.path === openPath ? nav.screen : 'home'
   const focus = nav.path === openPath ? nav.focus : null
   const printResets = (): void =>
@@ -289,6 +292,8 @@ export function App(): React.JSX.Element {
       <AppContextProvider
         revision={open?.revision ?? 0}
         canEdit={open?.mode === 'edit' && !open.conflict}
+        editingBy={editingBy}
+        needsNewerApp={open?.readOnly?.reason === 'newer_version'}
         showError={setError}
         notify={notify}
       >
@@ -300,6 +305,11 @@ export function App(): React.JSX.Element {
                 {update.state !== 'idle' && (
                   <div className="px-6 pt-6">
                     <UpdateBanner status={update} />
+                  </div>
+                )}
+                {open && !helpOpen && screen !== 'home' && open.readOnly && (
+                  <div className="px-6 pt-6">
+                    <ReadOnlyBanner state={open} onError={setError} />
                   </div>
                 )}
                 {helpOpen ? (

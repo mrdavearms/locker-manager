@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { Button } from './Button'
-import { useAction, useCanEdit } from '@renderer/lib/appContext'
+import { useAction, useCanEdit, useLockedReason } from '@renderer/lib/appContext'
 import { call, useRpc } from '@renderer/lib/rpc'
 import { useCodeGate } from './PinGate'
 
@@ -30,6 +30,7 @@ export function CodeReveal({ lockerId }: { lockerId: string }): React.JSX.Elemen
   const act = useAction()
   const canEdit = useCanEdit()
   const gate = useCodeGate()
+  const lockedReason = useLockedReason()
   const { data: privacy } = useRpc('privacy.get', {})
   const hideAfter = privacy?.autoHideSeconds ?? 30
   const [code, setCode] = useState<string | null>(null)
@@ -57,14 +58,12 @@ export function CodeReveal({ lockerId }: { lockerId: string }): React.JSX.Elemen
       </div>
     )
   }
-  return (
+  const button = (
     <Button
       size="sm"
       variant="secondary"
       disabled={!canEdit}
-      title={
-        canEdit ? 'Shows the code; this is recorded' : 'Only the person editing can show codes'
-      }
+      title={'Shows the code; this is recorded'}
       onClick={() =>
         void act(async () => {
           if (!(await gate())) return
@@ -78,5 +77,14 @@ export function CodeReveal({ lockerId }: { lockerId: string }): React.JSX.Elemen
     >
       <Eye size={16} aria-hidden /> Show code
     </Button>
+  )
+  if (canEdit) return button
+  return (
+    <div>
+      {button}
+      <p className="mt-1 text-xs text-ink-muted" data-testid="codes-locked-reason">
+        {lockedReason}
+      </p>
+    </div>
   )
 }

@@ -1,6 +1,7 @@
 import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
+import initSqlJs from 'sql.js'
 import { answerNextDialog, launchApp, placeFixture, sharedFolder } from './launch'
 
 // SPEC.md section 12: end-to-end tests of the data file's safety rules,
@@ -89,6 +90,64 @@ test('two copies of the app on one file: the second is read-only and follows the
   })
   await second.page.getByRole('button', { name: 'Start editing' }).click()
   await expect(second.page.getByTestId('mode-pill')).toHaveText('Editing')
+
+  await first.close()
+  await second.close()
+})
+
+test('read-only copy says who is editing and why codes and letters are locked, on every screen', async () => {
+  test.setTimeout(120_000)
+  const share = sharedFolder()
+  const path = placeFixture(share)
+  const SQL = await initSqlJs()
+  const db = new SQL.Database(readFileSync(path))
+  db.run("UPDATE meta SET value = '0' WHERE key = 'demo'")
+  writeFileSync(path, db.export())
+  db.close()
+
+  const first = await launchApp({ operator: 'Hannah' })
+  await first.page.setViewportSize({ width: 1300, height: 950 })
+  await answerNextDialog(first.app, 'open', path)
+  await first.page.getByTestId('open-file').click()
+  await first.page.getByTestId('nav-lockers').click()
+  await first.page.getByTestId('open-allocate').click()
+  await first.page.getByTestId('make-draft').click()
+  await first.page.getByTestId('commit-allocation').click()
+  await expect(first.page.getByTestId('allocation-done')).toContainText('given out')
+  await expect(first.page.getByTestId('save-status')).toContainText('Saved', { timeout: 10_000 })
+
+  const second = await launchApp({ operator: 'Dave' })
+  await second.page.setViewportSize({ width: 1300, height: 950 })
+  await answerNextDialog(second.app, 'open', path)
+  await second.page.getByTestId('open-file').click()
+  await expect(second.page.getByTestId('mode-pill')).toHaveText('Read-only')
+  await second.page.getByTestId('nav-students').click()
+  const banner = second.page.getByTestId('read-only-banner')
+  await expect(banner).toBeVisible()
+  await expect(banner).toContainText('not change anything, show codes or print letters')
+  await second.page.getByTestId('open-find').click()
+  await second.page.getByTestId('quick-find-input').fill('1')
+  await second.page.getByRole('option').first().click()
+  await expect(second.page.getByTestId('show-code')).toBeDisabled()
+  await expect(second.page.getByTestId('codes-locked-reason')).toContainText(
+    'Codes and letters are locked while Hannah on'
+  )
+  await second.page.getByTestId('open-find').click()
+  await second.page.getByTestId('quick-find-input').fill('Ava')
+  await second.page.getByRole('option').first().click()
+  await expect(second.page.getByTestId('student-letter')).toBeDisabled()
+  await expect(second.page.getByTestId('letters-locked-reason')).toContainText(
+    'Codes and letters are locked while Hannah on'
+  )
+
+  await second.page.getByTestId('nav-letters').click()
+  await expect(second.page.getByTestId('read-only-banner')).toBeVisible()
+  await expect(second.page.getByTestId('letters-rule')).toContainText(
+    'Codes and letters are locked while Hannah on'
+  )
+
+  await second.page.getByTestId('nav-home').click()
+  await expect(second.page.getByTestId('read-only-banner')).toHaveCount(1)
 
   await first.close()
   await second.close()

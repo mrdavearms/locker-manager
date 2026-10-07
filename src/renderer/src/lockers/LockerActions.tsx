@@ -7,7 +7,13 @@ import { Field, Select, TextInput } from '@renderer/components/Field'
 import { Modal } from '@renderer/components/Modal'
 import { QuickFind } from '@renderer/components/QuickFind'
 import { useCodeGate } from '@renderer/components/PinGate'
-import { useAction, useCanEdit, useNotify, useTerms } from '@renderer/lib/appContext'
+import {
+  useAction,
+  useCanEdit,
+  useLockedReason,
+  useNotify,
+  useTerms
+} from '@renderer/lib/appContext'
 import { plural } from '@renderer/lib/format'
 import { call, useRpc } from '@renderer/lib/rpc'
 
@@ -590,6 +596,7 @@ function StudentLetter({ s }: { s: StudentView }): React.JSX.Element {
   const canEdit = useCanEdit()
   const act = useAction()
   const gate = useCodeGate()
+  const lockedReason = useLockedReason()
   const { data: template } = useRpc('letters.template.get', {})
   const [saved, setSaved] = useState<string | null>(null)
   const languages = template?.languages ?? []
@@ -600,11 +607,6 @@ function StudentLetter({ s }: { s: StudentView }): React.JSX.Element {
         variant="secondary"
         disabled={!canEdit}
         data-testid="student-letter"
-        title={
-          canEdit
-            ? undefined
-            : 'Letters show codes, so they print only while the file is open for editing.'
-        }
         onClick={() =>
           void act(async () => {
             if (!(await gate())) return
@@ -619,6 +621,11 @@ function StudentLetter({ s }: { s: StudentView }): React.JSX.Element {
       >
         <Mail size={15} aria-hidden /> Save their letter as PDF…
       </Button>
+      {!canEdit && (
+        <p className="basis-full text-xs text-ink-muted" data-testid="letters-locked-reason">
+          {lockedReason}
+        </p>
+      )}
       {languages.length > 1 && (
         <Select
           aria-label="Letter language"

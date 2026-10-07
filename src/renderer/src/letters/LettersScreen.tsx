@@ -4,7 +4,13 @@ import type { LetterLanguage, LetterPreview, LetterSelection } from '@shared/let
 import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, Select, TextInput } from '@renderer/components/Field'
-import { useAction, useCanEdit, useRevision, useTerms } from '@renderer/lib/appContext'
+import {
+  useAction,
+  useCanEdit,
+  useLockedReason,
+  useRevision,
+  useTerms
+} from '@renderer/lib/appContext'
 import { plural } from '@renderer/lib/format'
 import { useRpc } from '@renderer/lib/rpc'
 import { SheetPreview } from '@renderer/print/SheetPreview'
@@ -18,6 +24,7 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
   const act = useAction()
   const gate = useCodeGate()
   const canEdit = useCanEdit()
+  const lockedReason = useLockedReason()
   const revision = useRevision()
   const { data: groups } = useRpc('groups.list', {})
   const { data: areas } = useRpc('locations.list', {})
@@ -263,9 +270,7 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
             <p className="text-xs text-ink-muted" data-testid="letters-rule">
               Letters print only while the file is open for editing, because every code printed is
               recorded in the history with your name.{' '}
-              {canEdit
-                ? 'Print at Actual size (100%).'
-                : 'The file is open read-only on this computer, so wait until the person editing closes it.'}
+              {canEdit ? 'Print at Actual size (100%).' : lockedReason}
             </p>
           </div>
           {saved && (
