@@ -37,6 +37,7 @@ export const channels = {
   renderLettersPdf: 'render:lettersPdf',
   renderLettersPrint: 'render:lettersPrint',
   renderLettersCheck: 'render:lettersCheck',
+  renderLettersCancel: 'render:lettersCancel',
   renderReportPdf: 'render:reportPdf',
   renderReportPrint: 'render:reportPrint',
   renderReportExport: 'render:reportExport',
@@ -61,5 +62,6 @@ export const channels = {
   updateStatus: 'event:update:status',
   openAbout: 'event:ui:openAbout',
   openTour: 'event:ui:openTour',
-  fileState: 'event:file:state'
+  fileState: 'event:file:state',
+  renderLettersProgress: 'event:render:lettersProgress'
 } as const

@@ -4,7 +4,9 @@ import { DEFAULT_TERMS } from '../../src/shared/terminology'
 import { defaultLetterTemplate } from '../../src/main/letters/defaultTemplate'
 import { formatBody, formatLine } from '../../src/main/letters/text'
 import { buildLetters, pick, showsFor, type LetterItem } from '../../src/main/render/letter'
-import { prepareLetters } from '../../src/main/render/prepareLetters'
+import { PDFDocument } from 'pdf-lib'
+import { runLetterJob } from '../../src/main/render/letterJob'
+import { prepareLetterChunks, prepareLetters } from '../../src/main/render/prepareLetters'
 import {
   issueCode,
   lockForLocker,
@@ -245,5 +247,91 @@ describe('who gets a letter (SPEC.md 4.8)', () => {
         blocks: t.blocks.map((b) => (b.id === 'know' ? { ...b, imageId: id } : b))
       })
     ).toThrow(/picture/)
+  })
+})
+
+describe('letters made in chunks, with progress and Cancel', () => {
+  it('splits letters into chunks of 25 that together hold every letter once', async () => {
+    const { db } = await allocatedDemo()
+    const { chunks, prepared } = prepareLetterChunks(
+      db,
+      { selection: { mode: 'all' }, language: { kind: 'each' }, masked: true, preview: false },
+      25
+    )
+    expect(prepared.items.length).toBeGreaterThan(200)
+    expect(chunks).toHaveLength(Math.ceil(prepared.items.length / 25))
+    const count = chunks.join('').split('<section class="letter"').length - 1
+    expect(count).toBe(prepared.items.length)
+    // Each chunk is a whole page of its own.
+    for (const c of chunks) expect(c).toMatch(/^<!doctype html>/i)
+  })
+
+  async function onePagePdf(pages: number): Promise<Uint8Array> {
+    const doc = await PDFDocument.create()
+    for (let i = 0; i < pages; i++) doc.addPage([595, 842])
+    return doc.save()
+  }
+
+  it('checks every chunk, then makes one PDF from them all, reporting progress', async () => {
+    const seen: string[] = []
+    const r = await runLetterJob(
+      ['a', 'b', 'c'],
+      {
+        onProgress: (done, total, stage) => seen.push(`${stage} ${done}/${total}`),
+        cancelled: () => false
+      },
+      { overflowing: async () => [], toPdf: async (html) => onePagePdf(html === 'b' ? 2 : 1) }
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect((await PDFDocument.load(r.bytes)).getPageCount()).toBe(4)
+    expect(seen).toEqual([
+      'checking 1/6',
+      'checking 2/6',
+      'checking 3/6',
+      'making 4/6',
+      'making 5/6',
+      'making 6/6'
+    ])
+  })
+
+  it('stops at the checking stage and names letters that run onto a second page', async () => {
+    let made = 0
+    const r = await runLetterJob(
+      ['a', 'b'],
+      { onProgress: () => undefined, cancelled: () => false },
+      {
+        overflowing: async (html) => (html === 'b' ? ['s-9'] : []),
+        toPdf: async () => {
+          made++
+          return onePagePdf(1)
+        }
+      }
+    )
+    expect(r).toEqual({ ok: false, overflow: ['s-9'] })
+    expect(made).toBe(0)
+  })
+
+  it('stops before the next chunk once Cancel is pressed', async () => {
+    let cancel = false
+    let made = 0
+    const r = await runLetterJob(
+      ['a', 'b', 'c'],
+      {
+        onProgress: (done) => {
+          if (done === 4) cancel = true
+        },
+        cancelled: () => cancel
+      },
+      {
+        overflowing: async () => [],
+        toPdf: async () => {
+          made++
+          return onePagePdf(1)
+        }
+      }
+    )
+    expect(r).toEqual({ ok: false, cancelled: true })
+    expect(made).toBe(1)
   })
 })

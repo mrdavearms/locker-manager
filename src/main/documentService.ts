@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, type WebContents } from 'electron'
 import log from 'electron-log/main'
 import { z } from 'zod'
 import { channels } from '@shared/channels'
@@ -13,15 +13,9 @@ import { recordPrintJob } from './repos/labels'
 import { getSchoolProfile } from './repos/school'
 import { buildReport, type BuiltReport } from './reports/build'
 import { reportCsv, reportXlsx } from './reports/export'
-import {
-  htmlToPdf,
-  overflowingLetters,
-  pdfPageCount,
-  printHtml,
-  printReport,
-  reportToPdf
-} from './render/pdf'
-import { prepareLetters, type PreparedLetters } from './render/prepareLetters'
+import { overflowingLetters, pdfPageCount, printHtml, printReport, reportToPdf } from './render/pdf'
+import { runLetterJob } from './render/letterJob'
+import { prepareLetterChunks, prepareLetters, type PreparedLetters } from './render/prepareLetters'
 import { buildReportHtml, reportDate, reportFooter } from './render/report'
 import { pickOutputPath, stampDate, writeOutput } from './renderService'
 
@@ -58,12 +52,28 @@ function overflowMessage(p: PreparedLetters, ids: string[]): string {
   }. Shorten the words or make a picture smaller in Settings, Letters. Nothing was saved.`
 }
 
-/** Builds the letters with real codes and checks every one fits its page. */
+// Only one letters job runs at a time from the window; Cancel sets this and
+// each job clears it when it starts. The job looks at it before every chunk.
+let cancelRequested = false
+
+/**
+ * Builds the letters with real codes and checks every one fits its page, a
+ * chunk at a time with progress sent to the window. For a PDF it also makes the
+ * PDF (`bytes`); for printing it stops after the check.
+ */
 async function readyLetters(
-  job: z.infer<typeof LettersJob>
-): Promise<{ ok: true; p: PreparedLetters } | { ok: false; message: string }> {
+  job: z.infer<typeof LettersJob>,
+  sender: WebContents,
+  to: 'pdf' | 'printer'
+): Promise<
+  | { ok: true; p: PreparedLetters; bytes: Uint8Array }
+  | { ok: false; cancelled?: boolean; message: string }
+> {
+  cancelRequested = false
   const s = fileSession()
-  const p = s.read((db) => prepareLetters(db, { ...job, masked: false, preview: false }))
+  const { chunks, prepared: p } = s.read((db) =>
+    prepareLetterChunks(db, { ...job, masked: false, preview: false })
+  )
   if (p.items.length === 0)
     return {
       ok: false,
@@ -77,9 +87,21 @@ async function readyLetters(
     const locked = s.read((db) => codesLocked(db))
     if (locked) return { ok: false, message: locked }
   }
-  const over = await overflowingLetters(p.html)
-  if (over.length > 0) return { ok: false, message: overflowMessage(p, over) }
-  return { ok: true, p }
+  const r = await runLetterJob(
+    chunks,
+    {
+      onProgress: (done, total, stage) => {
+        if (!sender.isDestroyed())
+          sender.send(channels.renderLettersProgress, { done, total, stage })
+      },
+      cancelled: () => cancelRequested
+    },
+    undefined,
+    to === 'printer'
+  )
+  if (r.ok) return { ok: true, p, bytes: r.bytes }
+  if ('cancelled' in r) return { ok: false, cancelled: true, message: '' }
+  return { ok: false, message: overflowMessage(p, r.overflow) }
 }
 
 /**
@@ -158,6 +180,10 @@ function fileName(report: BuiltReport, ext: string): string {
 }
 
 export function registerDocumentHandlers(): void {
+  ipcMain.on(channels.renderLettersCancel, () => {
+    cancelRequested = true
+  })
+
   ipcMain.handle(channels.renderLettersCheck, async (_e, raw: unknown) => {
     const job = LettersCheck.parse(raw)
     const p = fileSession().read((db) =>
@@ -173,11 +199,11 @@ export function registerDocumentHandlers(): void {
     }
   })
 
-  ipcMain.handle(channels.renderLettersPdf, async (_e, raw: unknown): Promise<Saved> => {
+  ipcMain.handle(channels.renderLettersPdf, async (e, raw: unknown): Promise<Saved> => {
     return await whileBusy('printing', async () => {
-      const ready = await readyLetters(LettersJob.parse(raw))
+      const ready = await readyLetters(LettersJob.parse(raw), e.sender, 'pdf')
       if (!ready.ok) return ready
-      const bytes = await htmlToPdf(ready.p.html)
+      const bytes = ready.bytes
       const pages = await pdfPageCount(bytes)
       if (pages !== ready.p.items.length) {
         log.warn('letter page count mismatch', pages, ready.p.items.length)
@@ -195,9 +221,9 @@ export function registerDocumentHandlers(): void {
     })
   })
 
-  ipcMain.handle(channels.renderLettersPrint, async (_e, raw: unknown): Promise<ActionResult> => {
+  ipcMain.handle(channels.renderLettersPrint, async (e, raw: unknown): Promise<ActionResult> => {
     return await whileBusy('printing', async () => {
-      const ready = await readyLetters(LettersJob.parse(raw))
+      const ready = await readyLetters(LettersJob.parse(raw), e.sender, 'printer')
       if (!ready.ok) return ready
       const r = await printHtml(ready.p.html, {
         widthMm: ready.p.page.width,
@@ -263,7 +289,8 @@ export function registerDocumentHandlers(): void {
       if (!ready.ok) return ready
       // Codes are only in the report when its request asked for them.
       const report = ready.report
-      const bytes = job.format === 'csv' ? reportCsv(report) : await reportXlsx(report, ready.school)
+      const bytes =
+        job.format === 'csv' ? reportCsv(report) : await reportXlsx(report, ready.school)
       const path = await pickOutputPath(
         fileName(report, job.format),
         job.format === 'csv'

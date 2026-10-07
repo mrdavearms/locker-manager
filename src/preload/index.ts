@@ -12,6 +12,7 @@ import type {
   ActionResult,
   AppInfo,
   InstallResult,
+  LettersProgress,
   OnboardingInfo,
   OnboardingSet,
   OperatorInfo,
@@ -94,6 +95,9 @@ const api = {
   lettersCheck: (
     job: LettersJob & { template?: LetterTemplate }
   ): Promise<{ overflow: string[] }> => ipcRenderer.invoke(channels.renderLettersCheck, job),
+  onLettersProgress: (listener: (progress: LettersProgress) => void) =>
+    subscribe(channels.renderLettersProgress, listener),
+  cancelLetters: (): void => ipcRenderer.send(channels.renderLettersCancel),
   reportPdf: (job: ReportJob): Promise<Saved> => ipcRenderer.invoke(channels.renderReportPdf, job),
   reportPrint: (job: ReportJob): Promise<ActionResult> =>
     ipcRenderer.invoke(channels.renderReportPrint, job),
