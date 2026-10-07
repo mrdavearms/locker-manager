@@ -45,7 +45,7 @@ function setupStatus(db: LockerDb): SetupStatus {
     db.get('SELECT 1 AS x FROM print_job WHERE kind = $k LIMIT 1', { $k: kind }) !== undefined
   return {
     completed: getSetting(db, 'setup.completedAt', z.string(), '') !== '',
-    hasSchoolDetails: school.hasLogo || school.colourPrimary !== null,
+    hasSchoolDetails: school.name.trim().length > 0,
     hasTerms: getSetting(db, 'terminology.updated', z.string(), '') !== '',
     lockers,
     lockersWithoutLock: without,

@@ -55,11 +55,11 @@ test('a small school with no locks, no import and no labels', async () => {
   await p.getByTestId('setup-next').click()
   // The Done step lists what is ticked.
   const done = p.getByTestId('setup-finish').locator('xpath=ancestor::section')
-  // SMALL-SCHOOL GAP: "School details" and "Words your school uses" show as not done
-  // ("can be done later"), because a school that only wants lockers has no reason to
-  // fill them in. The set-up page and Home keep treating them as outstanding.
+  // "School details" is ticked once the school has a name, with no logo or colour.
   await expect(done.getByText('School details')).toBeVisible()
-  await expect(done.locator('li', { hasText: 'School details' })).toContainText('can be done later')
+  await expect(done.locator('li', { hasText: 'School details' })).not.toContainText(
+    'can be done later'
+  )
   await p.getByTestId('setup-finish').click()
 
   // Five students by hand, year level 5, no group.
