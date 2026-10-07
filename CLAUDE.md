@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 7 October 2026 (v0.10.0 released; 1.0 waits for Dave's hand checks)._
+_Last updated: 7 October 2026 (v0.10.0 released; fix-before-1.0 branch in progress; 1.0 waits for Dave's hand checks)._
 
 ## What this is
 
@@ -164,6 +164,10 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     `suggestLocker`. Accessible-first and groups placed last stay school-wide. No migration:
     a plan without `order` reads as before, and the golden snapshot is unchanged. An older
     app that saves the plan drops the lines' own orders (Zod strips unknown keys); accepted.
+22. **Codes stay locked on a read-only computer** (Dave, 7 Oct 2026). Every code shown is
+    written to `code_reveal_log`, and only the editing computer can write to the file, so a
+    read-only computer cannot show, print or export codes. Every screen says who is editing
+    and why; conflict and newer-version cases have their own wording.
 15. **Anything with codes prints or exports only in edit mode** (Dave, 7 Oct 2026). Every
     code that leaves the app is written to `code_reveal_log`, which needs a write. The rule
     is stated next to every print button that can carry codes, in the user guide and in
@@ -234,6 +238,9 @@ All data reads and writes from the window go through ONE channel, `rpc`:
   "Locker" and so on in UI text.
 
 ## Gotchas found in M1
+
+- End-to-end test windows open in the background (`LOCKER_MANAGER_BACKGROUND=1`, set in
+  `tests/e2e/launch.ts`) so they do not take focus while you work.
 
 - React's `react-hooks/set-state-in-effect` lint rule forbids resetting form state in an
   effect when a dialog opens. Put the form in a child component inside the Radix dialog
@@ -375,3 +382,13 @@ locker, from `print_job.records`. A year code set made while lockers are out is 
 (setting `codes.reservedForNextYear`), skipped by `nextCodeFor`, and moved to the new year by
 `archiveYear`. A PIN change empties the undo list. A practice copy is recorded in the real
 file. Workbook import drops logo types the app does not make.
+
+**Fix-before-1.0 (7 Oct 2026).** Branch `fix-before-1-0`. A message strip confirms each
+change for 8 seconds with Undo. Students can be added by hand (matched by student ID on the
+next import), and their year level and group changed in their panel, with an offer to move
+them; new Settings tab "Year levels and groups". Home "Move or swap" asks which and a swap
+shows both lockers first; marking a held locker out of service offers to move the student.
+Lock resets have tick boxes, Tick all, "Mark N as reset" and Print this list. Read-only
+screens say who is editing and why codes and letters are locked (decision 22). After
+allocating, Print labels and Print letters buttons; after an import, "Give out lockers now".
+The updater never restarts during a print or import. Letters show a progress bar and Cancel.

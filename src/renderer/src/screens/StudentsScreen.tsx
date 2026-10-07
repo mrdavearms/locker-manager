@@ -1,14 +1,16 @@
 import { useState } from 'react'
-import { Accessibility, Ban, FileInput, Search, SpellCheck, UserX } from 'lucide-react'
+import { Accessibility, Ban, FileInput, Search, SpellCheck, UserPlus, UserX } from 'lucide-react'
 import type { StudentFilter, StudentView } from '@shared/students'
+import { AddStudentDialog } from '@renderer/components/AddStudentDialog'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, TextInput } from '@renderer/components/Field'
 import { Modal } from '@renderer/components/Modal'
-import { useAction, useCanEdit, useTerms } from '@renderer/lib/appContext'
+import { YearGroupFields } from '@renderer/components/YearGroupFields'
+import { useAction, useCanEdit, useNotify, useTerms } from '@renderer/lib/appContext'
 import { cn } from '@renderer/lib/cn'
 import { formatWhen } from '@renderer/lib/format'
 import { call, useRpc } from '@renderer/lib/rpc'
-import { StudentLockerCard, type LockerIntent } from '@renderer/lockers/LockerActions'
+import { IssuedDialog, StudentLockerCard, type LockerIntent } from '@renderer/lockers/LockerActions'
 
 const NAME_CHECK_TEXT: Record<string, string> = {
   mac: 'Mac name: MacDonald or Macdonald?',
@@ -30,11 +32,25 @@ function StudentPanel({
   const terms = useTerms()
   const canEdit = useCanEdit()
   const act = useAction()
+  const notify = useNotify()
   const [first, setFirst] = useState(s.firstName)
   const [last, setLast] = useState(s.lastName)
   const [preferred, setPreferred] = useState(s.preferredName ?? '')
   const [excluding, setExcluding] = useState(false)
   const [reason, setReason] = useState('')
+  const [yearLevel, setYearLevel] = useState(s.yearLevel ?? '')
+  const [groupCode, setGroupCode] = useState(s.groupCode ?? '')
+  const [offer, setOffer] = useState<{ lockerId: string; number: string } | null>(null)
+  const [issued, setIssued] = useState<{ code: string | null; number: string } | null>(null)
+  // The fields follow the stored year level and group when they change (Undo, another
+  // computer, or the save itself), without remounting the panel and losing the move offer.
+  const [seen, setSeen] = useState({ year: s.yearLevel ?? '', group: s.groupCode ?? '' })
+  if (seen.year !== (s.yearLevel ?? '') || seen.group !== (s.groupCode ?? '')) {
+    setSeen({ year: s.yearLevel ?? '', group: s.groupCode ?? '' })
+    setYearLevel(s.yearLevel ?? '')
+    setGroupCode(s.groupCode ?? '')
+  }
+  const placementDirty = yearLevel !== (s.yearLevel ?? '') || groupCode !== (s.groupCode ?? '')
   const dirty =
     first !== s.firstName || last !== s.lastName || preferred !== (s.preferredName ?? '')
 
@@ -76,7 +92,12 @@ function StudentPanel({
             className="mt-2"
             size="sm"
             disabled={!canEdit}
-            onClick={() => void act(() => call('student.update', { id: s.id, confirmName: true }))}
+            onClick={() =>
+              void act(async () => {
+                await call('student.update', { id: s.id, confirmName: true })
+                notify('Name spelling confirmed.')
+              })
+            }
           >
             The spelling is right
           </Button>
@@ -122,19 +143,20 @@ function StudentPanel({
                 setPreferred(s.preferredName ?? '')
               )}
             >
-              Undo
+              Put back
             </Button>
             <Button
               size="sm"
               onClick={() =>
-                void act(() =>
-                  call('student.update', {
+                void act(async () => {
+                  await call('student.update', {
                     id: s.id,
                     firstName: first,
                     lastName: last,
                     preferredName: preferred || null
                   })
-                )
+                  notify('Name saved.')
+                })
               }
             >
               Save name
@@ -147,6 +169,115 @@ function StudentPanel({
           </p>
         )}
       </div>
+
+      <div className="mt-5 grid gap-3">
+        <YearGroupFields
+          key={`${seen.year}-${seen.group}`}
+          idPrefix="st"
+          disabled={!canEdit}
+          year={yearLevel}
+          group={groupCode}
+          onYear={setYearLevel}
+          onGroup={setGroupCode}
+        />
+        <p className="text-xs text-ink-muted">
+          Your next import replaces these with what your student system says.
+        </p>
+        {placementDirty && (
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => (setYearLevel(s.yearLevel ?? ''), setGroupCode(s.groupCode ?? ''))}
+            >
+              Put back
+            </Button>
+            <Button
+              size="sm"
+              disabled={!canEdit}
+              data-testid="student-placement-save"
+              onClick={() =>
+                void act(async () => {
+                  const saved = await call('student.update', {
+                    id: s.id,
+                    yearLevel: yearLevel.trim() || null,
+                    groupCode: groupCode || null
+                  })
+                  // Show what was stored ("Year 8" typed is stored as "8"), so Save goes away.
+                  setYearLevel(saved.yearLevel ?? '')
+                  setGroupCode(saved.groupCode ?? '')
+                  notify(
+                    `${s.displayName} is now in ${terms.yearLevel.one.toLowerCase()} ${saved.yearLevel ?? 'not set'}, ${terms.group.one.toLowerCase()} ${saved.groupDisplay ?? 'none'}.`
+                  )
+                  if (s.locker) {
+                    const r = await call('student.lockerFits', { studentId: s.id })
+                    if (!r.fits && r.suggestion) setOffer(r.suggestion)
+                    else if (!r.fits) {
+                      const place =
+                        saved.groupDisplay ??
+                        (saved.yearLevel
+                          ? `${terms.yearLevel.one} ${saved.yearLevel}`
+                          : `no ${terms.group.one.toLowerCase()}`)
+                      notify(
+                        `${s.displayName} is now in ${place}, but there is no spare ${terms.locker.one.toLowerCase()} on their side. Use Move… when one is free.`
+                      )
+                    }
+                  }
+                })
+              }
+            >
+              Save
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {offer && s.locker && (
+        <Modal
+          open
+          onOpenChange={(o) => !o && setOffer(null)}
+          title={`Move ${s.displayName} to their new ${terms.area.one.toLowerCase()}?`}
+          description={`${terms.locker.one} ${s.locker.number} is not where their ${terms.yearLevel.one.toLowerCase()} or ${terms.group.one.toLowerCase()} now goes. Suggested: ${offer.number}. Their old code changes, so it goes on the reset list.`}
+          testId="move-offer"
+        >
+          <div className="mt-6 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setOffer(null)}>
+              Not now
+            </Button>
+            <Button
+              data-testid="move-offer-accept"
+              onClick={() =>
+                void act(async () => {
+                  const r = await call('student.move', {
+                    studentId: s.id,
+                    lockerId: offer.lockerId
+                  })
+                  setOffer(null)
+                  notify(
+                    `${s.displayName} moved to ${terms.locker.one.toLowerCase()} ${r.lockerNumber}.`,
+                    {
+                      undo: true
+                    }
+                  )
+                  // The new code was recorded as shown, so it must be shown.
+                  setIssued({ code: r.code, number: r.lockerNumber })
+                })
+              }
+            >
+              Move to {offer.number}
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+      {issued && (
+        <IssuedDialog
+          title={`${s.displayName} moved to ${terms.locker.one.toLowerCase()} ${issued.number}`}
+          code={issued.code}
+          lockerNumber={issued.number}
+          onClose={() => setIssued(null)}
+        />
+      )}
 
       <StudentLockerCard s={s} intent={intent} onIntentDone={onIntentDone} />
 
@@ -190,7 +321,12 @@ function StudentPanel({
               <Button
                 size="sm"
                 disabled={!canEdit}
-                onClick={() => void act(() => call('student.stillHere', { id: s.id }))}
+                onClick={() =>
+                  void act(async () => {
+                    await call('student.stillHere', { id: s.id })
+                    notify(`${s.displayName} is still enrolled.`)
+                  })
+                }
               >
                 Still enrolled
               </Button>
@@ -198,7 +334,12 @@ function StudentPanel({
                 size="sm"
                 variant="secondary"
                 disabled={!canEdit}
-                onClick={() => void act(() => call('student.confirmLeft', { id: s.id }))}
+                onClick={() =>
+                  void act(async () => {
+                    await call('student.confirmLeft', { id: s.id })
+                    notify(`${s.displayName} has left.`)
+                  })
+                }
               >
                 Has left
               </Button>
@@ -239,7 +380,8 @@ function StudentPanel({
                 void act(
                   async () => (
                     await call('exclusion.add', { kind: 'student', value: s.externalId, reason }),
-                    setExcluding(false)
+                    setExcluding(false),
+                    notify(`${s.displayName} is excluded from imports.`)
                   )
                 )
               }
@@ -421,6 +563,7 @@ export function StudentsScreen({
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(focus?.studentId ?? null)
   const [intent, setIntent] = useState<LockerIntent>(focus?.intent ?? null)
+  const [adding, setAdding] = useState(false)
   const { data: counts } = useRpc('students.counts', {})
   const { data: students } = useRpc('students.list', {
     filter,
@@ -455,10 +598,31 @@ export function StudentsScreen({
             with each import.
           </p>
         </div>
-        <Button size="lg" disabled={!canEdit} onClick={onImport} data-testid="start-import">
-          <FileInput size={20} aria-hidden /> Import students
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="lg"
+            variant="secondary"
+            disabled={!canEdit}
+            onClick={() => setAdding(true)}
+            data-testid="add-student-open"
+          >
+            <UserPlus size={20} aria-hidden /> Add a student…
+          </Button>
+          <Button size="lg" disabled={!canEdit} onClick={onImport} data-testid="start-import">
+            <FileInput size={20} aria-hidden /> Import students
+          </Button>
+        </div>
       </header>
+      <AddStudentDialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        onAdded={(s) => (
+          setAdding(false),
+          setFilter('current'),
+          setSearch(''),
+          setSelectedId(s.id)
+        )}
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <div

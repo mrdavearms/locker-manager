@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Check, Copy, PencilLine } from 'lucide-react'
 import { Banner } from '@renderer/components/Banner'
+import { ReadOnlyBanner } from '@renderer/components/ReadOnlyBanner'
 import { Button } from '@renderer/components/Button'
 import { DemoBadge } from '@renderer/components/DemoBadge'
 import { TaskGrid } from '@renderer/components/TaskGrid'
@@ -8,80 +9,12 @@ import { ProblemsPanel } from '@renderer/components/ProblemsPanel'
 import { GettingStarted } from '@renderer/onboarding/GettingStarted'
 import type { Screen } from '@renderer/components/NavRail'
 import { ResetList, type LockerIntent } from '@renderer/lockers/LockerActions'
-import { formatWhen, plural } from '@renderer/lib/format'
+import { plural } from '@renderer/lib/format'
 import type { OpenFileState } from '@renderer/lib/useFileState'
 
 interface Props {
   state: OpenFileState
   onError: (message: string) => void
-}
-
-function ReadOnlyBanner({ state, onError }: Props): React.JSX.Element | null {
-  const ro = state.readOnly
-  const [busy, setBusy] = useState(false)
-  if (!ro) return null
-  const holder = ro.holder
-  const act = async (fn: () => Promise<{ ok: boolean; message?: string }>): Promise<void> => {
-    setBusy(true)
-    const r = await fn()
-    setBusy(false)
-    if (!r.ok && r.message) onError(r.message)
-  }
-  if (ro.reason === 'newer_version') {
-    return (
-      <Banner
-        tone="warn"
-        title="This file was saved by a newer version of Locker Manager"
-        testId="read-only-banner"
-      >
-        You can look things up and print, but not change anything. Update Locker Manager (Help,
-        Check for updates) to edit it.
-      </Banner>
-    )
-  }
-  const who = holder ? `${holder.operator} on ${holder.computer}` : 'someone else'
-  const title =
-    ro.reason === 'lost_lock'
-      ? `${who} has taken over editing`
-      : ro.canStartEditing
-        ? `${holder?.operator ?? 'The other editor'} has finished`
-        : `Being edited by ${who}${holder ? ` since ${formatWhen(holder.startedAt)}` : ''}`
-  return (
-    <Banner
-      tone="locked"
-      title={title}
-      testId="read-only-banner"
-      actions={
-        ro.canStartEditing ? (
-          <Button disabled={busy} onClick={() => void act(() => window.api.startEditing())}>
-            Start editing
-          </Button>
-        ) : ro.canTakeOver ? (
-          <Button
-            variant="accent"
-            disabled={busy}
-            onClick={() => void act(() => window.api.takeOver())}
-          >
-            Take over editing
-          </Button>
-        ) : undefined
-      }
-    >
-      {ro.canStartEditing ? (
-        'You can start editing now.'
-      ) : ro.canTakeOver ? (
-        <>
-          Their computer has not been heard from since {formatWhen(holder?.heartbeatAt)}. If you are
-          sure they are not working on it, you can take over. Anything they had not saved stays on
-          their computer as a backup.
-        </>
-      ) : ro.reason === 'lost_lock' ? (
-        'You can still look things up and print. Anything you had not saved was kept as a backup.'
-      ) : (
-        'You can look things up and print, but not change anything. This updates by itself when they save.'
-      )}
-    </Banner>
-  )
 }
 
 function SchoolName({ state, onError }: Props): React.JSX.Element {
@@ -153,11 +86,13 @@ export function HomeScreen({
   onError,
   onNavigate,
   onFind,
+  onPrintResets,
   checklistHidden,
   onHideChecklist
 }: Props & {
   onNavigate: (s: Screen) => void
   onFind: (intent: LockerIntent) => void
+  onPrintResets: () => void
   /** The getting-started list was hidden on this computer. */
   checklistHidden: boolean
   onHideChecklist: () => void
@@ -283,7 +218,7 @@ export function HomeScreen({
                 'New student': () => onFind('assign'),
                 'Student has left': () => onFind('leave'),
                 'New code': () => onFind('recode'),
-                'Move or swap': () => onFind('move'),
+                'Move or swap': () => onFind('moveOrSwap'),
                 'Import students': () => onNavigate('import'),
                 'Start next year': () => onNavigate('rollover')
               }
@@ -293,7 +228,7 @@ export function HomeScreen({
 
       <ProblemsPanel onNavigate={onNavigate} />
 
-      <ResetList />
+      <ResetList onPrint={onPrintResets} />
 
       {!state.summary.demo && !state.summary.practice && (
         <section className="card flex flex-wrap items-center gap-4 p-5">

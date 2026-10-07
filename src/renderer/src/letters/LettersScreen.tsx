@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, ChevronLeft, ChevronRight, FileDown, PenLine, Printer } from 'lucide-react'
+import type { LettersProgress } from '@shared/ipc'
 import type { LetterLanguage, LetterPreview, LetterSelection } from '@shared/letters'
 import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, Select, TextInput } from '@renderer/components/Field'
-import { useAction, useCanEdit, useRevision, useTerms } from '@renderer/lib/appContext'
+import {
+  useAction,
+  useCanEdit,
+  useLockedReason,
+  useRevision,
+  useTerms
+} from '@renderer/lib/appContext'
 import { plural } from '@renderer/lib/format'
 import { useRpc } from '@renderer/lib/rpc'
 import { SheetPreview } from '@renderer/print/SheetPreview'
@@ -18,6 +25,7 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
   const act = useAction()
   const gate = useCodeGate()
   const canEdit = useCanEdit()
+  const lockedReason = useLockedReason()
   const revision = useRevision()
   const { data: groups } = useRpc('groups.list', {})
   const { data: areas } = useRpc('locations.list', {})
@@ -32,7 +40,25 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
   const [problem, setProblem] = useState<string | null>(null)
   const [overflow, setOverflow] = useState<{ key: string; names: string[] } | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'pdf' | 'print' | null>(null)
+  const [progress, setProgress] = useState<LettersProgress | null>(null)
+  const [stopping, setStopping] = useState(false)
+
+  useEffect(() => window.api.onLettersProgress(setProgress), [])
+
+  /** Runs one letters job with the progress bar and Cancel showing. */
+  async function withProgress<T>(kind: 'pdf' | 'print', fn: () => Promise<T>): Promise<T> {
+    setProgress(null)
+    setStopping(false)
+    setBusy(kind)
+    try {
+      return await fn()
+    } finally {
+      setBusy(null)
+      setProgress(null)
+      setStopping(false)
+    }
+  }
 
   const selection: LetterSelection | null =
     mode === 'group'
@@ -91,7 +117,7 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
   const shown = selection ? preview : null
   const checking = !overflow || overflow.key !== checkKey
   const job = selection ? { selection, language } : null
-  const ready = !!job && !!shown && shown.letters > 0 && !busy
+  const ready = !!job && !!shown && shown.letters > 0 && busy === null
 
   return (
     <div className="w-full space-y-6 px-6 py-8">
@@ -233,18 +259,15 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
               onClick={() =>
                 void act(async () => {
                   if (!job || !(await gate())) return
-                  setBusy(true)
-                  try {
-                    const r = await window.api.lettersPdf(job)
-                    if (r.ok) setSaved(r.path ?? null)
-                    else if (!r.cancelled) throw new Error(r.message)
-                  } finally {
-                    setBusy(false)
-                  }
+                  setSaved(null)
+                  const r = await withProgress('pdf', () => window.api.lettersPdf(job))
+                  if (r.ok) setSaved(r.path ?? null)
+                  else if (!r.cancelled) throw new Error(r.message)
                 })
               }
             >
-              <FileDown size={18} aria-hidden /> {busy ? 'Making the PDF…' : 'Save as PDF…'}
+              <FileDown size={18} aria-hidden />{' '}
+              {busy === 'pdf' ? 'Making the PDF…' : 'Save as PDF…'}
             </Button>
             <Button
               className="w-full"
@@ -253,19 +276,50 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
               onClick={() =>
                 void act(async () => {
                   if (!job || !(await gate())) return
-                  const r = await window.api.lettersPrint(job)
+                  const r = await withProgress('print', () => window.api.lettersPrint(job))
                   if (!r.ok && !r.cancelled) throw new Error(r.message)
                 })
               }
             >
               <Printer size={18} aria-hidden /> Print…
             </Button>
+            {busy !== null && (
+              <div className="space-y-2" data-testid="letters-progress">
+                <progress
+                  className="h-2 w-full"
+                  max={progress?.total ?? 1}
+                  value={progress?.done}
+                  aria-label="Making the letters"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-ink-muted" aria-live="polite">
+                    {stopping
+                      ? 'Stopping…'
+                      : !progress
+                        ? 'Getting the letters ready…'
+                        : progress.stage === 'checking'
+                          ? `Checking letter pages (${progress.done} of ${progress.total})`
+                          : `Making the PDF (${progress.done} of ${progress.total})`}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={stopping}
+                    data-testid="letters-cancel"
+                    onClick={() => {
+                      setStopping(true)
+                      window.api.cancelLetters()
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
             <p className="text-xs text-ink-muted" data-testid="letters-rule">
               Letters print only while the file is open for editing, because every code printed is
               recorded in the history with your name.{' '}
-              {canEdit
-                ? 'Print at Actual size (100%).'
-                : 'The file is open read-only on this computer, so wait until the person editing closes it.'}
+              {canEdit ? 'Print at Actual size (100%).' : lockedReason}
             </p>
           </div>
           {saved && (

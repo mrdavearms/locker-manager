@@ -4,6 +4,7 @@ import { cn } from '@renderer/lib/cn'
 import { useTerms } from '@renderer/lib/appContext'
 import { CodesForm } from '@renderer/settings/CodesForm'
 import { ComputerForm } from '@renderer/settings/ComputerForm'
+import { GroupsForm } from '@renderer/settings/GroupsForm'
 import { LabelsForm } from '@renderer/settings/LabelsForm'
 import { LettersForm } from '@renderer/settings/LettersForm'
 import { LocationsEditor } from '@renderer/settings/LocationsEditor'
@@ -18,6 +19,7 @@ type Tab =
   | 'school'
   | 'terms'
   | 'locations'
+  | 'groups'
   | 'locks'
   | 'codes'
   | 'labels'
@@ -37,6 +39,7 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
     { id: 'school', label: 'School' },
     { id: 'terms', label: 'Words we use' },
     { id: 'locations', label: `${terms.area.many} and ${terms.locker.many.toLowerCase()}` },
+    { id: 'groups', label: `${terms.yearLevel.many} and ${terms.group.many.toLowerCase()}` },
     { id: 'locks', label: 'Locks' },
     { id: 'codes', label: 'Lock codes' },
     { id: 'labels', label: 'Labels' },
@@ -50,6 +53,7 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
     school: 'school name logo colours stripes address share set-up settings file other school',
     terms: `words names homeroom form group year level leader office ${terms.group.one}`,
     locations: 'areas banks lockers add build number renumber layout tiers accessible',
+    groups: `year levels groups ${terms.group.many} display name codes placed last excluded students`,
     locks: 'locks kind type combination padlock keyed key dial built-in',
     codes: 'codes rules digits unique spares code set next year 0000',
     labels: 'labels sheets avery stock measure printer nudge calibration layout qr',
@@ -125,6 +129,7 @@ export function SettingsScreen({ initialTab = 'school' }: { initialTab?: Tab }):
         )}
         {tab === 'terms' && <TermsForm />}
         {tab === 'locations' && <LocationsEditor />}
+        {tab === 'groups' && <GroupsForm />}
         {tab === 'locks' && <LocksForm />}
         {tab === 'codes' && <CodesForm />}
         {tab === 'labels' && <LabelsForm />}

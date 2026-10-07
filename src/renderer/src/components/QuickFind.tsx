@@ -3,6 +3,7 @@ import { DoorClosed, Search, UserRound } from 'lucide-react'
 import type { QuickResult } from '@shared/history'
 import { useTerms } from '@renderer/lib/appContext'
 import { cn } from '@renderer/lib/cn'
+import { Button } from './Button'
 import { Modal } from './Modal'
 
 /** Ctrl+K (Cmd+K on a Mac) from anywhere: a name, student ID, locker number, lock serial or key number (SPEC.md 4.11). */
@@ -10,34 +11,43 @@ export function QuickFind({
   open,
   title,
   onClose,
-  onPick
+  onPick,
+  onAddStudent
 }: {
   open: boolean
   title: string
   onClose: () => void
   onPick: (r: QuickResult) => void
+  /** Offered when nothing is found: add the typed name as a new student. */
+  onAddStudent?: (typed: string) => void
 }): React.JSX.Element {
   const terms = useTerms()
   const [q, setQ] = useState('')
   const [results, setResults] = useState<QuickResult[]>([])
   const [active, setActive] = useState(0)
+  // The text the current results answer; a search is in flight while it differs from what is typed.
+  const [answered, setAnswered] = useState('')
   useEffect(() => {
     let cancelled = false
     if (q.trim() === '') return
     void window.api.rpc('search.quick', { q }).then((r) => {
-      if (!cancelled && r.ok) {
+      if (cancelled) return
+      if (r.ok) {
         setResults(r.value)
         setActive(0)
       }
+      setAnswered(q)
     })
     return () => {
       cancelled = true
     }
   }, [q])
+  const pending = q.trim() !== '' && answered !== q
   const shown = q.trim() === '' ? [] : results
   const pick = (r: QuickResult | undefined): void => {
     if (!r) return
     setQ('')
+    setAnswered('')
     setResults([])
     onPick(r)
   }
@@ -95,8 +105,18 @@ export function QuickFind({
             </button>
           </li>
         ))}
-        {q.trim() !== '' && shown.length === 0 && (
-          <li className="px-3 py-2 text-sm text-ink-muted">Nobody found.</li>
+        {q.trim() !== '' && shown.length === 0 && pending && (
+          <li className="px-3 py-2 text-sm text-ink-muted">Searching…</li>
+        )}
+        {q.trim() !== '' && shown.length === 0 && !pending && (
+          <li className="px-3 py-2 text-sm text-ink-muted">
+            <p>Nothing found.</p>
+            {onAddStudent && (
+              <Button className="mt-2" variant="secondary" onClick={() => onAddStudent(q.trim())}>
+                Add {q.trim()} as a new student…
+              </Button>
+            )}
+          </li>
         )}
       </ul>
     </Modal>

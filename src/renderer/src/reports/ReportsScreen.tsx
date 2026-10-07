@@ -61,14 +61,18 @@ function ReportFrame({ html, landscape }: { html: string; landscape: boolean }):
 }
 
 /** SPEC.md 4.9, 5.4 and 5.5: lists and reports, printed or exported. */
-export function ReportsScreen(): React.JSX.Element {
+export function ReportsScreen({
+  initialReport
+}: {
+  initialReport?: ReportId | undefined
+}): React.JSX.Element {
   const terms = useTerms()
   const act = useAction()
   const gate = useCodeGate()
   const canEdit = useCanEdit()
   const revision = useRevision()
   const { data: groups } = useRpc('groups.list', {})
-  const [id, setId] = useState<ReportId>('group_lists')
+  const [id, setId] = useState<ReportId>(initialReport ?? 'group_lists')
   const [group, setGroup] = useState('')
   const [since, setSince] = useState(weekAgo)
   const [includeCodes, setIncludeCodes] = useState(false)

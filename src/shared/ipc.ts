@@ -149,3 +149,10 @@ export interface RecentFile {
 
 /** Every file action answers with this: done, cancelled by the operator, or a plain message. */
 export type ActionResult = { ok: true } | { ok: false; cancelled?: boolean; message: string }
+
+/** Sent while letters are made: `done` of `total` steps (each chunk is checked, then made). */
+export interface LettersProgress {
+  done: number
+  total: number
+  stage: 'checking' | 'making'
+}

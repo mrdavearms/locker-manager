@@ -7,6 +7,7 @@ import {
   listCodeSets,
   resetTasks,
   markResetDone,
+  markResetDoneMany,
   revealCode,
   issueCode,
   lockForLocker,
@@ -21,6 +22,7 @@ import {
   releaseStudent,
   savedPlan,
   savePlan,
+  lockerFitsPlan,
   suggestLocker,
   swapStudents
 } from '../repos/assignments'
@@ -37,6 +39,7 @@ type Keys =
   | 'codes.sets.generate'
   | 'codes.resetTasks'
   | 'codes.resetDone'
+  | 'codes.resetDoneMany'
   | 'codes.reveal'
   | 'codes.recode'
   | 'codes.setFixed'
@@ -45,6 +48,7 @@ type Keys =
   | 'allocation.draft'
   | 'allocation.commit'
   | 'locker.suggest'
+  | 'student.lockerFits'
   | 'student.assign'
   | 'student.release'
   | 'student.move'
@@ -107,6 +111,11 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
       return null
     }
   },
+  'codes.resetDoneMany': {
+    kind: 'write',
+    audit: (_p, n) => ({ action: 'codes.reset_done_many', entity: 'lock', after: { locks: n } }),
+    run: (db, ctx, p) => markResetDoneMany(db, ctx, p.lockIds)
+  },
   'codes.reveal': {
     kind: 'write',
     // The code itself never goes in the history; code_reveal_log records the reveal.
@@ -162,6 +171,7 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
     run: (db, ctx, p) => commitDraft(db, ctx, p.assignments, { issueCodes: p.issueCodes })
   },
   'locker.suggest': { kind: 'read', run: (db, p) => suggestLocker(db, p.studentId) },
+  'student.lockerFits': { kind: 'read', run: (db, p) => lockerFitsPlan(db, p.studentId) },
   'student.assign': {
     kind: 'write',
     audit: (p) => ({

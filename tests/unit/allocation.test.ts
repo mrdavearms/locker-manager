@@ -17,6 +17,7 @@ import {
   draftAllocation,
   moveStudent,
   releaseStudent,
+  lockerFitsPlan,
   savePlan,
   savedPlan,
   suggestLocker,
@@ -26,10 +27,12 @@ import {
   generateYearSet,
   issueCode,
   markResetDone,
+  markResetDoneMany,
   resetTasks,
   revealCode
 } from '../../src/main/repos/codes'
 import type { LockerDb } from '../../src/main/db/db'
+import { updateStudent } from '../../src/main/repos/students'
 import { testContext } from './helpers'
 
 async function demo(): Promise<LockerDb> {
@@ -405,6 +408,18 @@ describe('committing, codes and the manual tools (SPEC.md 4.4, 4.5)', () => {
     return { db, ctx, r }
   }
 
+  it('a student moved from Year 7 to Year 8 no longer fits their Year 7 side locker, and gets a Year 8 suggestion', async () => {
+    const { db, ctx } = await allocated()
+    const a = db.get<{ student_id: string }>(
+      "SELECT a.student_id FROM assignment a JOIN student s ON s.id = a.student_id WHERE a.status = 'current' AND s.year_level = '7' LIMIT 1"
+    )!
+    expect(lockerFitsPlan(db, a.student_id).fits).toBe(true)
+    updateStudent(db, ctx, a.student_id, { yearLevel: '8', groupCode: '08A' })
+    const r = lockerFitsPlan(db, a.student_id)
+    expect(r.fits).toBe(false)
+    expect(Number(r.suggestion!.number)).toBeGreaterThan(114)
+  })
+
   it('commits the draft and issues a unique, valid code to every lock', async () => {
     const { db, r } = await allocated()
     expect(r.assigned).toBeGreaterThan(200)
@@ -442,6 +457,20 @@ describe('committing, codes and the manual tools (SPEC.md 4.4, 4.5)', () => {
     // Staff reset it to 0 0 0 0: off the list, ready for a new code.
     markResetDone(db, ctx, tasks[0]!.lockId)
     expect(resetTasks(db)).toEqual([])
+  })
+
+  it('marks many locks as reset in one change', async () => {
+    const { db, ctx } = await allocated()
+    const held = db.all<{ student_id: string }>(
+      "SELECT student_id FROM assignment WHERE status = 'current' LIMIT 3"
+    )
+    for (const h of held) releaseStudent(db, ctx, h.student_id, { left: true })
+    const ids = resetTasks(db).map((t) => t.lockId)
+    // A lock ticked twice counts once.
+    expect(markResetDoneMany(db, ctx, [...ids, ids[0]!])).toBe(3)
+    expect(resetTasks(db)).toEqual([])
+    // Already reset: nothing was waiting, so nothing is counted.
+    expect(markResetDoneMany(db, ctx, ids)).toBe(0)
   })
 
   it('a new student gets the first spare in their area and a code', async () => {

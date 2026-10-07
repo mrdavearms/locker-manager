@@ -38,7 +38,7 @@ export async function launchApp(
   }
   const app = await electron.launch({
     args: [resolve('.'), `--user-data-dir=${userData}`],
-    env: { ...process.env, CI: '1' }
+    env: { ...process.env, CI: '1', LOCKER_MANAGER_BACKGROUND: '1' }
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { getBusyState, whileBusy } from '../../src/main/busy'
 import {
   allowPrerelease,
   installBlockedReason,
@@ -111,5 +112,17 @@ describe('installBlockedReason', () => {
     ['unsavedChanges', 'unsaved']
   ] as const)('blocks while %s', (flag, word) => {
     expect(installBlockedReason({ ...idle, [flag]: true })).toMatch(new RegExp(word, 'i'))
+  })
+})
+
+describe('whileBusy', () => {
+  it('marks printing as busy only while the job runs, even when two overlap or one fails', async () => {
+    let release!: () => void
+    const slow = whileBusy('printing', () => new Promise<void>((r) => (release = r)))
+    await expect(whileBusy('printing', () => Promise.reject(new Error('x')))).rejects.toThrow('x')
+    expect(getBusyState().printing).toBe(true)
+    release()
+    await slow
+    expect(getBusyState().printing).toBe(false)
   })
 })

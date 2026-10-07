@@ -12,6 +12,7 @@ import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, Select, TextInput } from '@renderer/components/Field'
 import { useAction, useCanEdit, useTerms } from '@renderer/lib/appContext'
+import type { Screen } from '@renderer/components/NavRail'
 import { cn } from '@renderer/lib/cn'
 import { plural } from '@renderer/lib/format'
 import { call, useRpc } from '@renderer/lib/rpc'
@@ -419,7 +420,13 @@ function DraftPreview({
   )
 }
 
-export function AllocateScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
+export function AllocateScreen({
+  onDone,
+  onNavigate
+}: {
+  onDone: () => void
+  onNavigate: (s: Screen) => void
+}): React.JSX.Element {
   const terms = useTerms()
   const canEdit = useCanEdit()
   const act = useAction()
@@ -444,12 +451,20 @@ export function AllocateScreen({ onDone }: { onDone: () => void }): React.JSX.El
             {plural(result.assigned, terms.locker.one.toLowerCase())} given out
           </h1>
           <p className="mt-2 text-ink-muted">
-            {result.codes > 0 ? `${plural(result.codes, 'code')} issued. ` : ''}Next: print labels
-            and letters (in the next update). A backup was kept, and Undo puts everything back.
+            {result.codes > 0 ? `${plural(result.codes, 'code')} issued. ` : ''}Next, print the
+            labels and the letters. A backup was kept, and Undo puts everything back.
           </p>
-          <Button className="mt-6" size="lg" onClick={onDone}>
-            See the {terms.locker.many.toLowerCase()}
-          </Button>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Button size="lg" onClick={() => onNavigate('print')}>
+              Print labels
+            </Button>
+            <Button size="lg" onClick={() => onNavigate('letters')}>
+              Print letters
+            </Button>
+            <Button size="lg" variant="secondary" onClick={onDone}>
+              See the {terms.locker.many.toLowerCase()}
+            </Button>
+          </div>
         </section>
       </div>
     )

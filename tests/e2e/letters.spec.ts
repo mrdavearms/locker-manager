@@ -105,3 +105,73 @@ test('letters, reports and the portable export', async () => {
   expect(existsSync(rebuilt)).toBe(true)
   await l.close()
 })
+
+/** Opens the demo-shaped fixture, allocates everyone, and goes to Letters. */
+async function lettersForEveryone(): Promise<{
+  l: Awaited<ReturnType<typeof launchApp>>
+  share: string
+  total: number
+}> {
+  const share = sharedFolder()
+  const l = await launchApp()
+  await l.page.setViewportSize({ width: 1400, height: 1100 })
+  await answerNextDialog(l.app, 'open', placeFixture(share))
+  await l.page.getByTestId('open-file').click()
+  await l.page.getByTestId('nav-lockers').click()
+  await l.page.getByTestId('open-allocate').click()
+  await l.page.getByTestId('make-draft').click()
+  await l.page.getByTestId('commit-allocation').click()
+  await expect(l.page.getByTestId('allocation-done')).toContainText('given out')
+  await l.page.getByTestId('nav-letters').click()
+  await expect(l.page.getByTestId('letters-count')).toContainText(/Letter 1 of \d+/)
+  const total = Number(
+    /of (\d+)/.exec((await l.page.getByTestId('letters-count').textContent())!)![1]
+  )
+  return { l, share, total }
+}
+
+test('every student’s letters show a progress bar, then save as one PDF', async () => {
+  test.setTimeout(180_000)
+  const { l, share, total } = await lettersForEveryone()
+  const out = join(share, 'everyone.pdf')
+  await answerNextDialog(l.app, 'save', out)
+  const started = Date.now()
+  await l.page.getByTestId('letters-save-pdf').click()
+  await expect(l.page.getByTestId('letters-progress')).toBeVisible()
+  await expect(l.page.getByLabel('Making the letters')).toBeVisible()
+  await expect(l.page.getByTestId('letters-saved')).toBeVisible({ timeout: 60_000 })
+  const seconds = (Date.now() - started) / 1000
+  console.log(`${total} letters saved as a PDF in ${seconds.toFixed(1)} s`)
+  expect(seconds).toBeLessThan(30)
+  await expect(l.page.getByTestId('letters-progress')).toHaveCount(0)
+  expect(await pages(out)).toBe(total)
+  await l.close()
+})
+
+test('Cancel stops the letters: nothing is saved, recorded or reported as an error', async () => {
+  test.setTimeout(180_000)
+  const { l, share } = await lettersForEveryone()
+  // Slow every hidden page down so Cancel always lands before the last chunk.
+  await l.app.evaluate(({ BrowserWindow }) => {
+    const proto = BrowserWindow.prototype
+    const load = proto.loadFile
+    proto.loadFile = async function (this: typeof proto, ...args: Parameters<typeof load>) {
+      await new Promise((resolve) => setTimeout(resolve, 400))
+      return load.apply(this, args)
+    }
+  })
+  const out = join(share, 'cancelled.pdf')
+  await answerNextDialog(l.app, 'save', out)
+  await l.page.getByTestId('letters-save-pdf').click()
+  await expect(l.page.getByTestId('letters-progress')).toBeVisible()
+  await l.page.getByTestId('letters-cancel').click()
+  await expect(l.page.getByTestId('letters-progress')).toHaveCount(0, { timeout: 30_000 })
+  await expect(l.page.getByTestId('letters-saved')).toHaveCount(0)
+  await expect(l.page.getByTestId('error-dialog')).toHaveCount(0)
+  expect(existsSync(out)).toBe(false)
+  await expect(l.page.getByTestId('letters-save-pdf')).toBeEnabled()
+  await l.page.getByTestId('nav-history').click()
+  await expect(l.page.getByTestId('history-rows')).toBeVisible()
+  await expect(l.page.getByTestId('history-rows')).not.toContainText('Printed letters')
+  await l.close()
+})

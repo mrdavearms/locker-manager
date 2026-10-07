@@ -8,8 +8,8 @@ import type {
 } from '@shared/students'
 import type { LockerDb } from '../db/db'
 import { newId, stamp, type OperatorContext } from '../db/context'
-import { displayGroup, yearFromGroup } from '../import/groups'
-import { tidy } from '../import/nameCase'
+import { displayGroup, normaliseYearLevel, yearFromGroup } from '../import/groups'
+import { needsCaseFix, tidy, toNameCase } from '../import/nameCase'
 import { getSetting, setSetting } from './settings'
 
 export const GroupMapSchema = z.record(z.string(), z.string())
@@ -183,6 +183,8 @@ export function updateStudent(
     preferredName?: string | null
     needsAccessible?: boolean
     confirmName?: boolean
+    yearLevel?: string | null
+    groupCode?: string | null
   }
 ): StudentView {
   const current = getStudent(db, id)
@@ -200,6 +202,8 @@ export function updateStudent(
        name_override = CASE WHEN $override THEN 1 ELSE name_override END,
        name_check = CASE WHEN $confirm OR $override THEN '[]' ELSE name_check END,
        needs_accessible = COALESCE($acc, needs_accessible),
+       year_level = CASE WHEN $setY THEN $y ELSE year_level END,
+       group_code = CASE WHEN $setG THEN $g ELSE group_code END,
        updated_at = $u, updated_by = $by
      WHERE id = $id`,
     {
@@ -211,6 +215,10 @@ export function updateStudent(
       $override: nameChanged ? 1 : 0,
       $confirm: patch.confirmName ? 1 : 0,
       $acc: patch.needsAccessible === undefined ? null : patch.needsAccessible ? 1 : 0,
+      $setY: patch.yearLevel !== undefined ? 1 : 0,
+      $y: patch.yearLevel?.trim() ? normaliseYearLevel(patch.yearLevel) : null,
+      $setG: patch.groupCode !== undefined ? 1 : 0,
+      $g: patch.groupCode?.trim() || null,
       $u: s.updated_at,
       $by: s.updated_by
     }
@@ -336,4 +344,60 @@ export function setGroupSortLast(
   if (sortLast) set.add(code)
   else set.delete(code)
   setSetting(db, ctx, 'groups.sortLast', [...set].sort())
+}
+
+/**
+ * A student added by hand (a mid-year enrolment before the next import). The
+ * student ID is the key a later import matches on, so it is required and unique.
+ */
+export function createStudent(
+  db: LockerDb,
+  ctx: OperatorContext,
+  input: {
+    externalId: string
+    firstName: string
+    lastName: string
+    preferredName: string | null
+    yearLevel: string | null
+    groupCode: string | null
+  }
+): string {
+  const ext = input.externalId.trim()
+  if (!ext) throw new Error('Type their student ID, exactly as in your student system.')
+  if (db.get('SELECT 1 FROM student WHERE external_id = $e', { $e: ext }))
+    throw new Error(`Student ID ${ext} is already in the file. Use Find to look them up.`)
+  const fix = (n: string, isSurname: boolean): string =>
+    needsCaseFix(n) ? toNameCase(n, { particles: 'capital', isSurname }).value : n
+  const first = fix(tidy(input.firstName), false)
+  const last = fix(tidy(input.lastName), true)
+  if (!first || !last) throw new Error('A student needs a first and last name.')
+  const group = input.groupCode?.trim() || null
+  const year = input.yearLevel?.trim()
+    ? normaliseYearLevel(input.yearLevel)
+    : group
+      ? yearFromGroup(group)
+      : null
+  const id = newId()
+  const s = stamp(ctx)
+  const today = s.created_at.slice(0, 10)
+  db.run(
+    `INSERT INTO student (id, external_id, first_name_raw, last_name_raw, first_name, last_name, preferred_name,
+                          year_level, group_code, name_check, first_seen, last_seen, created_at, updated_at, updated_by)
+     VALUES ($id, $e, $fr, $lr, $f, $l, $p, $y, $g, '[]', $d, $d, $c, $c, $by)`,
+    {
+      $id: id,
+      $e: ext,
+      $fr: input.firstName.trim(),
+      $lr: input.lastName.trim(),
+      $f: first,
+      $l: last,
+      $p: input.preferredName?.trim() || null,
+      $y: year,
+      $g: group,
+      $d: today,
+      $c: s.created_at,
+      $by: s.updated_by
+    }
+  )
+  return id
 }

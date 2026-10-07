@@ -9,11 +9,14 @@ import { Button } from './components/Button'
 import { ConflictDialog } from './components/ConflictDialog'
 import { DemoBadge, PracticeBadge } from './components/DemoBadge'
 import { LockerMark } from './components/LockerMark'
+import { MessageStrip, type Message } from './components/MessageStrip'
 import { Modal } from './components/Modal'
 import { NavRail, type Screen } from './components/NavRail'
 import { NewFileDialog } from './components/NewFileDialog'
 import { OperatorDialog } from './components/OperatorDialog'
 import { PinGateProvider } from './components/PinGate'
+import { ReadOnlyBanner } from './components/ReadOnlyBanner'
+import { AddStudentDialog } from './components/AddStudentDialog'
 import { QuickFind } from './components/QuickFind'
 import { StatusBar } from './components/StatusBar'
 import { UpdateBanner } from './components/UpdateBanner'
@@ -32,6 +35,7 @@ import type { LockerIntent } from './lockers/LockerActions'
 import { HelpScreen } from './help/HelpScreen'
 import { Tour } from './onboarding/Tour'
 import { HistoryScreen } from './screens/HistoryScreen'
+import type { ReportId } from '@shared/reports'
 import { HomeScreen } from './screens/HomeScreen'
 import { LockersScreen } from './screens/LockersScreen'
 import { SettingsScreen, type SettingsTab } from './screens/SettingsScreen'
@@ -50,7 +54,8 @@ const FIND_TITLES: Record<NonNullable<LockerIntent> | 'find', string> = {
   leave: 'Who has left?',
   recode: 'Whose code needs changing?',
   move: 'Who is moving?',
-  swap: 'Who is swapping?'
+  swap: 'Who is swapping?',
+  moveOrSwap: 'Who is moving or swapping?'
 }
 
 function isTyping(target: EventTarget | null): boolean {
@@ -80,12 +85,31 @@ export function App(): React.JSX.Element {
   const [newOpen, setNewOpen] = useState(false)
   const [backupsOpen, setBackupsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<Message | null>(null)
+  const notify = useCallback(
+    (text: string, opts?: { undo?: boolean }) =>
+      setMessage({ text, undo: opts?.undo ?? true, n: Date.now() }),
+    []
+  )
+  const closeMessage = useCallback(() => setMessage(null), [])
+  const undoFromMessage = useCallback(() => {
+    void window.api.undo().then((r) => {
+      if (r.ok) setMessage({ text: 'Undone.', undo: false, n: Date.now() })
+      else {
+        setMessage(null)
+        setError(r.message)
+      }
+    })
+  }, [])
   const [finder, setFinder] = useState<Finder | null>(null)
+  // The typed name when Add a student was opened from the find box for a new student.
+  const [addingStudent, setAddingStudent] = useState<string | null>(null)
   // The screen belongs to the open file: a different (or no) file starts on Home.
   const [nav, setNav] = useState<{
     path: string | null
     screen: Screen
     focus: { studentId?: string; lockerId?: string; intent: LockerIntent; n: number } | null
+    report?: ReportId
   }>({
     path: null,
     screen: 'home',
@@ -104,8 +128,18 @@ export function App(): React.JSX.Element {
 
   const open = file?.status === 'open' ? file : null
   const openPath = open?.path ?? null
+  // A message belongs to the file it was made in: drop it when another file (or none) is open.
+  const [messagePath, setMessagePath] = useState<string | null>(null)
+  if (messagePath !== openPath) {
+    setMessagePath(openPath)
+    setMessage(null)
+  }
+  const holder = open?.readOnly?.holder
+  const editingBy = holder ? `${holder.operator} on ${holder.computer}` : null
   const screen: Screen = nav.path === openPath ? nav.screen : 'home'
   const focus = nav.path === openPath ? nav.focus : null
+  const printResets = (): void =>
+    setNav({ path: openPath, screen: 'reports', focus: null, report: 'reset_checklist' })
   const setScreen = useCallback(
     (next: Screen) => setNav({ path: openPath, screen: next, focus: null }),
     [openPath]
@@ -165,17 +199,19 @@ export function App(): React.JSX.Element {
         setFinder({ title: FIND_TITLES.find, intent: null })
       } else if (k === 'z' && !isTyping(e.target)) {
         e.preventDefault()
-        void (e.shiftKey ? window.api.redo() : window.api.undo()).then(
-          (r) => !r.ok && setError(r.message)
+        void (e.shiftKey ? window.api.redo() : window.api.undo()).then((r) =>
+          r.ok ? notify(e.shiftKey ? 'Redone.' : 'Undone.', { undo: false }) : setError(r.message)
         )
       } else if (k === 'y' && !isTyping(e.target)) {
         e.preventDefault()
-        void window.api.redo().then((r) => !r.ok && setError(r.message))
+        void window.api
+          .redo()
+          .then((r) => (r.ok ? notify('Redone.', { undo: false }) : setError(r.message)))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [openPath])
+  }, [openPath, notify])
 
   const onFound = (r: QuickResult): void => {
     const intent = finder?.intent ?? null
@@ -256,7 +292,11 @@ export function App(): React.JSX.Element {
       <AppContextProvider
         revision={open?.revision ?? 0}
         canEdit={open?.mode === 'edit' && !open.conflict}
+        editingBy={editingBy}
+        needsNewerApp={open?.readOnly?.reason === 'newer_version'}
+        inConflict={!!open?.conflict}
         showError={setError}
+        notify={notify}
       >
         <PinGateProvider showError={setError}>
           <div className="flex flex-1 flex-col md:flex-row">
@@ -266,6 +306,11 @@ export function App(): React.JSX.Element {
                 {update.state !== 'idle' && (
                   <div className="px-6 pt-6">
                     <UpdateBanner status={update} />
+                  </div>
+                )}
+                {open && !helpOpen && screen !== 'home' && open.readOnly && (
+                  <div className="px-6 pt-6">
+                    <ReadOnlyBanner state={open} onError={setError} />
                   </div>
                 )}
                 {helpOpen ? (
@@ -315,16 +360,24 @@ export function App(): React.JSX.Element {
                       }
                     />
                   ) : screen === 'import' ? (
-                    <ImportWizard onClose={() => setScreen('students')} />
+                    <ImportWizard onClose={() => setScreen('students')} onNavigate={setScreen} />
                   ) : screen === 'lockers' ? (
                     <LockersScreen
                       key={focus?.n ?? 'lockers'}
                       onSetUp={() => setScreen('setup')}
                       onAllocate={() => setScreen('allocate')}
+                      onOpenStudent={(studentId, intent) =>
+                        setNav({
+                          path: openPath,
+                          screen: 'students',
+                          focus: { studentId, intent, n: Date.now() }
+                        })
+                      }
+                      onPrintResets={printResets}
                       focusLockerId={focus?.lockerId ?? null}
                     />
                   ) : screen === 'allocate' ? (
-                    <AllocateScreen onDone={() => setScreen('lockers')} />
+                    <AllocateScreen onDone={() => setScreen('lockers')} onNavigate={setScreen} />
                   ) : screen === 'history' ? (
                     <HistoryScreen state={open} />
                   ) : screen === 'print' ? (
@@ -332,7 +385,7 @@ export function App(): React.JSX.Element {
                   ) : screen === 'letters' ? (
                     <LettersScreen onDesign={() => setScreen('settings-letters')} />
                   ) : screen === 'reports' ? (
-                    <ReportsScreen />
+                    <ReportsScreen key={nav.report ?? 'reports'} initialReport={nav.report} />
                   ) : screen === 'rollover' ? (
                     <RolloverScreen onNavigate={setScreen} />
                   ) : screen === 'settings' ? (
@@ -350,6 +403,7 @@ export function App(): React.JSX.Element {
                       state={open}
                       onError={setError}
                       onNavigate={setScreen}
+                      onPrintResets={printResets}
                       onFind={(intent) =>
                         setFinder({ title: FIND_TITLES[intent ?? 'find'], intent })
                       }
@@ -375,7 +429,35 @@ export function App(): React.JSX.Element {
             </main>
           </div>
           {open && finder && (
-            <QuickFind open title={finder.title} onClose={() => setFinder(null)} onPick={onFound} />
+            <QuickFind
+              open
+              title={finder.title}
+              onClose={() => setFinder(null)}
+              onPick={onFound}
+              {...(finder.intent === 'assign'
+                ? {
+                    onAddStudent: (typed: string) => {
+                      setFinder(null)
+                      setAddingStudent(typed)
+                    }
+                  }
+                : {})}
+            />
+          )}
+          {open && (
+            <AddStudentDialog
+              open={addingStudent !== null}
+              initialName={addingStudent ?? ''}
+              onClose={() => setAddingStudent(null)}
+              onAdded={(s) => {
+                setAddingStudent(null)
+                setNav({
+                  path: openPath,
+                  screen: 'students',
+                  focus: { studentId: s.id, intent: 'assign', n: Date.now() }
+                })
+              }}
+            />
           )}
           <Tour
             open={tourOpen}
@@ -391,6 +473,8 @@ export function App(): React.JSX.Element {
           />
         </PinGateProvider>
       </AppContextProvider>
+
+      <MessageStrip message={message} onUndo={undoFromMessage} onClose={closeMessage} />
 
       {open && (
         <StatusBar

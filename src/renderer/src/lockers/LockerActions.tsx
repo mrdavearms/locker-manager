@@ -7,12 +7,20 @@ import { Field, Select, TextInput } from '@renderer/components/Field'
 import { Modal } from '@renderer/components/Modal'
 import { QuickFind } from '@renderer/components/QuickFind'
 import { useCodeGate } from '@renderer/components/PinGate'
-import { useAction, useCanEdit, useTerms } from '@renderer/lib/appContext'
+import {
+  useAction,
+  useCanEdit,
+  useLockedReason,
+  useNotify,
+  useTerms
+} from '@renderer/lib/appContext'
+import { plural } from '@renderer/lib/format'
 import { call, useRpc } from '@renderer/lib/rpc'
 
-export type LockerIntent = 'assign' | 'leave' | 'recode' | 'move' | 'swap' | null
+export type LockerIntent = 'assign' | 'leave' | 'recode' | 'move' | 'swap' | 'moveOrSwap' | null
 
-function IssuedDialog({
+/** Shows the code a student was just given; the code is already recorded as shown. */
+export function IssuedDialog({
   title,
   code,
   lockerNumber,
@@ -35,8 +43,8 @@ function IssuedDialog({
       {code ? (
         <>
           <p className="text-sm text-ink-muted">
-            The code for the student to set. It is also on their letter: print it from Letters, or
-            with Save their letter below.
+            The code for the student to set. Their letter has it too: use Save their letter as PDF
+            in their panel, or Letters, New lockers and codes since the last letters.
           </p>
           <div className="mt-3">
             <CodeBoxes code={code} />
@@ -114,9 +122,13 @@ export function StudentLockerCard({
   const terms = useTerms()
   const canEdit = useCanEdit()
   const act = useAction()
+  const notify = useNotify()
   const [dialog, setDialog] = useState<LockerIntent>(intent)
   const [lockerId, setLockerId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
+  const [swapWith, setSwapWith] = useState<{ id: string; name: string; number: string } | null>(
+    null
+  )
   const [issued, setIssued] = useState<{
     title: string
     code: string | null
@@ -126,6 +138,7 @@ export function StudentLockerCard({
     setDialog(null)
     setLockerId(null)
     setReason('')
+    setSwapWith(null)
     onIntentDone()
   }
 
@@ -277,7 +290,29 @@ export function StudentLockerCard({
           </div>
         </Modal>
       )}
-      {dialog === 'swap' && s.locker && (
+      {dialog === 'moveOrSwap' && s.locker && (
+        <Modal
+          open
+          onOpenChange={(o) => !o && close()}
+          title={`Move or swap ${s.displayName}?`}
+          description={`Now in ${terms.locker.one.toLowerCase()} ${s.locker.number}.`}
+        >
+          <div className="grid gap-3">
+            <Button size="lg" onClick={() => setDialog('move')}>
+              <MoveRight size={18} aria-hidden /> Move to a spare {terms.locker.one.toLowerCase()}
+            </Button>
+            <Button size="lg" variant="secondary" onClick={() => setDialog('swap')}>
+              <ArrowLeftRight size={18} aria-hidden /> Swap with another student
+            </Button>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <Button variant="secondary" onClick={close}>
+              Cancel
+            </Button>
+          </div>
+        </Modal>
+      )}
+      {dialog === 'swap' && s.locker && !swapWith && (
         <QuickFind
           open
           title={`Swap ${s.displayName} with…`}
@@ -286,11 +321,54 @@ export function StudentLockerCard({
             void act(async () => {
               if (!r.studentId || r.studentId === s.id)
                 throw new Error('Choose another student who has a locker.')
-              await call('student.swap', { studentId: s.id, otherStudentId: r.studentId })
-              close()
+              const other = await call('student.get', { id: r.studentId })
+              if (!other || !other.locker)
+                throw new Error('Choose another student who has a locker.')
+              setSwapWith({ id: other.id, name: other.displayName, number: other.locker.number })
             })
           }
         />
+      )}
+      {dialog === 'swap' && s.locker && swapWith && (
+        <Modal
+          open
+          onOpenChange={(o) => !o && close()}
+          title={`Swap ${s.displayName} and ${swapWith.name}?`}
+          description="Nothing changes until you choose Swap them."
+          testId="swap-summary"
+        >
+          <ul className="grid gap-1 text-sm">
+            <li>
+              {s.displayName} goes to {terms.locker.one.toLowerCase()} {swapWith.number}
+            </li>
+            <li>
+              {swapWith.name} goes to {terms.locker.one.toLowerCase()} {s.locker.number}
+            </li>
+          </ul>
+          <p className="mt-3 text-sm text-ink-muted">
+            Both codes change, because each knows the other&apos;s, and both locks go on the reset
+            list.
+          </p>
+          <div className="mt-6 flex justify-end gap-2">
+            <Button variant="secondary" onClick={close}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                void act(async () => {
+                  await call('student.swap', { studentId: s.id, otherStudentId: swapWith.id })
+                  const mine = s.locker!.number
+                  close()
+                  notify(
+                    `Swapped ${s.displayName} (${swapWith.number}) and ${swapWith.name} (${mine}).`
+                  )
+                })
+              }
+            >
+              Swap them
+            </Button>
+          </div>
+        </Modal>
       )}
       {dialog === 'recode' && s.locker && (
         <Modal
@@ -363,7 +441,10 @@ export function StudentLockerCard({
                       left: true,
                       ...(reason ? { reason } : {})
                     }),
-                    close()
+                    close(),
+                    notify(
+                      `${s.displayName} has left. ${terms.locker.one} ${s.locker!.number} is spare and on the reset list.`
+                    )
                   )
                 )
               }
@@ -385,12 +466,48 @@ export function StudentLockerCard({
   )
 }
 
-export function ResetList(): React.JSX.Element | null {
+export function ResetList({
+  collapsed = false,
+  onPrint
+}: {
+  /** Show only the count until opened (the Lockers screen). */
+  collapsed?: boolean
+  /** Open the Locks to reset report, to print the list. */
+  onPrint?: () => void
+}): React.JSX.Element | null {
   const terms = useTerms()
   const canEdit = useCanEdit()
   const act = useAction()
+  const notify = useNotify()
   const { data: tasks } = useRpc('codes.resetTasks', {})
+  const [ticked, setTicked] = useState<Set<string>>(new Set())
+  const [shown, setShown] = useState(false)
   if (!tasks || tasks.length === 0) return null
+  // A lock that was reset elsewhere is no longer on the list, so it cannot stay ticked.
+  const chosen = tasks.filter((t) => ticked.has(t.lockId)).map((t) => t.lockId)
+  const toggle = (lockId: string, on: boolean): void =>
+    setTicked((prev) => {
+      const next = new Set(prev)
+      if (on) next.add(lockId)
+      else next.delete(lockId)
+      return next
+    })
+  if (collapsed && !shown) {
+    return (
+      <section
+        className="card flex flex-wrap items-center gap-3 p-4 animate-rise"
+        aria-labelledby="reset-heading"
+        data-testid="reset-list"
+      >
+        <h2 id="reset-heading" className="flex-1 text-base font-semibold">
+          {plural(tasks.length, 'lock')} to reset
+        </h2>
+        <Button size="sm" variant="secondary" onClick={() => setShown(true)}>
+          Show
+        </Button>
+      </section>
+    )
+  }
   return (
     <section
       className="card p-6 animate-rise"
@@ -404,9 +521,46 @@ export function ResetList(): React.JSX.Element | null {
         Reset each lock to 0 0 0 0 with the master key, then tick it off. Letters for these wait
         until the lock is reset.
       </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => setTicked(new Set(tasks.map((t) => t.lockId)))}
+        >
+          Tick all
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => setTicked(new Set())}>
+          Untick all
+        </Button>
+        <Button
+          size="sm"
+          disabled={!canEdit || chosen.length === 0}
+          onClick={() =>
+            void act(async () => {
+              const n = await call('codes.resetDoneMany', { lockIds: chosen })
+              setTicked(new Set())
+              notify(`${plural(n, 'lock')} marked as reset.`)
+            })
+          }
+        >
+          {chosen.length === 0 ? 'Mark as reset' : `Mark ${chosen.length} as reset`}
+        </Button>
+        {onPrint && (
+          <Button size="sm" variant="ghost" onClick={onPrint}>
+            Print this list
+          </Button>
+        )}
+      </div>
       <ul className="mt-4 divide-y divide-line">
         {tasks.map((t) => (
           <li key={t.lockId} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
+            <input
+              type="checkbox"
+              className="size-4"
+              aria-label={`${terms.locker.one} ${t.lockerNumber ?? 'spare'} is reset`}
+              checked={ticked.has(t.lockId)}
+              onChange={(e) => toggle(t.lockId, e.target.checked)}
+            />
             <span className="stencil w-16 text-2xl leading-none">{t.lockerNumber ?? '?'}</span>
             <span className="flex-1">
               {t.holder ?? `Spare ${terms.locker.one.toLowerCase()}`}
@@ -419,7 +573,12 @@ export function ResetList(): React.JSX.Element | null {
             <Button
               size="sm"
               disabled={!canEdit}
-              onClick={() => void act(() => call('codes.resetDone', { lockId: t.lockId }))}
+              onClick={() =>
+                void act(async () => {
+                  await call('codes.resetDone', { lockId: t.lockId })
+                  notify(`${terms.locker.one} ${t.lockerNumber ?? ''} marked as reset.`)
+                })
+              }
             >
               Reset done
             </Button>
@@ -438,6 +597,7 @@ function StudentLetter({ s }: { s: StudentView }): React.JSX.Element {
   const canEdit = useCanEdit()
   const act = useAction()
   const gate = useCodeGate()
+  const lockedReason = useLockedReason()
   const { data: template } = useRpc('letters.template.get', {})
   const [saved, setSaved] = useState<string | null>(null)
   const languages = template?.languages ?? []
@@ -448,11 +608,6 @@ function StudentLetter({ s }: { s: StudentView }): React.JSX.Element {
         variant="secondary"
         disabled={!canEdit}
         data-testid="student-letter"
-        title={
-          canEdit
-            ? undefined
-            : 'Letters show codes, so they print only while the file is open for editing.'
-        }
         onClick={() =>
           void act(async () => {
             if (!(await gate())) return
@@ -467,6 +622,11 @@ function StudentLetter({ s }: { s: StudentView }): React.JSX.Element {
       >
         <Mail size={15} aria-hidden /> Save their letter as PDF…
       </Button>
+      {!canEdit && (
+        <p className="basis-full text-xs text-ink-muted" data-testid="letters-locked-reason">
+          {lockedReason}
+        </p>
+      )}
       {languages.length > 1 && (
         <Select
           aria-label="Letter language"

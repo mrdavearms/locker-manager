@@ -188,7 +188,17 @@ export const rpcParams = {
     lastName: z.string().max(80).optional(),
     preferredName: z.string().max(80).nullable().optional(),
     needsAccessible: z.boolean().optional(),
-    confirmName: z.boolean().optional()
+    confirmName: z.boolean().optional(),
+    yearLevel: z.string().max(20).nullable().optional(),
+    groupCode: z.string().max(40).nullable().optional()
+  }),
+  'student.create': z.object({
+    externalId: z.string().trim().min(1).max(40),
+    firstName: z.string().trim().min(1).max(80),
+    lastName: z.string().trim().min(1).max(80),
+    preferredName: z.string().max(80).nullable(),
+    yearLevel: z.string().max(20).nullable(),
+    groupCode: z.string().max(40).nullable()
   }),
   'student.stillHere': z.object({ id }),
   'student.confirmLeft': z.object({ id }),
@@ -215,6 +225,7 @@ export const rpcParams = {
   }),
   'codes.resetTasks': z.object({}),
   'codes.resetDone': z.object({ lockId: id }),
+  'codes.resetDoneMany': z.object({ lockIds: z.array(id).min(1).max(10_000) }),
   'codes.reveal': z.object({ lockerId: id }),
   'codes.recode': z.object({ lockerId: id, reason: z.string().trim().min(3).max(200) }),
   'codes.setFixed': z.object({
@@ -230,6 +241,7 @@ export const rpcParams = {
     issueCodes: z.boolean()
   }),
   'locker.suggest': z.object({ studentId: id }),
+  'student.lockerFits': z.object({ studentId: id }),
   'student.assign': z.object({ studentId: id, lockerId: id }),
   'student.release': z.object({
     studentId: id,
@@ -368,6 +380,7 @@ export interface RpcResults {
   'students.counts': StudentCounts
   'student.get': StudentView | null
   'student.update': StudentView
+  'student.create': StudentView
   'student.stillHere': null
   'student.confirmLeft': null
   'exclusions.list': ExclusionView[]
@@ -383,6 +396,7 @@ export interface RpcResults {
   'codes.sets.generate': { codes: number; spares: number; validCount: number; overHalf: boolean }
   'codes.resetTasks': ResetTask[]
   'codes.resetDone': null
+  'codes.resetDoneMany': number
   'codes.reveal': { code: string | null }
   'codes.recode': { code: string | null }
   'codes.setFixed': null
@@ -391,6 +405,10 @@ export interface RpcResults {
   'allocation.draft': DraftView
   'allocation.commit': { assigned: number; codes: number }
   'locker.suggest': { lockerId: string; number: string } | null
+  'student.lockerFits': {
+    fits: boolean
+    suggestion: { lockerId: string; number: string } | null
+  }
   'student.assign': { code: string | null; lockerNumber: string }
   'student.release': null
   'student.move': { code: string | null; lockerNumber: string }

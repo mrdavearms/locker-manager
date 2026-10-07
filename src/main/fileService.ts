@@ -24,7 +24,7 @@ import {
   type OperatorInfo,
   type RecentFile
 } from '@shared/ipc'
-import { setBusy } from './busy'
+import { setBusy, whileBusy } from './busy'
 import { createNewDatabase } from './db/newFile'
 import { LockerDb } from './db/db'
 import { appendAudit, newId, setMeta } from './db/context'
@@ -343,114 +343,123 @@ export function registerFileHandlers(): void {
   // The whole file as a portable Excel workbook (SPEC.md 5.5).
   ipcMain.handle(
     channels.fileExportAll,
-    async (_e, raw: unknown): Promise<ActionResult & { path?: string }> => {
-      const { includeCodes } = z.object({ includeCodes: z.boolean() }).parse(raw)
-      const st = session.state
-      if (st.status !== 'open') return { ok: false, message: 'Open a file first.' }
-      if (includeCodes && (st.mode !== 'edit' || st.conflict))
-        return {
-          ok: false,
-          message:
-            'Open the file for editing to export codes: every code exported is recorded. You can export without codes now.'
+    async (_e, raw: unknown): Promise<ActionResult & { path?: string }> =>
+      // Counted as printing: like a saved report, a file is being written for staff.
+      await whileBusy('printing', async () => {
+        const { includeCodes } = z.object({ includeCodes: z.boolean() }).parse(raw)
+        const st = session.state
+        if (st.status !== 'open') return { ok: false, message: 'Open a file first.' }
+        if (includeCodes && (st.mode !== 'edit' || st.conflict))
+          return {
+            ok: false,
+            message:
+              'Open the file for editing to export codes: every code exported is recorded. You can export without codes now.'
+          }
+        if (includeCodes) {
+          const locked = session.read((db) => codesLocked(db))
+          if (locked) return { ok: false, message: locked }
         }
-      if (includeCodes) {
-        const locked = session.read((db) => codesLocked(db))
-        if (locked) return { ok: false, message: locked }
-      }
-      // Which lockers' codes the workbook will hold: current, past and next year's.
-      // Worked out before the export runs, while nothing else can change the file.
-      const lockerIds = includeCodes ? session.read((db) => lockersWithAnyCode(db)) : []
-      const spares = includeCodes ? session.read((db) => spareCodeCount(db)) : 0
-      const bytes = await session.read((db) =>
-        exportWorkbook(db, {
-          operator: operatorName(),
-          appVersion: app.getVersion(),
-          includeCodes,
-          now: new Date()
-        })
-      )
-      const path = await pickOutputPath(
-        `${includeCodes ? 'CONFIDENTIAL ' : ''}${st.summary.schoolName} portable export ${stampDate()}.xlsx`,
-        { name: 'Excel workbook', extension: 'xlsx' }
-      )
-      if (!path) return { ok: false, cancelled: true, message: '' }
-      // Recorded before the file is written: no code leaves the app unrecorded.
-      try {
-        if (
-          session.state.status === 'open' &&
-          session.state.mode === 'edit' &&
-          !session.state.conflict
+        // Which lockers' codes the workbook will hold: current, past and next year's.
+        // Worked out before the export runs, while nothing else can change the file.
+        const lockerIds = includeCodes ? session.read((db) => lockersWithAnyCode(db)) : []
+        const spares = includeCodes ? session.read((db) => spareCodeCount(db)) : 0
+        const bytes = await session.read((db) =>
+          exportWorkbook(db, {
+            operator: operatorName(),
+            appVersion: app.getVersion(),
+            includeCodes,
+            now: new Date()
+          })
         )
-          session.write(
-            {
-              action: 'file.exported',
-              entity: 'file',
-              after: { includeCodes, lockers: lockerIds.length, spareCodes: spares }
-            },
-            (db, ctx) => {
-              for (const id of lockerIds) logReveal(db, ctx, id, 'export')
-              if (spares > 0) logReveal(db, ctx, null, 'export')
-            }
+        const path = await pickOutputPath(
+          `${includeCodes ? 'CONFIDENTIAL ' : ''}${st.summary.schoolName} portable export ${stampDate()}.xlsx`,
+          { name: 'Excel workbook', extension: 'xlsx' }
+        )
+        if (!path) return { ok: false, cancelled: true, message: '' }
+        // Recorded before the file is written: no code leaves the app unrecorded.
+        try {
+          if (
+            session.state.status === 'open' &&
+            session.state.mode === 'edit' &&
+            !session.state.conflict
           )
-        else if (includeCodes) throw new Error('The file is no longer open for editing.')
-      } catch (error) {
-        return {
-          ok: false,
-          message: `${error instanceof Error ? error.message : String(error)} Nothing was saved.`
+            session.write(
+              {
+                action: 'file.exported',
+                entity: 'file',
+                after: { includeCodes, lockers: lockerIds.length, spareCodes: spares }
+              },
+              (db, ctx) => {
+                for (const id of lockerIds) logReveal(db, ctx, id, 'export')
+                if (spares > 0) logReveal(db, ctx, null, 'export')
+              }
+            )
+          else if (includeCodes) throw new Error('The file is no longer open for editing.')
+        } catch (error) {
+          return {
+            ok: false,
+            message: `${error instanceof Error ? error.message : String(error)} Nothing was saved.`
+          }
         }
-      }
-      await writeOutput(path, bytes)
-      log.info('portable export written', { includeCodes })
-      return { ok: true, path }
-    }
+        await writeOutput(path, bytes)
+        log.info('portable export written', { includeCodes })
+        return { ok: true, path }
+      })
   )
 
   // A new data file from a portable export. The workbook's file is never changed.
-  ipcMain.handle(channels.fileFromExport, async (): Promise<ActionResult> => {
-    const win = focusedWindow()
-    const openOpts = {
-      title: 'Choose a Locker Manager portable export',
-      properties: ['openFile' as const],
-      filters: [{ name: 'Excel workbook', extensions: ['xlsx'] }]
-    }
-    const pick = win
-      ? await dialog.showOpenDialog(win, openOpts)
-      : await dialog.showOpenDialog(openOpts)
-    const source = pick.filePaths[0]
-    if (pick.canceled || !source) return { ok: false, cancelled: true, message: '' }
-    let built: Awaited<ReturnType<typeof importWorkbook>>
-    try {
-      built = await importWorkbook(new Uint8Array(await readFile(source)), {
-        operator: operatorName(),
-        machine: machineName(),
-        now: () => new Date()
+  ipcMain.handle(
+    channels.fileFromExport,
+    async (): Promise<ActionResult> =>
+      await whileBusy('importing', async () => {
+        const win = focusedWindow()
+        const openOpts = {
+          title: 'Choose a Locker Manager portable export',
+          properties: ['openFile' as const],
+          filters: [{ name: 'Excel workbook', extensions: ['xlsx'] }]
+        }
+        const pick = win
+          ? await dialog.showOpenDialog(win, openOpts)
+          : await dialog.showOpenDialog(openOpts)
+        const source = pick.filePaths[0]
+        if (pick.canceled || !source) return { ok: false, cancelled: true, message: '' }
+        let built: Awaited<ReturnType<typeof importWorkbook>>
+        try {
+          built = await importWorkbook(new Uint8Array(await readFile(source)), {
+            operator: operatorName(),
+            machine: machineName(),
+            now: () => new Date()
+          })
+        } catch (error) {
+          return { ok: false, message: error instanceof Error ? error.message : String(error) }
+        }
+        const saveOpts = {
+          title: 'Where should the new data file live?',
+          buttonLabel: 'Create',
+          defaultPath: join(app.getPath('documents'), `${built.school} (from export).lockers`),
+          filters: FILTERS
+        }
+        const target = win
+          ? await dialog.showSaveDialog(win, saveOpts)
+          : await dialog.showSaveDialog(saveOpts)
+        if (target.canceled || !target.filePath) {
+          built.db.close()
+          return { ok: false, cancelled: true, message: '' }
+        }
+        const path = /\.lockers$/i.test(target.filePath)
+          ? target.filePath
+          : `${target.filePath}.lockers`
+        if (existsSync(path)) {
+          built.db.close()
+          return {
+            ok: false,
+            message: 'A file with that name is already there. Choose another name.'
+          }
+        }
+        log.info('data file rebuilt from a portable export', { codes: built.codesIncluded })
+        return afterOpen(await session.createNew(path, built.db))
       })
-    } catch (error) {
-      return { ok: false, message: error instanceof Error ? error.message : String(error) }
-    }
-    const saveOpts = {
-      title: 'Where should the new data file live?',
-      buttonLabel: 'Create',
-      defaultPath: join(app.getPath('documents'), `${built.school} (from export).lockers`),
-      filters: FILTERS
-    }
-    const target = win
-      ? await dialog.showSaveDialog(win, saveOpts)
-      : await dialog.showSaveDialog(saveOpts)
-    if (target.canceled || !target.filePath) {
-      built.db.close()
-      return { ok: false, cancelled: true, message: '' }
-    }
-    const path = /\.lockers$/i.test(target.filePath)
-      ? target.filePath
-      : `${target.filePath}.lockers`
-    if (existsSync(path)) {
-      built.db.close()
-      return { ok: false, message: 'A file with that name is already there. Choose another name.' }
-    }
-    log.info('data file rebuilt from a portable export', { codes: built.codesIncluded })
-    return afterOpen(await session.createNew(path, built.db))
-  })
+  )
 
   ipcMain.handle(channels.fileClose, async () => {
     await session.close()

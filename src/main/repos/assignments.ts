@@ -315,6 +315,32 @@ export function commitDraft(
   return { assigned: assignments.length, codes }
 }
 
+function ruleFor(plan: AllocationPlan, s: { yearLevel: string | null; group: string | null }) {
+  return plan.rules.find(
+    (r) =>
+      (r.yearLevels.length === 0 || (s.yearLevel !== null && r.yearLevels.includes(s.yearLevel))) &&
+      (r.groups.length === 0 || (s.group !== null && r.groups.includes(s.group)))
+  )
+}
+
+/** Whether the student's locker is where their allocation line would put them now. */
+export function lockerFitsPlan(
+  db: LockerDb,
+  studentId: string
+): { fits: boolean; suggestion: { lockerId: string; number: string } | null } {
+  const a = currentAssignment(db, studentId)
+  const { students, lockers } = engineInputs(db)
+  const s = students.find((x) => x.id === studentId)
+  if (!a || !s) return { fits: true, suggestion: null }
+  const rule = ruleFor(savedPlan(db), s)
+  const l = lockers.find((x) => x.id === a.lockerId)
+  if (!rule || !l) return { fits: true, suggestion: null }
+  const fits =
+    (rule.areaIds.length === 0 || rule.areaIds.includes(l.areaId)) &&
+    (rule.bankIds.length === 0 || rule.bankIds.includes(l.bankId))
+  return { fits, suggestion: fits ? null : suggestLocker(db, studentId) }
+}
+
 /** The first spare locker in the student's area, by the plan's rules (SPEC.md 4.4). */
 export function suggestLocker(
   db: LockerDb,
@@ -324,11 +350,7 @@ export function suggestLocker(
   const { students, lockers } = engineInputs(db)
   const s = students.find((x) => x.id === studentId)
   if (!s) return null
-  const rule = plan.rules.find(
-    (r) =>
-      (r.yearLevels.length === 0 || (s.yearLevel !== null && r.yearLevels.includes(s.yearLevel))) &&
-      (r.groups.length === 0 || (s.group !== null && r.groups.includes(s.group)))
-  )
+  const rule = ruleFor(plan, s)
   const candidates = lockers.filter(
     (l) =>
       l.free > 0 &&
