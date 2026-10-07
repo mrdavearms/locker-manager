@@ -410,7 +410,7 @@ replaces these with the student system's values.
 If their locker is no longer on the right side for their year level, the app offers to
 move them: click **Move to** and the locker number, or leave them where they are.
 
-**Settings, Year levels and groups** sets the names shown for each year level and group, and
+**Settings, Year levels and homerooms** (the tab name follows your own words) sets the names shown for each year level and group, and
 which ones are **Placed last** when lockers are given out.
 
 ## A new student arrives
