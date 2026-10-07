@@ -89,11 +89,13 @@ export function App(): React.JSX.Element {
   )
   const closeMessage = useCallback(() => setMessage(null), [])
   const undoFromMessage = useCallback(() => {
-    void window.api
-      .undo()
-      .then((r) =>
-        r.ok ? setMessage({ text: 'Undone.', undo: false, n: Date.now() }) : setError(r.message)
-      )
+    void window.api.undo().then((r) => {
+      if (r.ok) setMessage({ text: 'Undone.', undo: false, n: Date.now() })
+      else {
+        setMessage(null)
+        setError(r.message)
+      }
+    })
   }, [])
   const [finder, setFinder] = useState<Finder | null>(null)
   // The screen belongs to the open file: a different (or no) file starts on Home.
@@ -119,6 +121,12 @@ export function App(): React.JSX.Element {
 
   const open = file?.status === 'open' ? file : null
   const openPath = open?.path ?? null
+  // A message belongs to the file it was made in: drop it when another file (or none) is open.
+  const [messagePath, setMessagePath] = useState<string | null>(null)
+  if (messagePath !== openPath) {
+    setMessagePath(openPath)
+    setMessage(null)
+  }
   const screen: Screen = nav.path === openPath ? nav.screen : 'home'
   const focus = nav.path === openPath ? nav.focus : null
   const setScreen = useCallback(

@@ -30,7 +30,7 @@ export function MessageStrip({
     <div
       aria-live="polite"
       role="status"
-      className="pointer-events-none fixed inset-x-0 bottom-16 z-40 flex justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 bottom-20 z-40 flex justify-center px-4"
     >
       {message && (
         <div
