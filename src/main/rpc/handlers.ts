@@ -29,6 +29,8 @@ import { rolloverHandlers } from './rolloverHandlers'
 import { lockerHandlers } from './lockerHandlers'
 import { studentHandlers } from './studentHandlers'
 
+const NotUsedSchema = z.array(z.enum(['labels', 'letters']))
+
 function setupStatus(db: LockerDb): SetupStatus {
   const school = getSchoolProfile(db)
   const lockers = Number(
@@ -48,7 +50,8 @@ function setupStatus(db: LockerDb): SetupStatus {
     lockers,
     lockersWithoutLock: without,
     labelsPrinted: printed('labels'),
-    lettersPrinted: printed('letters')
+    lettersPrinted: printed('letters'),
+    notUsed: getSetting(db, 'setup.notUsed', NotUsedSchema, [])
   }
 }
 
@@ -220,6 +223,19 @@ export const handlers: Handlers = {
     audit: (p) => ({ action: p.done ? 'setup.completed' : 'setup.reopened', entity: 'settings' }),
     run: (db, ctx: OperatorContext, p) => {
       setSetting(db, ctx, 'setup.completedAt', p.done ? ctx.now().toISOString() : '')
+      return setupStatus(db)
+    }
+  },
+  'setup.notUsed': {
+    kind: 'write',
+    audit: (p) => ({
+      action: p.notUsed ? 'setup.item_not_used' : 'setup.item_used',
+      entity: 'settings',
+      after: p.item
+    }),
+    run: (db, ctx: OperatorContext, p) => {
+      const rest = getSetting(db, 'setup.notUsed', NotUsedSchema, []).filter((i) => i !== p.item)
+      setSetting(db, ctx, 'setup.notUsed', p.notUsed ? [...rest, p.item] : rest)
       return setupStatus(db)
     }
   }

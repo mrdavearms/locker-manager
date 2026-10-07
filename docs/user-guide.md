@@ -26,6 +26,8 @@ Each step ticks itself off when it is done, and the list goes away when all five
 To put it away sooner, click **Hide this list**. To bring it back, click **Guide**, then
 **Show the getting-started list**.
 
+A school that does not print labels or letters can click **We don't use this** on that step, and it counts as done. Click **Use it after all** to change your mind.
+
 The **Guide** button opens this guide at the help for the screen you are on. Search it for
 any task, and click **Show me** to go to the right screen.
 

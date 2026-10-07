@@ -1,9 +1,9 @@
 import { Check, ChevronRight, EyeOff } from 'lucide-react'
 import { Button } from '@renderer/components/Button'
 import type { Screen } from '@renderer/components/NavRail'
-import { useTerms } from '@renderer/lib/appContext'
+import { useAction, useCanEdit, useTerms } from '@renderer/lib/appContext'
 import { cn } from '@renderer/lib/cn'
-import { useRpc } from '@renderer/lib/rpc'
+import { call, useRpc } from '@renderer/lib/rpc'
 import type { OpenFileState } from '@renderer/lib/useFileState'
 
 /**
@@ -20,6 +20,8 @@ export function GettingStarted({
   onHide: () => void
 }): React.JSX.Element | null {
   const terms = useTerms()
+  const canEdit = useCanEdit()
+  const act = useAction()
   const { data } = useRpc('setup.status', {})
   if (!data) return null
   const c = state.summary.counts
@@ -30,6 +32,8 @@ export function GettingStarted({
     done: boolean
     go: Screen
     action: string
+    /** Only labels and letters can be set aside. */
+    optional?: 'labels' | 'letters'
   }[] = [
     {
       id: 'setup',
@@ -62,19 +66,23 @@ export function GettingStarted({
       id: 'labels',
       title: `Print ${terms.locker.one.toLowerCase()} labels`,
       hint: 'Print a test sheet on plain paper first to line up your printer.',
-      done: data.labelsPrinted,
+      done: data.labelsPrinted || data.notUsed.includes('labels'),
       go: 'print',
-      action: 'Print labels'
+      action: 'Print labels',
+      optional: 'labels'
     },
     {
       id: 'letters',
       title: 'Print the letters',
       hint: 'One page per student with their locker and code.',
-      done: data.lettersPrinted,
+      done: data.lettersPrinted || data.notUsed.includes('letters'),
       go: 'letters',
-      action: 'Print letters'
+      action: 'Print letters',
+      optional: 'letters'
     }
   ]
+  const setNotUsed = (item: 'labels' | 'letters', notUsed: boolean): Promise<unknown> =>
+    act(() => call('setup.notUsed', { item, notUsed }))
   const left = steps.filter((s) => !s.done)
   if (left.length === 0) return null
   const next = left[0]!
@@ -116,10 +124,18 @@ export function GettingStarted({
               {s.done ? <Check size={16} /> : i + 1}
             </span>
             <div className="min-w-0 flex-1">
-              <p className={cn('font-semibold', s.done && 'text-ink-muted line-through')}>
-                {s.title}
-                {s.done && <span className="sr-only"> (done)</span>}
-              </p>
+              {s.optional && data.notUsed.includes(s.optional) ? (
+                <p className="font-semibold text-ink-muted">
+                  {s.title}
+                  <span className="ml-2 text-sm font-normal">Not used</span>
+                  <span className="sr-only"> (done)</span>
+                </p>
+              ) : (
+                <p className={cn('font-semibold', s.done && 'text-ink-muted line-through')}>
+                  {s.title}
+                  {s.done && <span className="sr-only"> (done)</span>}
+                </p>
+              )}
               {!s.done && <p className="text-sm text-ink-muted">{s.hint}</p>}
             </div>
             {!s.done && (
@@ -130,6 +146,28 @@ export function GettingStarted({
                 data-testid={s.id === 'setup' ? 'open-setup' : `start-${s.id}`}
               >
                 {s.action} <ChevronRight size={15} aria-hidden />
+              </Button>
+            )}
+            {!s.done && s.optional && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!canEdit}
+                onClick={() => void setNotUsed(s.optional!, true)}
+                data-testid={`not-used-${s.id}`}
+              >
+                We don&apos;t use this
+              </Button>
+            )}
+            {s.optional && data.notUsed.includes(s.optional) && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!canEdit}
+                onClick={() => void setNotUsed(s.optional!, false)}
+                data-testid={`use-after-all-${s.id}`}
+              >
+                Use it after all
               </Button>
             )}
           </li>
