@@ -188,7 +188,9 @@ export const rpcParams = {
     lastName: z.string().max(80).optional(),
     preferredName: z.string().max(80).nullable().optional(),
     needsAccessible: z.boolean().optional(),
-    confirmName: z.boolean().optional()
+    confirmName: z.boolean().optional(),
+    yearLevel: z.string().max(20).nullable().optional(),
+    groupCode: z.string().max(40).nullable().optional()
   }),
   'student.create': z.object({
     externalId: z.string().trim().min(1).max(40),
@@ -238,6 +240,7 @@ export const rpcParams = {
     issueCodes: z.boolean()
   }),
   'locker.suggest': z.object({ studentId: id }),
+  'student.lockerFits': z.object({ studentId: id }),
   'student.assign': z.object({ studentId: id, lockerId: id }),
   'student.release': z.object({
     studentId: id,
@@ -400,6 +403,10 @@ export interface RpcResults {
   'allocation.draft': DraftView
   'allocation.commit': { assigned: number; codes: number }
   'locker.suggest': { lockerId: string; number: string } | null
+  'student.lockerFits': {
+    fits: boolean
+    suggestion: { lockerId: string; number: string } | null
+  }
   'student.assign': { code: string | null; lockerNumber: string }
   'student.release': null
   'student.move': { code: string | null; lockerNumber: string }

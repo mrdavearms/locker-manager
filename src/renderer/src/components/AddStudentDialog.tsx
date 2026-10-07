@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import type { StudentView } from '@shared/students'
 import { useAction, useNotify, useTerms } from '@renderer/lib/appContext'
-import { call, useRpc } from '@renderer/lib/rpc'
+import { call } from '@renderer/lib/rpc'
 import { Button } from './Button'
-import { Field, Select, TextInput } from './Field'
+import { Field, TextInput } from './Field'
 import { Modal } from './Modal'
-
-const OTHER = '__other'
+import { YearGroupFields } from './YearGroupFields'
 
 /** "Zelda Newcomb" -> first "Zelda", last "Newcomb"; one word goes in the first name. */
 function splitName(typed: string): { first: string; last: string } {
@@ -27,23 +26,15 @@ function AddStudentForm({
   const terms = useTerms()
   const act = useAction()
   const notify = useNotify()
-  const { data: groups } = useRpc('groups.list', {})
   const initial = splitName(initialName)
   const [externalId, setExternalId] = useState('')
   const [first, setFirst] = useState(initial.first)
   const [last, setLast] = useState(initial.last)
   const [preferred, setPreferred] = useState('')
-  const [yearChoice, setYearChoice] = useState('')
-  const [yearOther, setYearOther] = useState('')
+  const [yearLevel, setYearLevel] = useState('')
   const [groupCode, setGroupCode] = useState('')
 
-  const years = [
-    ...new Set((groups ?? []).map((g) => g.yearLevel).filter((y): y is string => y !== null))
-  ].sort((a, b) => Number(a) - Number(b) || a.localeCompare(b))
-  const yearLevel = yearChoice === OTHER ? yearOther.trim() : yearChoice
   const ready = externalId.trim() !== '' && first.trim() !== '' && last.trim() !== ''
-  const yearWord = terms.yearLevel.one
-  const groupWord = terms.group.one
 
   const save = (): void =>
     void act(async () => {
@@ -102,46 +93,13 @@ function AddStudentForm({
           onChange={(e) => setPreferred(e.target.value)}
         />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={yearWord} htmlFor="add-st-year">
-          <Select
-            id="add-st-year"
-            value={yearChoice}
-            onChange={(e) => setYearChoice(e.target.value)}
-          >
-            <option value="">Not set</option>
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {yearWord} {y}
-              </option>
-            ))}
-            <option value={OTHER}>Other…</option>
-          </Select>
-          {yearChoice === OTHER && (
-            <TextInput
-              className="mt-2"
-              aria-label={`Other ${yearWord.toLowerCase()}`}
-              value={yearOther}
-              maxLength={20}
-              onChange={(e) => setYearOther(e.target.value)}
-            />
-          )}
-        </Field>
-        <Field label={groupWord} htmlFor="add-st-group">
-          <Select
-            id="add-st-group"
-            value={groupCode}
-            onChange={(e) => setGroupCode(e.target.value)}
-          >
-            <option value="">None</option>
-            {(groups ?? []).map((g) => (
-              <option key={g.code} value={g.code}>
-                {g.display}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      </div>
+      <YearGroupFields
+        idPrefix="add-st"
+        year={yearLevel}
+        group={groupCode}
+        onYear={setYearLevel}
+        onGroup={setGroupCode}
+      />
       <div className="mt-2 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>
           Cancel

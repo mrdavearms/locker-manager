@@ -183,6 +183,8 @@ export function updateStudent(
     preferredName?: string | null
     needsAccessible?: boolean
     confirmName?: boolean
+    yearLevel?: string | null
+    groupCode?: string | null
   }
 ): StudentView {
   const current = getStudent(db, id)
@@ -200,6 +202,8 @@ export function updateStudent(
        name_override = CASE WHEN $override THEN 1 ELSE name_override END,
        name_check = CASE WHEN $confirm OR $override THEN '[]' ELSE name_check END,
        needs_accessible = COALESCE($acc, needs_accessible),
+       year_level = CASE WHEN $setY THEN $y ELSE year_level END,
+       group_code = CASE WHEN $setG THEN $g ELSE group_code END,
        updated_at = $u, updated_by = $by
      WHERE id = $id`,
     {
@@ -211,6 +215,10 @@ export function updateStudent(
       $override: nameChanged ? 1 : 0,
       $confirm: patch.confirmName ? 1 : 0,
       $acc: patch.needsAccessible === undefined ? null : patch.needsAccessible ? 1 : 0,
+      $setY: patch.yearLevel !== undefined ? 1 : 0,
+      $y: patch.yearLevel?.trim() ? normaliseYearLevel(patch.yearLevel) : null,
+      $setG: patch.groupCode !== undefined ? 1 : 0,
+      $g: patch.groupCode?.trim() || null,
       $u: s.updated_at,
       $by: s.updated_by
     }

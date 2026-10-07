@@ -17,6 +17,7 @@ import {
   draftAllocation,
   moveStudent,
   releaseStudent,
+  lockerFitsPlan,
   savePlan,
   savedPlan,
   suggestLocker,
@@ -30,6 +31,7 @@ import {
   revealCode
 } from '../../src/main/repos/codes'
 import type { LockerDb } from '../../src/main/db/db'
+import { updateStudent } from '../../src/main/repos/students'
 import { testContext } from './helpers'
 
 async function demo(): Promise<LockerDb> {
@@ -404,6 +406,18 @@ describe('committing, codes and the manual tools (SPEC.md 4.4, 4.5)', () => {
     const r = commitDraft(db, ctx, draft.assignments, { issueCodes: true })
     return { db, ctx, r }
   }
+
+  it('a student moved from Year 7 to Year 8 no longer fits their Year 7 side locker, and gets a Year 8 suggestion', async () => {
+    const { db, ctx } = await allocated()
+    const a = db.get<{ student_id: string }>(
+      "SELECT a.student_id FROM assignment a JOIN student s ON s.id = a.student_id WHERE a.status = 'current' AND s.year_level = '7' LIMIT 1"
+    )!
+    expect(lockerFitsPlan(db, a.student_id).fits).toBe(true)
+    updateStudent(db, ctx, a.student_id, { yearLevel: '8', groupCode: '08A' })
+    const r = lockerFitsPlan(db, a.student_id)
+    expect(r.fits).toBe(false)
+    expect(Number(r.suggestion!.number)).toBeGreaterThan(114)
+  })
 
   it('commits the draft and issues a unique, valid code to every lock', async () => {
     const { db, r } = await allocated()

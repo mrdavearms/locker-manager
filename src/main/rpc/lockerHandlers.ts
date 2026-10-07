@@ -21,6 +21,7 @@ import {
   releaseStudent,
   savedPlan,
   savePlan,
+  lockerFitsPlan,
   suggestLocker,
   swapStudents
 } from '../repos/assignments'
@@ -45,6 +46,7 @@ type Keys =
   | 'allocation.draft'
   | 'allocation.commit'
   | 'locker.suggest'
+  | 'student.lockerFits'
   | 'student.assign'
   | 'student.release'
   | 'student.move'
@@ -162,6 +164,7 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
     run: (db, ctx, p) => commitDraft(db, ctx, p.assignments, { issueCodes: p.issueCodes })
   },
   'locker.suggest': { kind: 'read', run: (db, p) => suggestLocker(db, p.studentId) },
+  'student.lockerFits': { kind: 'read', run: (db, p) => lockerFitsPlan(db, p.studentId) },
   'student.assign': {
     kind: 'write',
     audit: (p) => ({
