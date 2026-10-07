@@ -392,8 +392,12 @@ during the year never use it, and it becomes next year's codes when you start ne
 If a student is not in your import yet:
 
 1. Click **Students**, then **Add a student…**. Or, on Home, click **New student**; when
-   **Find** has nothing, it offers to add them.
-2. Type their name, student ID, year level and group, then click **Add**.
+   nothing is found, click **Add (their name) as a new student…**.
+2. Type their student ID, first name and last name, then choose their year level and group,
+   and click **Add student**.
+
+The words Year level, Homeroom and Group follow your school's own words (Settings, **Words
+we use**).
 
 The next import matches them by **student ID**, so use the same ID your student system
 uses. Their year level and group are then replaced by the student system's values.
@@ -404,7 +408,7 @@ Find the student and change **Year level** and **Group** in their panel. The nex
 replaces these with the student system's values.
 
 If their locker is no longer on the right side for their year level, the app offers to
-**Move** them. Choose a new locker, or leave them where they are.
+move them: click **Move to** and the locker number, or leave them where they are.
 
 **Settings, Year levels and groups** sets the names shown for each year level and group, and
 which ones are **Placed last** when lockers are given out.
@@ -425,7 +429,7 @@ Their locker becomes a spare. Because they know its code, the lock goes on **Loc
 
 ## Move or swap students
 
-On Home, click **Move or swap** and choose which one. Or find the student and, in their
+On Home, click **Move or swap** and choose **Move to a spare locker** or **Swap with another student**. Or find the student and, in their
 panel, click **Move…** (choose the new locker) or **Swap…** (find the other student). A swap
 shows both lockers before anything changes. Whole student records move, never just names. The codes change,
 because each student knows their old locker's code, and the locks go on **Locks to reset**.
