@@ -61,7 +61,8 @@ const RETRYABLE_RENAME = new Set(['EPERM', 'EBUSY', 'EACCES'])
  *   1. check the file on disk is still the version we last saw (else: conflict);
  *   2. write a temporary file beside it with a unique name, flushed to disk;
  *   3. read the temporary file back and check its hash;
- *   4. keep the version being replaced as a backup;
+ *   4. keep the version being replaced as a backup (started straight after step 1,
+ *      so compressing it overlaps steps 2 and 3, and finished before step 5);
  *   5. check the disk version once more, then rename the temporary file over it.
  * A failure at any step leaves the original untouched; the temporary file is
  * removed when possible, and tidied up on a later open if not.
@@ -75,7 +76,7 @@ export async function saveAtomically(req: SaveRequest): Promise<SaveOutcome> {
   const disk = await currentDiskHash(fs, path)
   if (disk.hash !== req.expectedHash) return { kind: 'conflict', diskHash: disk.hash }
 
-  // 2
+  // 2 needs a name for the temporary file.
   const tmp = `${path}.tmp-${req.randomSuffix()}`
   const discardTmp = async (): Promise<void> => {
     try {
@@ -84,42 +85,56 @@ export async function saveAtomically(req: SaveRequest): Promise<SaveOutcome> {
       // Left for the tidy-up on the next open.
     }
   }
-  try {
-    await fs.writeNewFileDurable(tmp, bytes)
-  } catch (error) {
-    await discardTmp()
-    throw new SaveFailedError('The new version could not be written.', 'write', errorCode(error))
+
+  // 4 starts now and runs alongside 2 and 3. A failure is reported, never thrown.
+  let backupJob: Promise<string | undefined> = Promise.resolve(undefined)
+  if (disk.bytes && req.backupPrevious) {
+    try {
+      backupJob = req.backupPrevious(disk.bytes).then(
+        () => undefined,
+        (error: unknown) => (error instanceof Error ? error.message : String(error))
+      )
+    } catch (error) {
+      backupJob = Promise.resolve(error instanceof Error ? error.message : String(error))
+    }
   }
 
-  // 3
   try {
-    const readBack = await fs.readFile(tmp)
-    if (sha256(readBack) !== wantHash) {
+    // 2
+    try {
+      await fs.writeNewFileDurable(tmp, bytes)
+    } catch (error) {
+      await discardTmp()
+      throw new SaveFailedError('The new version could not be written.', 'write', errorCode(error))
+    }
+
+    // 3
+    try {
+      const readBack = await fs.readFile(tmp)
+      if (sha256(readBack) !== wantHash) {
+        await discardTmp()
+        throw new SaveFailedError(
+          'The new version did not read back correctly, so it was not used.',
+          'verify'
+        )
+      }
+    } catch (error) {
+      if (error instanceof SaveFailedError) throw error
       await discardTmp()
       throw new SaveFailedError(
-        'The new version did not read back correctly, so it was not used.',
-        'verify'
+        'The new version could not be read back to check it.',
+        'verify',
+        errorCode(error)
       )
     }
   } catch (error) {
-    if (error instanceof SaveFailedError) throw error
-    await discardTmp()
-    throw new SaveFailedError(
-      'The new version could not be read back to check it.',
-      'verify',
-      errorCode(error)
-    )
+    // Never leave the backup running on its own after a failed save.
+    await backupJob
+    throw error
   }
 
-  // 4
-  let backupError: string | undefined
-  if (disk.bytes && req.backupPrevious) {
-    try {
-      await req.backupPrevious(disk.bytes)
-    } catch (error) {
-      backupError = error instanceof Error ? error.message : String(error)
-    }
-  }
+  // 4 finishes before the swap.
+  const backupError = await backupJob
 
   // 5
   let recheck: { hash: string | null }
