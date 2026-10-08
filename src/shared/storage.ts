@@ -40,6 +40,8 @@ export interface BackupReachView {
   promisedDays: number
   /** True when the size limit is cutting backups off before the promised days. */
   short: boolean
+  /** True when the folder is at its size limit, so backups are spread out to fit. */
+  full: boolean
 }
 
 export interface StorageView {

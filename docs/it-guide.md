@@ -147,10 +147,13 @@ Retention: everything from the last day, the newest of each hour to 7 days, the 
 each day to 99 days, then the newest of each week while there is room, up to 500 MB per
 place (the limit can be raised to 5000 MB in Settings, Storage). Named backups (before an
 update to the file format, before a restore, a version set aside in a conflict) are kept
-regardless of age and removed last. When the limit is reached, the weekly backups older
-than 99 days go first, then busy stretches of the last day are thinned to one per 10
-minutes, then the oldest backups go. Settings, Storage shows how far back each place
-really reaches, and warns when the limit cuts it short of 99 days. A school of about 2,000
+regardless of age and removed last. When the limit is reached, the busiest stages are thinned first so
+the backups still span 99 days: weekly backups older than 99 days go, then the last day is
+thinned to one per 10 minutes, the hourly week to one per 3, 6, 12 and then 24 hours, the
+last day to one an hour, and the daily backups to one per 2, 4, 8 days and so on. Only then
+do the oldest backups go. Settings, Storage shows how far back each place really reaches,
+notes when backups are being spread out, and warns when the limit cuts them short of 99
+days. A school of about 2,000
 students has a file of about 24 MB after five years; it needs roughly 1 GB per place to
 keep 99 days of backups at about 30 saves a school day. **Backups contain lock codes** (from M4 onwards): the backup folder sits
 beside the data file and has the same permissions, so restrict the shared folder to staff

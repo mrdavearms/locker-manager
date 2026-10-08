@@ -205,10 +205,12 @@ are the last to go if a folder runs out of room.
 Backups are compressed to about a third of the file's size, so more of them fit. Open them
 through **Backups** in Locker Manager, not by double-clicking them.
 
-Next to each place, Storage shows how far back its backups really go. If a large file fills
-the 500 MB limit before the backups reach back 99 days, a warning says so. To keep backups
-for longer, raise **Keep the backups folder under** if the drive has room, or move the data
-file (with its Locker Manager backups folder) to a folder with more space.
+Next to each place, Storage shows how far back its backups really go. When a large file
+fills the 500 MB limit, Locker Manager keeps fewer backups for recent hours, then for recent
+days, so the backups still reach back 99 days; a note says so. If even that is not enough, a
+warning says the backups do not reach back 99 days. Either way, to keep more, raise **Keep
+the backups folder under** if the drive has room, or move the data file (with its Locker
+Manager backups folder) to a folder with more space.
 
 ## Close the file
 

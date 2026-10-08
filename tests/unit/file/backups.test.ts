@@ -186,6 +186,34 @@ describe('planPrune (SPEC.md 6.5)', () => {
     expect(busy.slice(0, 29).every((e) => !doomed.has(e.name))).toBe(true)
   })
 
+  it('over the cap, thins the hourly backups before giving up any day', () => {
+    // A save every 30 minutes for 99 days: 48 in the last day, 144 hourly, 92 daily.
+    const entries = every(30 * MINUTE, 99, 100)
+    const doomed = new Set(planPrune(entries, now, { ...DEFAULT_POLICY, maxBytes: 150 * 100 }))
+    const kept = entries.filter((e) => !doomed.has(e.name))
+    expect(kept.length).toBeLessThanOrEqual(150)
+    // Every daily backup is still there, so the school can go back any day.
+    const daily = kept.filter((e) => age(e) >= 7)
+    expect(daily.length).toBeGreaterThanOrEqual(91)
+    expect(Math.max(...kept.map(age))).toBeGreaterThan(98)
+    // The last day is untouched; the hourly week is thinned.
+    expect(kept.filter((e) => age(e) < 1)).toHaveLength(48)
+    expect(kept.filter((e) => age(e) >= 1 && age(e) < 7).length).toBeLessThan(144)
+  })
+
+  it('over a tight cap, spreads the daily backups out rather than losing the oldest weeks', () => {
+    const entries = every(30 * MINUTE, 99, 100)
+    const doomed = new Set(planPrune(entries, now, { ...DEFAULT_POLICY, maxBytes: 100 * 100 }))
+    const kept = entries.filter((e) => !doomed.has(e.name))
+    expect(kept.length).toBeLessThanOrEqual(100)
+    expect(Math.max(...kept.map(age))).toBeGreaterThan(95)
+    // No gap of more than about two days anywhere in the 99 days.
+    const ages = kept.map(age).sort((a, b) => a - b)
+    for (let i = 1; i < ages.length; i++) expect(ages[i]! - ages[i - 1]!).toBeLessThan(2.5)
+    // The last hour is still whole.
+    expect(entries.slice(0, 2).every((e) => !doomed.has(e.name))).toBe(true)
+  })
+
   it('deletes named backups only after every other one but the newest has gone', () => {
     const named: BackupEntry = {
       name: 'named',
@@ -341,13 +369,19 @@ describe('backupReach (Settings, Storage)', () => {
     expect(backupReach([], now, DEFAULT_POLICY)).toEqual({
       oldest: null,
       promisedDays: 99,
-      short: false
+      short: false,
+      full: false
     })
   })
 
   it('is not short when the folder has room, however young the backups are', () => {
     const r = backupReach([entry(0.1, 10), entry(2, 10)], now, DEFAULT_POLICY)
-    expect(r).toEqual({ oldest: new Date(now.getTime() - 2 * DAY), promisedDays: 99, short: false })
+    expect(r).toEqual({
+      oldest: new Date(now.getTime() - 2 * DAY),
+      promisedDays: 99,
+      short: false,
+      full: false
+    })
   })
 
   it('is short when the folder is full and the oldest everyday backup is too young', () => {
@@ -371,6 +405,13 @@ describe('backupReach (Settings, Storage)', () => {
   it('is not short once the backups reach back as far as promised', () => {
     const policy = { ...DEFAULT_POLICY, maxBytes: 100 }
     expect(backupReach([entry(0.1, 30), entry(99.5, 60)], now, policy).short).toBe(false)
+  })
+
+  it('says a full folder is full even when it still reaches back far enough', () => {
+    const policy = { ...DEFAULT_POLICY, maxBytes: 100 }
+    const r = backupReach([entry(0.1, 30), entry(99.5, 60)], now, policy)
+    expect(r.full).toBe(true)
+    expect(backupReach([entry(0.1, 10)], now, policy).full).toBe(false)
   })
 })
 

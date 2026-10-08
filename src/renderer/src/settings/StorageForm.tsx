@@ -51,6 +51,10 @@ export function StorageForm(): React.JSX.Element {
     ...(view.reach.shared.short ? ['beside the file'] : []),
     ...(view.reach.thisComputer.short ? ['on this computer'] : [])
   ]
+  const spread = [
+    ...(view.reach.shared.full && !view.reach.shared.short ? ['beside the file'] : []),
+    ...(view.reach.thisComputer.full && !view.reach.thisComputer.short ? ['on this computer'] : [])
+  ]
   const field = (k: keyof FullBackupRules, label: string, hint: string): React.JSX.Element => (
     <Field label={label} hint={hint} htmlFor={`st-${k}`}>
       <TextInput
@@ -97,6 +101,16 @@ export function StorageForm(): React.JSX.Element {
               promise. To keep backups for longer, raise &ldquo;Keep the backups folder under&rdquo;
               below if the drive has room, or move the data file (with its Locker Manager backups
               folder) to a folder with more space.
+            </Banner>
+          </div>
+        )}
+        {spread.length > 0 && (
+          <div className="mb-5">
+            <Banner tone="info" title="Backups are spread out to fit" testId="storage-spread">
+              The backups folder {spread.join(' and the one ')} has reached its limit of{' '}
+              {view.rules.maxMb} MB. To still reach back {view.rules.dailyDays} days, fewer backups
+              are kept for recent hours, then for recent days. To keep every backup the rules list,
+              raise &ldquo;Keep the backups folder under&rdquo; below if the drive has room.
             </Banner>
           </div>
         )}

@@ -96,11 +96,15 @@ function localDayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
 }
 
-function weekKey(d: Date): number {
-  // Whole weeks since a fixed Monday, in local time.
+function dayNumber(d: Date): number {
+  // Whole days since a fixed Monday, in local time.
   const midnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
   const monday = new Date(2001, 0, 1).getTime()
-  return Math.floor(Math.round((midnight - monday) / DAY) / 7)
+  return Math.round((midnight - monday) / DAY)
+}
+
+function weekKey(d: Date): number {
+  return Math.floor(dayNumber(d) / 7)
 }
 
 /**
@@ -110,10 +114,12 @@ function weekKey(d: Date): number {
  * this after every save keeps the newest save of each hour, then of each day.
  * Named backups ("before update to 1.4.0") are kept regardless of age.
  *
- * Then, while over the size cap: deletes the weekly backups older than the promise
- * (oldest first), thins recent bursts (older than an hour) to one per 10 minutes,
- * then deletes the oldest unnamed, then the oldest named. The newest backup is
- * never deleted.
+ * Then, while over the size cap, it thins the busiest stages first so the backups
+ * still reach back across the whole promise (Dave, 9 Oct 2026): weekly backups
+ * older than the promise go (oldest first); the last day is thinned to one per 10
+ * minutes; the hourly week to one per 3, 6, 12 then 24 hours; the last day to one
+ * an hour; the daily stage to one per 2, 4, 8... days. Only then the oldest
+ * unnamed, then the oldest named. The last hour and the newest backup are kept.
  */
 export function planPrune(
   entries: readonly BackupEntry[],
@@ -152,18 +158,29 @@ export function planPrune(
     if (!keep.has(e.name) || e.label !== null || e.name === newest) continue
     if (now.getTime() - e.at.getTime() >= policy.dailyDays * DAY) drop(e)
   }
-  // Then thin bursts of recent saves to one per 10 minutes (keeping the last hour
-  // whole), so a busy day never pushes out weeks of history.
-  if (total > policy.maxBytes) {
-    const seenSlots = new Set<number>()
+  // Keeps the newest kept backup in each slot of one age range, dropping the rest,
+  // newest slots first, until under the cap. The last hour is never thinned.
+  const thin = (fromMs: number, toMs: number, slot: (e: BackupEntry) => number): void => {
+    if (total <= policy.maxBytes) return
+    const seen = new Set<number>()
     for (const e of sorted) {
       if (total <= policy.maxBytes) break
       if (!keep.has(e.name) || e.label !== null || e.name === newest) continue
       const age = now.getTime() - e.at.getTime()
-      if (age < HOUR || age >= policy.keepAllDays * DAY) continue
-      if (!firstIn(seenSlots, Math.floor(e.at.getTime() / (10 * 60 * 1000)))) drop(e)
+      if (age < Math.max(HOUR, fromMs) || age >= toMs) continue
+      if (!firstIn(seen, slot(e))) drop(e)
     }
   }
+  const lastDay = [0, policy.keepAllDays * DAY] as const
+  const hourly = [policy.keepAllDays * DAY, policy.hourlyDays * DAY] as const
+  const daily = [policy.hourlyDays * DAY, policy.dailyDays * DAY] as const
+  // A busy day never pushes out weeks of history.
+  thin(...lastDay, (e) => Math.floor(e.at.getTime() / (10 * 60 * 1000)))
+  for (const hours of [3, 6, 12, 24])
+    thin(...hourly, (e) => Math.floor(e.at.getTime() / (hours * HOUR)))
+  thin(...lastDay, (e) => Math.floor(e.at.getTime() / HOUR))
+  for (let days = 2; days < policy.dailyDays; days *= 2)
+    thin(...daily, (e) => Math.floor(dayNumber(e.at) / days))
   for (const pass of ['unnamed', 'named'] as const) {
     for (const e of oldestFirst) {
       if (total <= policy.maxBytes) break
@@ -185,16 +202,16 @@ export function backupReach(
   entries: readonly BackupEntry[],
   now: Date,
   policy: BackupPolicy
-): { oldest: Date | null; promisedDays: number; short: boolean } {
+): { oldest: Date | null; promisedDays: number; short: boolean; full: boolean } {
   const promisedDays = policy.dailyDays
   const everyday = entries.filter((e) => e.label === null)
-  if (everyday.length === 0) return { oldest: null, promisedDays, short: false }
+  if (everyday.length === 0) return { oldest: null, promisedDays, short: false, full: false }
   const oldest = new Date(Math.min(...everyday.map((e) => e.at.getTime())))
   const newest = entries.reduce((a, b) => (a.at > b.at ? a : b))
   const total = entries.reduce((n, e) => n + e.size, 0)
   const full = total + newest.size > policy.maxBytes
   const short = full && now.getTime() - oldest.getTime() < promisedDays * DAY
-  return { oldest, promisedDays, short }
+  return { oldest, promisedDays, short, full }
 }
 
 export async function listBackups(fs: FsPort, dir: string, base: string): Promise<BackupEntry[]> {

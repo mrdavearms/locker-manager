@@ -546,7 +546,8 @@ export function registerFileHandlers(): void {
       return {
         oldest: r.oldest?.toISOString() ?? null,
         promisedDays: r.promisedDays,
-        short: r.short
+        short: r.short,
+        full: r.full
       }
     }
     return {
