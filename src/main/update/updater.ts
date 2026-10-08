@@ -39,7 +39,7 @@ let installing = false
 let startup = true
 let fileOpenedSinceLaunch = false
 let skipped = false
-let closeFile: () => Promise<void> = async () => undefined
+let closeFile: () => Promise<unknown> = async () => undefined
 
 function atStartup(): boolean {
   return installAtStartup({ startup, fileOpenedSinceLaunch, skipped })
@@ -124,7 +124,7 @@ export interface SetupOptions {
   /** What the last Mac install did, if anything. */
   lastMacResult: MacResult | null
   /** Saves and closes the data file before a restart. */
-  closeFile: () => Promise<void>
+  closeFile: () => Promise<unknown>
 }
 
 export function setupUpdater(
@@ -309,7 +309,9 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
  * unsaved changes are saved and the data file closed (releasing the edit lock)
  * before the app quits (SPEC.md 9.3).
  */
-export async function installUpdateNow(beforeInstall: () => Promise<void>): Promise<InstallResult> {
+export async function installUpdateNow(
+  beforeInstall: () => Promise<unknown>
+): Promise<InstallResult> {
   if (status.state !== 'ready') {
     return { started: false, reason: 'No update has been downloaded yet.' }
   }

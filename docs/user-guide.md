@@ -205,6 +205,11 @@ backups, such as "Before starting 2027", are always kept.
 Click **Close file** at the bottom right, or just close the window. Your changes are saved
 and other staff can then edit.
 
+If your last changes cannot be saved as the file closes (for example the shared folder is
+not reachable, or two versions of the file are waiting to be sorted out), they are kept as a
+backup named "unsaved changes at close" and a message tells you. Open that backup under
+**Backups** to get them back.
+
 ## Find a setting
 
 At the top of **Settings**, type in **Search settings** (for example `PIN` or `labels`). Only

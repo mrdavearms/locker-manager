@@ -100,7 +100,17 @@ export async function initFileService(): Promise<void> {
     pid: process.pid,
     env: { home: homedir(), tmpDir: tmpdir(), platform: process.platform },
     ignoredCopies: (p) => prefs.get().ignoredCopies[p] ?? [],
-    onChange: broadcast
+    onChange: broadcast,
+    // Closing could not save: the changes are in a backup. Say so, even with no window.
+    onCloseWarning: (message) => {
+      log.warn('closed with unsaved changes kept as a backup')
+      void dialog.showMessageBox({
+        type: 'warning',
+        title: brand.name,
+        message: 'Your last changes were not saved to the school’s file',
+        detail: message
+      })
+    }
   })
 }
 
