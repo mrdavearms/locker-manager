@@ -26,8 +26,7 @@ import {
 } from '@shared/ipc'
 import { setBusy, whileBusy } from './busy'
 import { createNewDatabase } from './db/newFile'
-import { LockerDb } from './db/db'
-import { appendAudit, newId, setMeta } from './db/context'
+import { makePracticeCopy } from './practice'
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { lockersWithAnyCode, logReveal, spareCodeCount } from './repos/codes'
@@ -276,17 +275,14 @@ export function registerFileHandlers(): void {
     if (st.summary.demo || st.summary.practice)
       return { ok: false, message: 'This is already a practice or demo file.' }
     const school = st.summary.schoolName
-    // The school's own file records that a copy was taken (the copy holds every code).
-    if (st.mode === 'edit' && !st.conflict)
-      session.write({ action: 'practice.copied', entity: 'file' }, () => null)
+    // Editing: the school's own file records that a copy was taken (it holds every code).
+    // Not editing: nothing can be recorded, so codes stay locked and the copy has none
+    // (decision 22).
+    const editing = st.mode === 'edit' && !st.conflict
+    if (editing) session.write({ action: 'practice.copied', entity: 'file' }, () => null)
     const bytes = session.read((db) => db.export())
-    const db = await LockerDb.fromBytes(bytes)
     const ctx = { operator: operatorName(), machine: machineName(), now: () => new Date() }
-    db.transaction(() => {
-      setMeta(db, 'practice', '1')
-      setMeta(db, 'file_id', newId())
-      appendAudit(db, ctx, { action: 'practice.started', entity: 'file' })
-    })
+    const db = await makePracticeCopy(bytes, ctx, { withCodes: editing })
     const folder = join(app.getPath('userData'), 'Practice')
     await rm(folder, { recursive: true, force: true })
     await nodeFs.mkdirp(folder)

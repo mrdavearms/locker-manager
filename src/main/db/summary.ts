@@ -7,6 +7,8 @@ export interface FileSummary {
   demo: boolean
   /** A practice copy of a school's file (SPEC.md 10): it never saves back. */
   practice: boolean
+  /** A practice copy made on a computer that was not editing: it holds no codes. */
+  practiceNoCodes: boolean
   schemaVersion: number
   counts: {
     students: number
@@ -34,6 +36,7 @@ export function summarise(db: LockerDb): FileSummary {
     schoolName: school?.name ?? '(no name)',
     demo: getMeta(db, 'demo') === '1',
     practice: getMeta(db, 'practice') === '1',
+    practiceNoCodes: getMeta(db, 'practice_no_codes') === '1',
     schemaVersion: db.userVersion,
     counts: {
       students: count(db, 'SELECT COUNT(*) AS n FROM student WHERE archived_at IS NULL'),

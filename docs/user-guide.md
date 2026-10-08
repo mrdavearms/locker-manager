@@ -759,6 +759,10 @@ A **PRACTICE** sign shows at the top. The copy lives on this computer only, and 
 in it reaches your school's file. Click **Close file** to finish. Starting practice again
 makes a fresh copy.
 
+Codes stay locked on a computer that is not editing, so a practice copy made there has no
+codes. A copy made by the person editing keeps the codes, and the school's file records
+that it was made.
+
 ## Share your set-up with another school
 
 In **Settings**, **School**, under **Share your set-up**:

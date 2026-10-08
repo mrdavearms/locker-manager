@@ -154,6 +154,13 @@ export function HomeScreen({
           <Banner tone="info" title="You are in a practice copy" testId="practice-banner">
             This is a copy of your school’s file on this computer only. Try anything: nothing you do
             here reaches the real file. Click Close file at the bottom to go back.
+            {state.summary.practiceNoCodes && (
+              <span data-testid="practice-no-codes">
+                {' '}
+                Codes stay locked on a computer that is not editing, so this practice copy has no
+                codes.
+              </span>
+            )}
           </Banner>
         )}
         {state.locationWarning && (
@@ -241,6 +248,8 @@ export function HomeScreen({
             <p className="text-sm text-ink-muted">
               Make a copy of this file on this computer to train someone or try something out.
               Nothing done in the copy reaches the real file.
+              {(state.mode !== 'edit' || state.conflict) &&
+                ' Codes stay locked on a computer that is not editing, so this practice copy has no codes.'}
             </p>
           </div>
           <Button
