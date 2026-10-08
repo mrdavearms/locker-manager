@@ -591,8 +591,7 @@ export class DataFileSession {
 
   private localBackupDir(): string {
     const c = this.cur
-    const id = c ? (getMeta(c.db, 'file_id') ?? 'unknown') : 'unknown'
-    return join(this.d.localBackupRoot, id)
+    return join(this.d.localBackupRoot, safeFolderName(c ? getMeta(c.db, 'file_id') : null))
   }
 
   private async save(): Promise<void> {
@@ -1185,6 +1184,18 @@ function holderView(info: LockInfo) {
     startedAt: info.startedAt,
     heartbeatAt: info.heartbeatAt
   }
+}
+
+const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * The file id names this computer's backup folder. It comes from the file, so only the
+ * form the app makes (a UUID from `newId`) is used as it is; anything else is hashed.
+ */
+function safeFolderName(id: string | null | undefined): string {
+  if (!id) return 'unknown'
+  if (FILE_ID.test(id)) return id
+  return `other-${sha256(new TextEncoder().encode(id)).slice(0, 32)}`
 }
 
 function lowerFirst(s: string): string {

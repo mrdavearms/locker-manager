@@ -634,6 +634,51 @@ describe('undo and redo (SPEC.md 4.12)', () => {
   })
 })
 
+describe('this computer’s backup folder', () => {
+  it('a file id that is not one the app makes cannot point the backups elsewhere', async () => {
+    const dir = tempDir()
+    const path = join(dir, 'shared', 'Locker data.lockers')
+    mkdirSync(join(dir, 'shared'))
+    const db = await createNewDatabase(
+      { operator: 'Setup', machine: 'SETUP-PC', now: () => new Date('2026-10-01T00:00:00Z') },
+      { schoolName: 'SYNTHETIC High School', appVersion: '0.1.0' }
+    )
+    db.run("UPDATE meta SET value = '../../escaped' WHERE key = 'file_id'")
+    writeFileSync(path, db.export())
+    db.close()
+    // Deep enough that '../../escaped' still lands inside this test's own folder.
+    const base = join(dir, 'deep', 'er')
+    mkdirSync(base, { recursive: true })
+    const dave = person('Dave', 'DAVE-MAC', base)
+    await dave.session.open(path)
+    rename(dave, 'SYNTHETIC Saved')
+    await dave.session.flush()
+    rename(dave, 'SYNTHETIC Saved Again')
+    await dave.session.close()
+    const root = join(base, 'local-backups-DAVE-MAC')
+    expect(existsSync(join(dir, 'deep', 'escaped'))).toBe(false)
+    const folders = readdirSync(root)
+    expect(folders).toHaveLength(1)
+    expect(folders[0]).toMatch(/^[A-Za-z0-9-]+$/)
+    expect(readdirSync(join(root, folders[0]!)).length).toBeGreaterThan(0)
+  })
+
+  it('a file id the app made is used as it is', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const db = await LockerDb.fromBytes(new Uint8Array(readFileSync(path)))
+    const id = db.get<{ value: string }>("SELECT value FROM meta WHERE key = 'file_id'")!.value
+    db.close()
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    await dave.session.open(path)
+    rename(dave, 'SYNTHETIC Saved')
+    await dave.session.flush()
+    rename(dave, 'SYNTHETIC Saved Again')
+    await dave.session.close()
+    expect(readdirSync(join(dir, 'local-backups-DAVE-MAC'))).toEqual([id])
+  })
+})
+
 describe('closing never throws away unsaved changes', () => {
   /** School name in the first backup whose name holds `label`, shared or local. */
   async function backupNamed(dir: string, label: string): Promise<string | null> {
