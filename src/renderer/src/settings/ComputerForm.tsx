@@ -124,8 +124,8 @@ export function ComputerForm(): React.JSX.Element {
             onPick={(channel) => set({ channel })}
           />
           <p className="text-xs text-ink-muted">
-            On a Mac, updates are downloaded by hand until the app is signed by Apple. Test versions
-            arrive first and may have problems; use them only if you are helping to test.
+            On a Mac, the app installs updates itself while it is in the Applications folder. Test
+            versions arrive first and may have problems; use them only if you are helping to test.
           </p>
         </div>
       </SectionCard>
