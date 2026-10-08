@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import { LockerDb } from '../../../src/main/db/db'
 import { createNewDatabase } from '../../../src/main/db/newFile'
 import { summarise } from '../../../src/main/db/summary'
-import { BACKUP_FOLDER_NAME } from '../../../src/main/file/backups'
+import { BACKUP_FOLDER_NAME, readBackupFile } from '../../../src/main/file/backups'
 import { nodeFs } from '../../../src/main/file/fsPort'
 import { lockPathFor, STALE_AFTER_MS } from '../../../src/main/file/lockFile'
 import { DataFileSession, type SessionDeps } from '../../../src/main/file/session'
@@ -731,7 +731,13 @@ describe('closing never throws away unsaved changes', () => {
     for (const folder of folders) {
       if (!existsSync(folder)) continue
       const hit = readdirSync(folder).find((b) => b.includes(label))
-      if (hit) return schoolNameOnDisk(join(folder, hit))
+      if (!hit) continue
+      const read = await readBackupFile(nodeFs, join(folder, hit))
+      if (!read.ok) throw new Error(`backup ${hit} could not be read`)
+      const db = await LockerDb.fromBytes(read.bytes)
+      const name = summarise(db).schoolName
+      db.close()
+      return name
     }
     return null
   }
