@@ -19,12 +19,16 @@ jobs:
     name: Lint, types, unit tests, build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # No install scripts: none are needed, and Electron downloads its own
+      # binary when the end-to-end tests first start it.
+      - run: npm ci --ignore-scripts
       - name: No student data or secrets in the repository
         run: npm run check:no-student-data
       - run: npm run lint
@@ -42,12 +46,18 @@ jobs:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      # Electron fetches its binary on first use; do it now so the download time
+      # does not count against the first end-to-end test.
+      - name: Download Electron
+        run: node -e "require('electron')"
       # File renaming, locking and crash behaviour differ by platform, so the
       # data-file tests run here as well as on Linux.
       - name: Unit, file-safety and crash tests
@@ -57,7 +67,7 @@ jobs:
         run: npm run test:e2e
       - name: Keep the Playwright report when a test fails
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: playwright-report-${{ matrix.os }}
           path: |

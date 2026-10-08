@@ -8,12 +8,13 @@ built to use these secrets the moment they exist; no code changes are needed._
 | | Unsigned (now) | Signed |
 |---|---|---|
 | Windows first install | Blue "Windows protected your PC" screen; staff click More info, Run anyway | Installs with no warning |
-| Windows updates | Install themselves | Install themselves |
+| Windows updates | Install themselves, checked only against GitHub | Install themselves; refused if the publisher differs |
 | Mac first install | "Cannot be opened"; staff use System Settings > Privacy & Security > Open Anyway | Opens normally |
-| Mac updates | App says "new version available" and opens the download page | Install themselves |
+| Mac updates | Install themselves (since 0.11.0), checked only against GitHub | Install themselves through Apple's updater, which refuses an app signed by anyone else |
 
-So signing removes the scary first-run screen on both platforms, and on the Mac it is the
-only way to get self-installing updates.
+So signing removes the scary first-run screen on both platforms, and it is the only way to
+make updates prove they came from you rather than from whoever controls the GitHub
+repository (see "GitHub settings only Dave can switch on" below).
 
 ## Costs
 
@@ -186,6 +187,164 @@ it now arrives on a hardware token, which a cloud build cannot use. Only use thi
 the authority provides a cloud signing service that can export a `.pfx`, in which case set
 `WIN_CSC_LINK` (base64 of the `.pfx`, made the same way as Part C for the Mac) and
 `WIN_CSC_KEY_PASSWORD`. The workflow prefers Azure when both are present.
+
+## GitHub settings only Dave can switch on
+
+_Written 9 October 2026, after the security review (finding H1) and v0.11.0._
+
+### Why this matters now
+
+Since v0.11.0, Windows and Mac copies both download and install updates by themselves.
+Neither build is signed yet, so the app has only one way to tell a real update from a fake
+one: the file's SHA-512 (a fingerprint of the file) listed in `latest.yml` or
+`latest-mac.yml`. Those lists sit on the same GitHub Release as the installers. Anyone who
+can change the release can change both, and the app will accept the result.
+
+So today, **whoever controls the GitHub repository controls the code running on every
+school computer that has Locker Manager**, within about four hours (the update check
+interval). That includes someone with a phished GitHub password, a leaked token from this
+Mac, or a bad npm package running inside a build. The data file with every student name
+and code is within reach of that code.
+
+The release workflow has been tightened (commit `ci: release builds can no longer change a
+release`): builds that run npm packages now get a read-only token, and only two small jobs
+can write. The settings below close the doors the workflow cannot close by itself. Do them
+in this order. Each one takes a few minutes.
+
+### 1. Immutable releases
+
+Once a release is published, nobody can replace its files, move its tag or delete its
+tag, not even you. A stolen login can still publish a new release, but cannot quietly
+swap the installer inside one that schools already trust.
+
+1. Open https://github.com/mrdavearms/locker-manager/settings (Settings tab, General).
+2. Scroll to the **Releases** section.
+3. Tick **Enable release immutability** and confirm.
+
+It applies to releases published from then on. Drafts can still be changed, which is what
+the release workflow needs: it fills the draft, checks it, then publishes it.
+
+The cost: the **Rollout percentage** workflow (staged rollout) works by replacing
+`latest.yml` and `latest-mac.yml` on a published release, so it stops working on any
+release published after this. That is the right trade while builds are unsigned. If
+staged rollout is ever needed, it would have to be set on the draft before publishing.
+
+### 2. Tag protection for `v*`
+
+A version tag starts the release. This makes sure only you can create, move or delete one.
+
+1. Open https://github.com/mrdavearms/locker-manager/settings/rules (Settings, Rules,
+   Rulesets).
+2. Click **New ruleset**, then **New tag ruleset**.
+3. **Ruleset name**: `Release tags`. **Enforcement status**: Active.
+4. **Bypass list**: click **Add bypass**, choose **Repository admin**. You are the
+   repository admin, so `scripts/release.sh` keeps working for you.
+5. **Target tags**: **Add target**, **Include by pattern**, type `v*`.
+6. Under **Rules**, tick **Restrict creations**, **Restrict updates**,
+   **Restrict deletions** and **Block force pushes**.
+7. Click **Create**.
+
+From then on, a workflow token or any account without admin rights cannot make a `v` tag.
+Your own login still can, which is why the next two steps matter.
+
+### 3. The `release` environment with you as required reviewer
+
+The workflow's **Upload, verify and publish** job and the **Rollout percentage** workflow
+both name an environment called `release`. Until the environment has a reviewer, they run
+straight through as before. With a reviewer, each one stops and waits until you approve it.
+Nothing is uploaded to the release before that point, so a tag pushed by someone else
+builds installers that go nowhere.
+
+1. Open https://github.com/mrdavearms/locker-manager/settings/environments (Settings,
+   Environments).
+2. Click **New environment**, name it exactly `release`, click **Configure environment**.
+3. Tick **Required reviewers**, type `mrdavearms` and pick yourself.
+4. Leave **Prevent self-review** unticked. You are the only maintainer and you start the
+   release yourself, so ticking it would mean nobody could ever approve.
+5. Under **Deployment branches and tags**, choose **Selected branches and tags**, then
+   **Add deployment branch or tag rule**: add a **Tag** rule `v*.*.*`, and a **Branch**
+   rule `main` (the rollout workflow is started from `main`).
+6. Click **Save protection rules**.
+
+What a release then looks like: run `scripts/release.sh` as usual. About 10 to 15 minutes
+later GitHub emails you, and the run on the Actions page shows **Review deployments**.
+Check that both build jobs are green and that the tag is one you made, tick `release`, and
+click **Approve and deploy**. The upload, the file check, the notes and publishing follow
+by themselves, then the update proof runs.
+
+If the signing secrets are added later, you can move them from repository secrets to
+**Environment secrets** on this page so only an approved job can read them. That needs the
+build jobs to name the environment too, which means one more approval per release; it is
+not set up that way now.
+
+### 4. Main branch: protect against deletion and force pushes only
+
+You commit straight to `main`, and `scripts/release.sh` pushes the version commit there.
+A ruleset that **requires a pull request** or **requires status checks** would block both,
+and as the only maintainer you cannot approve your own pull request. So do not turn those
+on. A light ruleset still helps: it stops anyone (including a stolen token) rewriting or
+deleting `main`'s history.
+
+1. Open https://github.com/mrdavearms/locker-manager/settings/rules, **New ruleset**,
+   **New branch ruleset**.
+2. **Ruleset name**: `Main`. **Enforcement status**: Active. Leave the bypass list empty.
+3. **Target branches**: **Add target**, **Include default branch**.
+4. Under **Rules**, leave **Restrict deletions** and **Block force pushes** ticked (they
+   are on by default). Untick everything else.
+5. Click **Create**.
+
+### 5. Two quick account and Actions checks
+
+- **Your GitHub login**: https://github.com/settings/security. Use a passkey or a hardware
+  security key for two-factor sign-in. A one-time code from an app can be phished; a
+  passkey cannot.
+- **Tokens**: https://github.com/settings/tokens and
+  https://github.com/settings/personal-access-tokens. Delete any you do not use. On this
+  Mac, `gh auth status` shows the token the `gh` command uses; it can do anything you can.
+- **Default workflow token**: https://github.com/mrdavearms/locker-manager/settings/actions
+  (Settings, Actions, General), under **Workflow permissions**, choose **Read repository
+  contents and packages permissions** and untick **Allow GitHub Actions to create and
+  approve pull requests**. Every workflow already asks for what it needs, so this changes
+  nothing today; it protects any workflow added later.
+
+### What these settings do not fix
+
+They make an attack harder and noisier, but your own GitHub login still has the power to
+publish an update to every school. Only code signing moves that power off GitHub:
+
+- **Windows: Azure Artifact Signing, about A$15 a month.** Once the first signed release
+  is out, electron-updater compares the publisher on each new installer with the one in
+  the installed app and refuses any other. An attacker would need the Azure account as
+  well as GitHub. After the first signed release, check that the installed app's
+  `resources\app-update.yml` has a `publisherName` line; without it the check is skipped.
+- **Mac: Apple Developer Program, about A$150 a year.** A signed copy updates through
+  Apple's own updater (Squirrel.Mac), which refuses an app signed by anyone else. The
+  app's own installer (`src/main/update/macInstaller.ts`) is then used only by older
+  unsigned copies.
+
+### What the app can and cannot check by itself
+
+Without signing, everything the app downloads comes from one place, and anyone who
+controls that place controls everything the app could check against.
+
+- **It does check now**: the SHA-512 against the release's update list (catches a broken
+  or cut-off download, not a deliberate swap); on a Mac, that the new app has the same
+  bundle identifier and the expected version, and that its ad-hoc code signature is intact
+  (again: not altered after it was built, but says nothing about who built it).
+- **It cannot check who uploaded a file.** GitHub's API does show an `uploader` for each
+  file, and with the new workflow that is always `github-actions[bot]`. But an attacker
+  with write access can run a workflow too, and every school computer asking GitHub's API
+  would share a limit of 60 requests an hour per school internet address. Not worth it.
+- **One free option that would work: sign the update list with a key that never touches
+  GitHub.** You would keep a private key on this Mac (or a hardware key), and the app
+  would carry the matching public key. At release time, after approving, you would sign
+  `latest.yml` and `latest-mac.yml` locally and upload the two small signature files. The
+  app would refuse an update whose list is not signed by your key. A GitHub break-in alone
+  could then not push an update; the attacker would also need your Mac. The cost is about
+  a day of work (Node's built-in Ed25519, a check before installing on both platforms, a
+  `sign-release` script, tests) and one extra step in every release. Losing the key means
+  shipping one release that schools install by hand. Worth doing only if signing is more
+  than a few months away.
 
 ## Removing signing
 
