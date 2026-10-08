@@ -18,7 +18,7 @@ import { registerDocumentHandlers } from './documentService'
 import { setFontDir } from './render/fonts'
 import { registerRpc } from './rpc/registry'
 import { buildMenu } from './menu'
-import { detectDeveloperIdSignature } from './signing'
+import { detectDeveloperIdSignature, detectWindowsSignature } from './signing'
 import { buildCommit } from './buildInfo'
 import { macBlocker, updateMode } from './update/policy'
 import { bundleWritable, readLastMacResult, runningBundle } from './update/macInstaller'
@@ -75,10 +75,13 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   void app.whenReady().then(async () => {
-    const signed =
-      app.isPackaged && process.platform === 'darwin'
+    const signed = !app.isPackaged
+      ? false
+      : process.platform === 'darwin'
         ? await detectDeveloperIdSignature(process.execPath)
-        : false
+        : process.platform === 'win32'
+          ? await detectWindowsSignature(process.execPath)
+          : false
     // An unsigned Mac copy replaces its own app bundle when macOS allows it (update/macInstaller.ts).
     const unsignedMac = app.isPackaged && process.platform === 'darwin' && !signed
     const bundle = unsignedMac ? runningBundle() : ''

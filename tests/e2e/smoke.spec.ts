@@ -44,6 +44,18 @@ test('About shows the version and the licence', async () => {
   await expect(l.page.getByRole('dialog')).toBeHidden()
 })
 
+test('About lists the third-party software and its licences', async () => {
+  await l.page.getByTestId('open-about').click()
+  await l.page.getByRole('button', { name: 'Third-party software' }).click()
+  const text = l.page.getByTestId('third-party-text')
+  await expect(text).toContainText(`Locker Manager ${pkg.version}: third-party software`)
+  await expect(text).toContainText('Apache License')
+  await l.page.keyboard.press('Escape')
+  await expect(l.page.getByTestId('third-party-notices')).toBeHidden()
+  await l.page.keyboard.press('Escape')
+  await expect(l.page.getByRole('dialog')).toBeHidden()
+})
+
 test('the renderer has no Node access', async () => {
   const leaked = await l.page.evaluate(() => {
     const g = globalThis as unknown as Record<string, unknown>
