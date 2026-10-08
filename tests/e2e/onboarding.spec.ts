@@ -21,10 +21,19 @@ test('the tour shows once per computer, and can be taken again from the Guide', 
   await expect(tour).toContainText('Step 2 of 6')
   await l.page.getByTestId('tour-skip').click()
   await expect(tour).toBeHidden()
-  const prefs = JSON.parse(readFileSync(join(share, 'ud', 'preferences.json'), 'utf8')) as {
-    tourSeenAt: string | null
-  }
-  expect(prefs.tourSeenAt).not.toBeNull()
+  // The app writes preferences.json after the tour closes; slow Windows runners need a moment.
+  await expect
+    .poll(() => {
+      try {
+        const prefs = JSON.parse(readFileSync(join(share, 'ud', 'preferences.json'), 'utf8')) as {
+          tourSeenAt: string | null
+        }
+        return prefs.tourSeenAt
+      } catch {
+        return null
+      }
+    })
+    .not.toBeNull()
 
   // Not again: not on reopening the file, nor after restarting the app.
   await l.page.getByRole('button', { name: 'Close file' }).click()
