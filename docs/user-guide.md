@@ -584,7 +584,9 @@ import that added students, **Give out lockers now** takes you to Allocate.
 
 **Letters print only while the file is open for editing.** Every code that is printed is
 recorded in the history with your name. If someone else is editing, wait until they close
-the file.
+the file. When you click **Print…**, the codes are recorded before the print window opens.
+If you cancel, the history notes that the letters were not printed, and the codes stay
+recorded.
 
 **Held back**: a letter is held back while its lock still needs sorting out, for example
 when it needs a new code or must be reset first. The yellow message lists them. Deal with

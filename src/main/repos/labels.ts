@@ -288,13 +288,14 @@ export function recordPrintJob(
   ctx: OperatorContext,
   kind: 'labels' | 'letters' | 'report' | 'calibration',
   lockerIds: readonly string[]
-): void {
+): string {
   const s = stamp(ctx)
+  const id = newId()
   db.run(
     `INSERT INTO print_job (id, kind, template_id, records, printed_at, printed_by, machine, created_at, updated_at, updated_by)
      VALUES ($id, $k, 'default', $r, $at, $by, $m, $at, $at, $by)`,
     {
-      $id: newId(),
+      $id: id,
       $k: kind,
       $r: JSON.stringify(lockerIds),
       $at: s.created_at,
@@ -302,4 +303,5 @@ export function recordPrintJob(
       $m: ctx.machine
     }
   )
+  return id
 }
