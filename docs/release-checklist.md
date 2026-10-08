@@ -39,8 +39,13 @@ the same number once the fault is fixed. The Update proof workflow then runs by 
 git tag v0.0.2 && git push origin v0.0.2
 ```
 
-Watch the Release workflow on the Actions page. It takes about 10 to 15 minutes. If a
-job fails, fix the cause, delete the tag and the draft release, and tag again:
+Watch the Release workflow on the Actions page. The builds take about 10 to 15 minutes.
+Once the `release` environment has you as its required reviewer (docs/signing.md, "GitHub
+settings only Dave can switch on"), the run then stops at **Upload, verify and publish**
+and GitHub emails you. Check both build jobs are green and the tag is yours, click
+**Review deployments**, tick `release`, **Approve and deploy**. Nothing is uploaded to the
+release before you approve. If a job fails, fix the cause, delete the tag and the draft
+release, and tag again:
 
 ```bash
 git tag -d v0.0.2 && git push origin :refs/tags/v0.0.2
@@ -62,7 +67,10 @@ git tag -d v0.0.2 && git push origin :refs/tags/v0.0.2
 
 ## Staged rollout (optional)
 
-To offer a release to some schools' computers first (SPEC.md 9.3):
+To offer a release to some schools' computers first (SPEC.md 9.3). This does not work on a
+release published after immutable releases are switched on (docs/signing.md), because it
+replaces the update files on a published release. The run also waits for your approval,
+like publishing.
 
 1. Publish the release as usual.
 2. On the Actions page, open **Rollout percentage**, click **Run workflow**, type the tag
