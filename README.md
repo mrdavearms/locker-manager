@@ -85,8 +85,10 @@ as a shared drive, OneDrive or SharePoint. It holds:
 
 ### Beside the data file
 
-- Backups of the file are kept in a `Locker Manager backups` folder beside it. They hold
-  everything the data file holds, including codes.
+- Backups of the file are kept in a `Locker Manager backups` folder beside it, compressed
+  (`.lockers.gz`). They hold everything the data file holds, including codes. Every save
+  is kept for a day, then one an hour for a week, then one a day for 99 days, within a
+  500 MB limit; Settings, Storage shows how far back they really reach.
 - While someone is editing, `<name>.lockers.lock` holds their name, computer name and app
   version. It is removed when they close the file.
 
@@ -95,10 +97,12 @@ as a shared drive, OneDrive or SharePoint. It holds:
 In the app's folder (Windows `%AppData%\Locker Manager\`, Mac
 `~/Library/Application Support/Locker Manager/`):
 
-- `backups`: more backups of the file, kept on each computer that has edited it. They hold
-  codes.
-- `Practice`: a full copy of the school's file, including codes, if someone used **Practise
-  on a copy**. It is replaced the next time practice starts.
+- `backups`: more compressed backups of the file, kept on each computer that has edited it.
+  They hold codes. If the app ever closes without being able to save, the unsaved changes
+  are kept as a backup named "unsaved changes at close", here and beside the data file.
+- `Practice`: a copy of the school's file, if someone used **Practise on a copy**. A copy
+  made on the computer that is editing holds the codes; a copy made on any other computer
+  has every code removed. It is replaced the next time practice starts.
 - `Demo`: the demo school (made-up students only).
 - `preferences.json`: the person's name, recently opened files and their school names,
   appearance and update choices, and whether the tour has been seen.
