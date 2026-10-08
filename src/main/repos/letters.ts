@@ -17,6 +17,7 @@ import { decryptCode, readCodeKey } from '../codes/cipher'
 import { displayGroup } from '../import/groups'
 import { compareLockerNumbers } from '../locations/lockerNumbers'
 import { defaultLetterTemplate } from '../letters/defaultTemplate'
+import { imageDataUrl } from '../render/html'
 import type { LetterImage, LetterItem, LetterSchool } from '../render/letter'
 import { parseLockerList } from './labels'
 import { getSchoolProfile, getTerms } from './school'
@@ -69,10 +70,7 @@ function listImageIds(db: LockerDb): string[] {
   return db.all<{ id: string }>('SELECT id FROM image').map((r) => r.id)
 }
 
-function toDataUrl(data: Uint8Array, mime: string): string {
-  return `data:${mime};base64,${Buffer.from(data).toString('base64')}`
-}
-
+/** The school's pictures. One whose type is not a picture type the app allows is left out. */
 export function listImages(db: LockerDb): ImageView[] {
   return db
     .all<{
@@ -83,15 +81,21 @@ export function listImages(db: LockerDb): ImageView[] {
       width: number
       height: number
     }>('SELECT id, name, mime, data, width, height FROM image ORDER BY created_at')
-    .map((r) => ({
-      id: r.id,
-      name: r.name,
-      mime: r.mime,
-      dataUrl: toDataUrl(r.data, r.mime),
-      bytes: r.data.byteLength,
-      width: r.width,
-      height: r.height
-    }))
+    .flatMap((r) => {
+      const dataUrl = imageDataUrl(r.data, r.mime)
+      if (!dataUrl) return []
+      return [
+        {
+          id: r.id,
+          name: r.name,
+          mime: r.mime,
+          dataUrl,
+          bytes: r.data.byteLength,
+          width: r.width,
+          height: r.height
+        }
+      ]
+    })
 }
 
 export function letterImages(db: LockerDb): Map<string, LetterImage> {

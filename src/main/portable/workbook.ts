@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs'
+import { LETTER_IMAGE_TYPES } from '@shared/letters'
 import { LOCK_TYPE_INFO, type LockType } from '@shared/locks'
 import { LockerDb } from '../db/db'
 import { appendAudit, newId, setMeta, type OperatorContext } from '../db/context'
@@ -294,6 +295,14 @@ export async function importWorkbook(
           .join(', ')})`
         for (const r of rows.slice(1)) {
           if (table === 'meta' && SKIP_META.has(String(r[header.indexOf('key')] ?? ''))) continue
+          // As for logos below: only picture types the app makes come back in.
+          if (
+            table === 'image' &&
+            !(LETTER_IMAGE_TYPES as readonly string[]).includes(
+              String(r[header.indexOf('mime')] ?? '')
+            )
+          )
+            continue
           const params: Record<string, string | number | Uint8Array | null> = {}
           used.forEach(([h, i], n) => {
             const col = cols.get(h)!

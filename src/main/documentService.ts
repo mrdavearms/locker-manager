@@ -18,6 +18,7 @@ import { runLetterJob } from './render/letterJob'
 import { prepareLetterChunks, prepareLetters, type PreparedLetters } from './render/prepareLetters'
 import { buildReportHtml, reportDate, reportFooter } from './render/report'
 import { pickOutputPath, stampDate, writeOutput } from './renderService'
+import { recordThenPrint } from './printFlow'
 
 // Letters and reports (SPEC.md 4.8, 4.9, 5.2, 5.4, 5.5). Every code that leaves
 // the app on paper, in a PDF or in an export is recorded in the reveal log, so
@@ -108,23 +109,40 @@ async function readyLetters(
  * Records the letters (and every code in them) BEFORE the file is written, so no
  * code ever leaves the app unrecorded. Returns why it could not, or null.
  */
-function recordLetters(p: PreparedLetters, to: 'pdf' | 'printer'): string | null {
+function recordLetters(p: PreparedLetters, to: 'pdf' | 'printer'): Recorded {
   const hasCodes = p.items.some((i) => i.code)
   const why = recordBlocked(hasCodes)
-  if (why !== undefined) return why
+  if (why !== undefined) return why === null ? { jobId: null } : { refused: why }
   const lockerIds = p.items.map((i) => i.record.lockerId)
   try {
-    fileSession().write(
+    const jobId = fileSession().write(
       { action: 'letters.printed', entity: 'print_job', after: { letters: lockerIds.length, to } },
       (db, ctx) => {
         for (const i of p.items) if (i.code) revealCode(db, ctx, i.record.lockerId, 'letter')
-        recordPrintJob(db, ctx, 'letters', lockerIds)
+        return recordPrintJob(db, ctx, 'letters', lockerIds)
       }
     )
+    return { jobId }
   } catch (error) {
-    if (hasCodes) return error instanceof Error ? error.message : String(error)
+    if (hasCodes) return { refused: error instanceof Error ? error.message : String(error) }
   }
-  return null
+  return { jobId: null }
+}
+
+/** Written or not, what came of recording a print or export. */
+type Recorded = { refused: string } | { jobId: string | null }
+
+/**
+ * The print dialog was cancelled or printing failed after the record was written.
+ * The reveal record stays (codes may have reached the print queue); the print job
+ * is removed so the letters still show as not printed, and the history says so.
+ */
+function notPrinted(kind: 'letters' | 'report', jobId: string | null): (() => void) | null {
+  if (!jobId) return null
+  return () =>
+    fileSession().write({ action: `${kind}.print_cancelled`, entity: 'print_job' }, (db) =>
+      db.run('DELETE FROM print_job WHERE id = $id', { $id: jobId })
+    )
 }
 
 /** undefined: go ahead and record. null: nothing to record. A string: refuse. */
@@ -152,12 +170,12 @@ function readyReport(
   return { ok: true, report, school }
 }
 
-function recordReport(report: BuiltReport, how: 'printed' | 'exported', to: string): string | null {
+function recordReport(report: BuiltReport, how: 'printed' | 'exported', to: string): Recorded {
   const hasCodes = report.revealedLockers.length > 0
   const why = recordBlocked(hasCodes)
-  if (why !== undefined) return why
+  if (why !== undefined) return why === null ? { jobId: null } : { refused: why }
   try {
-    fileSession().write(
+    const jobId = fileSession().write(
       {
         action: how === 'printed' ? 'report.printed' : 'report.exported',
         entity: 'print_job',
@@ -166,13 +184,14 @@ function recordReport(report: BuiltReport, how: 'printed' | 'exported', to: stri
       (db, ctx) => {
         for (const id of report.revealedLockers)
           revealCode(db, ctx, id, how === 'printed' ? 'report' : 'export')
-        if (how === 'printed') recordPrintJob(db, ctx, 'report', report.revealedLockers)
+        return how === 'printed' ? recordPrintJob(db, ctx, 'report', report.revealedLockers) : null
       }
     )
+    return { jobId }
   } catch (error) {
-    if (hasCodes) return error instanceof Error ? error.message : String(error)
+    if (hasCodes) return { refused: error instanceof Error ? error.message : String(error) }
   }
-  return null
+  return { jobId: null }
 }
 
 function fileName(report: BuiltReport, ext: string): string {
@@ -214,8 +233,8 @@ export function registerDocumentHandlers(): void {
       }
       const path = await pickOutputPath(`Locker letters ${stampDate()}.pdf`)
       if (!path) return { ok: false, cancelled: true, message: '' }
-      const refused = recordLetters(ready.p, 'pdf')
-      if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
+      const rec = recordLetters(ready.p, 'pdf')
+      if ('refused' in rec) return { ok: false, message: `${rec.refused} Nothing was saved.` }
       await writeOutput(path, bytes)
       return { ok: true, path }
     })
@@ -225,20 +244,14 @@ export function registerDocumentHandlers(): void {
     return await whileBusy('printing', async () => {
       const ready = await readyLetters(LettersJob.parse(raw), e.sender, 'printer')
       if (!ready.ok) return ready
-      const r = await printHtml(ready.p.html, {
-        widthMm: ready.p.page.width,
-        heightMm: ready.p.page.height
+      const p = ready.p
+      return await recordThenPrint({
+        record: () => {
+          const rec = recordLetters(p, 'printer')
+          return 'refused' in rec ? rec : { undo: notPrinted('letters', rec.jobId) }
+        },
+        print: () => printHtml(p.html, { widthMm: p.page.width, heightMm: p.page.height })
       })
-      if (!r.printed)
-        return {
-          ok: false,
-          cancelled: r.reason === 'cancelled',
-          message:
-            r.reason === 'cancelled' ? '' : `Printing did not finish: ${r.reason ?? 'unknown'}.`
-        }
-      const notRecorded = recordLetters(ready.p, 'printer')
-      if (notRecorded) log.warn('printed letters could not be recorded', notRecorded)
-      return { ok: true }
     })
   })
 
@@ -253,8 +266,8 @@ export function registerDocumentHandlers(): void {
       )
       const path = await pickOutputPath(fileName(ready.report, 'pdf'))
       if (!path) return { ok: false, cancelled: true, message: '' }
-      const refused = recordReport(ready.report, 'printed', 'pdf')
-      if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
+      const rec = recordReport(ready.report, 'printed', 'pdf')
+      if ('refused' in rec) return { ok: false, message: `${rec.refused} Nothing was saved.` }
       await writeOutput(path, bytes)
       return { ok: true, path }
     })
@@ -265,20 +278,18 @@ export function registerDocumentHandlers(): void {
       const ready = readyReport(ReportJob.parse(raw))
       if (!ready.ok) return ready
       const page = { school: ready.school, printedAt: new Date(), preview: false }
-      const r = await printReport(buildReportHtml(ready.report, page), {
-        landscape: ready.report.landscape,
-        footer: `${ready.school} · ${ready.report.title}${ready.report.confidential ? ' · CONFIDENTIAL' : ''} · Printed ${reportDate(page.printedAt)}`
+      const report = ready.report
+      return await recordThenPrint({
+        record: () => {
+          const rec = recordReport(report, 'printed', 'printer')
+          return 'refused' in rec ? rec : { undo: notPrinted('report', rec.jobId) }
+        },
+        print: () =>
+          printReport(buildReportHtml(report, page), {
+            landscape: report.landscape,
+            footer: `${ready.school} · ${report.title}${report.confidential ? ' · CONFIDENTIAL' : ''} · Printed ${reportDate(page.printedAt)}`
+          })
       })
-      if (!r.printed)
-        return {
-          ok: false,
-          cancelled: r.reason === 'cancelled',
-          message:
-            r.reason === 'cancelled' ? '' : `Printing did not finish: ${r.reason ?? 'unknown'}.`
-        }
-      const notRecorded = recordReport(ready.report, 'printed', 'printer')
-      if (notRecorded) log.warn('printed report could not be recorded', notRecorded)
-      return { ok: true }
     })
   })
 
@@ -298,8 +309,8 @@ export function registerDocumentHandlers(): void {
           : { name: 'Excel workbook', extension: 'xlsx' }
       )
       if (!path) return { ok: false, cancelled: true, message: '' }
-      const refused = recordReport(ready.report, 'exported', job.format)
-      if (refused) return { ok: false, message: `${refused} Nothing was saved.` }
+      const rec = recordReport(ready.report, 'exported', job.format)
+      if ('refused' in rec) return { ok: false, message: `${rec.refused} Nothing was saved.` }
       await writeOutput(path, bytes)
       return { ok: true, path }
     })

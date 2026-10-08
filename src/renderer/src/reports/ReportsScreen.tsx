@@ -220,7 +220,8 @@ export function ReportsScreen({
                 <p className="font-semibold">This shows lock codes.</p>
                 <p className="mt-1">
                   It is marked CONFIDENTIAL, and every code printed or exported is recorded with
-                  your name. Keep the paper locked away and shred it when finished.
+                  your name, before the print window opens (it stays recorded if you cancel). Keep
+                  the paper locked away and shred it when finished.
                 </p>
                 <label className="mt-3 flex items-center gap-2">
                   <input

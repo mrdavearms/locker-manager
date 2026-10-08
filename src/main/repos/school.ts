@@ -2,6 +2,7 @@ import type { SchoolProfile } from '@shared/locations'
 import { resolveTerms, type Terminology } from '@shared/terminology'
 import type { LockerDb } from '../db/db'
 import type { OperatorContext } from '../db/context'
+import { imageDataUrl } from '../render/html'
 import { setSetting } from './settings'
 
 type SchoolRow = {
@@ -25,10 +26,7 @@ function row(db: LockerDb): SchoolRow {
   return r
 }
 
-function dataUrl(bytes: Uint8Array | null, type: string | null): string | null {
-  if (!bytes || !type) return null
-  return `data:${type};base64,${Buffer.from(bytes).toString('base64')}`
-}
+const dataUrl = imageDataUrl
 
 export function getSchoolProfile(db: LockerDb): SchoolProfile {
   const r = row(db)

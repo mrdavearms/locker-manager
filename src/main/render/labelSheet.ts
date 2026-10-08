@@ -2,7 +2,7 @@ import type { LabelElement, LabelRecord, LabelTemplate, Stock } from '@shared/la
 import type { Terminology } from '@shared/terminology'
 import { fitText } from './fit'
 import { fontFaceCss, LINE_HEIGHT } from './fonts'
-import { esc, mm } from './html'
+import { esc, mm, safeImageUrl } from './html'
 import { labelPosition, labelsPerSheet } from './stocks'
 
 // Label sheets as HTML at exact millimetre geometry (SPEC.md 5.1 and 5.3). Every
@@ -65,12 +65,13 @@ function renderElement(
     fitText(text, box, { max: e.fontMax, min: e.fontMin }, weight, twoLines)
   switch (e.type) {
     case 'logo': {
-      const src =
+      const src = safeImageUrl(
         input.template.colour === 'mono'
           ? (input.logo.mono ?? input.logo.colour)
           : (input.logo.colour ?? input.logo.mono)
+      )
       return src
-        ? `<img class="el logo" src="${src}" style="left:${mm(e.x)};top:${mm(e.y)};width:${mm(e.w)};height:${mm(e.h)}" alt="">`
+        ? `<img class="el logo" src="${esc(src)}" style="left:${mm(e.x)};top:${mm(e.y)};width:${mm(e.w)};height:${mm(e.h)}" alt="">`
         : ''
     }
     case 'name': {

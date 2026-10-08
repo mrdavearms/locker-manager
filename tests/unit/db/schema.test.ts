@@ -286,3 +286,18 @@ describe('lock code status', () => {
     ).toThrow(/CHECK/)
   })
 })
+
+describe('indexes for large schools', () => {
+  it('finding a locker’s waiting code uses an index, not a read of every year’s codes', async () => {
+    const db = await freshDb()
+    const plan = db
+      .all<{ detail: string }>(
+        `EXPLAIN QUERY PLAN SELECT e.id, e.code_cipher FROM code_set_entry e JOIN code_set s ON s.id = e.code_set_id
+          WHERE s.purpose = 'year' AND s.school_year_id = 'y' AND e.locker_id = 'l' AND e.status = 'available'
+          LIMIT 1`
+      )
+      .map((r) => r.detail)
+      .join('\n')
+    expect(plan).toMatch(/code_set_entry_locker/)
+  })
+})

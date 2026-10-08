@@ -6,6 +6,8 @@ export interface FileSummaryView {
   demo: boolean
   /** A practice copy of a school's file (SPEC.md 10): it never saves back. */
   practice: boolean
+  /** A practice copy made on a computer that was not editing: it holds no codes. */
+  practiceNoCodes: boolean
   schemaVersion: number
   counts: {
     students: number

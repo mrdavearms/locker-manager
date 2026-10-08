@@ -205,6 +205,11 @@ backups, such as "Before starting 2027", are always kept.
 Click **Close file** at the bottom right, or just close the window. Your changes are saved
 and other staff can then edit.
 
+If your last changes cannot be saved as the file closes (for example the shared folder is
+not reachable, or two versions of the file are waiting to be sorted out), they are kept as a
+backup named "unsaved changes at close" and a message tells you. Open that backup under
+**Backups** to get them back.
+
 ## Find a setting
 
 At the top of **Settings**, type in **Search settings** (for example `PIN` or `labels`). Only
@@ -579,7 +584,9 @@ import that added students, **Give out lockers now** takes you to Allocate.
 
 **Letters print only while the file is open for editing.** Every code that is printed is
 recorded in the history with your name. If someone else is editing, wait until they close
-the file.
+the file. When you click **Print…**, the codes are recorded before the print window opens.
+If you cancel, the history notes that the letters were not printed, and the codes stay
+recorded.
 
 **Held back**: a letter is held back while its lock still needs sorting out, for example
 when it needs a new code or must be reset first. The yellow message lists them. Deal with
@@ -753,6 +760,10 @@ To train someone, or to try something without risk:
 A **PRACTICE** sign shows at the top. The copy lives on this computer only, and nothing done
 in it reaches your school's file. Click **Close file** to finish. Starting practice again
 makes a fresh copy.
+
+Codes stay locked on a computer that is not editing, so a practice copy made there has no
+codes. A copy made by the person editing keeps the codes, and the school's file records
+that it was made.
 
 ## Share your set-up with another school
 

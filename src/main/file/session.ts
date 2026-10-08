@@ -60,6 +60,8 @@ export interface SessionDeps {
   /** Sync copies the operator has said are not copies. */
   ignoredCopies?: (dataPath: string) => string[]
   onChange?: (state: FileState) => void
+  /** Told when closing could not save the changes (they are kept as a backup). */
+  onCloseWarning?: (message: string) => void
   saveDelayMs?: number
   heartbeatMs?: number
   pollMs?: number
@@ -589,8 +591,7 @@ export class DataFileSession {
 
   private localBackupDir(): string {
     const c = this.cur
-    const id = c ? (getMeta(c.db, 'file_id') ?? 'unknown') : 'unknown'
-    return join(this.d.localBackupRoot, id)
+    return join(this.d.localBackupRoot, safeFolderName(c ? getMeta(c.db, 'file_id') : null))
   }
 
   private async save(): Promise<void> {
@@ -1139,18 +1140,29 @@ export class DataFileSession {
   // ---------------------------------------------------------------- close
 
   /**
-   * Saves, releases the lock and closes. An unresolved conflict cannot be saved
-   * over, so this computer's version is kept as a named backup instead.
+   * Saves, releases the lock and closes. Whenever the changes cannot be saved (an
+   * unresolved conflict, a failed save, a change found on disk at the last moment, or
+   * a sync-copy comparison still open), this computer's version is kept as a named
+   * backup first, and a warning is returned and passed to `onCloseWarning`.
    */
-  async close(): Promise<void> {
+  async close(): Promise<string | null> {
     const c = this.cur
-    if (!c) return
+    if (!c) return null
     this.stopTicking()
+    let warning: string | null = null
     try {
-      if (c.conflict && c.conflict.reason !== 'copy' && c.dirty) {
-        await this.backupBytes(c.db.export(), 'unsaved changes at close').catch(() => null)
-      } else {
-        await this.flush()
+      if (c.mode === 'edit' && !c.conflict) await this.flush().catch(() => undefined)
+      if (c.mode === 'edit' && c.dirty) {
+        let where: string
+        try {
+          const partial = await this.backupBytes(c.db.export(), 'unsaved changes at close')
+          where = partial
+            ? `They were kept as a backup named "unsaved changes at close", but ${lowerFirst(partial)}`
+            : 'They were kept as a backup named "unsaved changes at close". Open Backups to get them back.'
+        } catch {
+          where = 'No backup of them could be written either.'
+        }
+        warning = `Your last changes could not be saved to the school’s file. ${where}`
       }
       if (c.mode === 'edit') await releaseLock(this.lockDeps()).catch(() => undefined)
     } finally {
@@ -1160,6 +1172,8 @@ export class DataFileSession {
       this.cur = null
       this.emit()
     }
+    if (warning) this.d.onCloseWarning?.(warning)
+    return warning
   }
 }
 
@@ -1170,6 +1184,18 @@ function holderView(info: LockInfo) {
     startedAt: info.startedAt,
     heartbeatAt: info.heartbeatAt
   }
+}
+
+const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * The file id names this computer's backup folder. It comes from the file, so only the
+ * form the app makes (a UUID from `newId`) is used as it is; anything else is hashed.
+ */
+function safeFolderName(id: string | null | undefined): string {
+  if (!id) return 'unknown'
+  if (FILE_ID.test(id)) return id
+  return `other-${sha256(new TextEncoder().encode(id)).slice(0, 32)}`
 }
 
 function lowerFirst(s: string): string {

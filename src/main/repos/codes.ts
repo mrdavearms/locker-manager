@@ -109,6 +109,32 @@ export function takenCodes(
   return out
 }
 
+/** Every code set on a lock right now, whatever the lock's status or area. */
+function codesOnLocks(db: LockerDb): Set<string> {
+  const key = codeKey(db)
+  const out = new Set<string>()
+  for (const r of db.all<{ code_cipher: Uint8Array }>(
+    'SELECT code_cipher FROM lock WHERE code_cipher IS NOT NULL'
+  )) {
+    const c = decryptCode(key, r.code_cipher)
+    if (c) out.add(c)
+  }
+  return out
+}
+
+/** Codes waiting or handed out in any code set (year sets and spare pools). */
+function codesInOtherSets(db: LockerDb): Set<string> {
+  const key = codeKey(db)
+  const out = new Set<string>()
+  for (const r of db.all<{ code_cipher: Uint8Array }>(
+    "SELECT code_cipher FROM code_set_entry WHERE status IN ('available','assigned')"
+  )) {
+    const c = decryptCode(key, r.code_cipher)
+    if (c) out.add(c)
+  }
+  return out
+}
+
 /** Codes this lock must not get again (its own history within the rule's years). */
 export function previousCodes(db: LockerDb, lockId: string, years: number, now: Date): Set<string> {
   const key = codeKey(db)
@@ -171,9 +197,12 @@ function nextCodeFor(
   const spares = db.all<{ id: string; code_cipher: Uint8Array; code_length: number }>(
     "SELECT e.id, e.code_cipher, e.code_length FROM code_set_entry e JOIN code_set s ON s.id = e.code_set_id WHERE s.purpose = 'spares' AND e.status = 'available' ORDER BY e.rowid LIMIT 200"
   )
+  // A spare that matches a code on any lock is skipped: whoever got it would know a
+  // classmate's code. Older files can hold such spares.
+  const onLocks = spares.length > 0 ? codesOnLocks(db) : new Set<string>()
   for (const sp of spares) {
     const c = decryptCode(key, sp.code_cipher)
-    if (fits(c)) return { code: c, entryId: sp.id }
+    if (fits(c) && !onLocks.has(c)) return { code: c, entryId: sp.id }
   }
   const [code] = generateCodes(1, rules, source, {
     taken: takenCodes(db, rules.uniqueness, areaOfLock(db, lock.id)),
@@ -416,11 +445,18 @@ export function generateYearSet(
   const source = input.seed ? seededSource(input.seed) : secureSource
   const avoid = lockers.map((l) => previousCodes(db, l.lock_id, rules.historyYears, ctx.now()))
   const taken = takenCodes(db, rules.uniqueness)
+  // Spares can be handed out at any time, so they must never be a code on a lock now,
+  // nor one waiting in another set, whatever the uniqueness rule says.
+  const notForSpares = new Set([...taken, ...codesOnLocks(db), ...codesInOtherSets(db)])
   // This year's codes on the locks do not block next year's set; only other sets do.
   for (const a of avoid) for (const c of a) taken.delete(c)
   const { count } = countValidCodes(rules)
   const total = lockers.length + rules.sparePoolSize
-  const codes = generateCodes(total, rules, source, { taken, avoidPerSlot: avoid })
+  const avoidPerSlot = [
+    ...avoid,
+    ...Array.from({ length: rules.sparePoolSize }, () => notForSpares)
+  ]
+  const codes = generateCodes(total, rules, source, { taken, avoidPerSlot })
   const key = codeKey(db)
   const s = stamp(ctx)
   const insertSet = (purpose: 'year' | 'spares', name: string): string => {
