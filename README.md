@@ -14,8 +14,8 @@ follows once a school has checked printing on real label sheets and printers.
 Get the newest installer from the **[Releases page](https://github.com/mrdavearms/locker-manager/releases)**:
 `Locker-Manager-Setup-<version>.exe` for Windows, `Locker-Manager-<version>-universal.dmg`
 for Mac. Every release page carries the exact first-time steps for the one-off security
-warning on each platform. Once installed, the app updates itself (on a Mac it tells you and
-opens the download page, until the app is signed by Apple).
+warning on each platform. Once installed, the app updates itself on Windows and on a Mac
+(on a Mac, keep it in the Applications folder).
 
 ## What it does
 

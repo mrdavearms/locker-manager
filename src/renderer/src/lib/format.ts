@@ -31,6 +31,13 @@ export function formatWhen(iso: string | null | undefined, now = new Date()): st
   return `${date.format(d)}, ${t}`
 }
 
+/** Always the full date and time: "9 Oct 2026, 6:56 am". */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'unknown'
+  return `${date.format(d)}, ${formatTime(iso)}`
+}
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} bytes`
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
@@ -39,4 +46,11 @@ export function formatBytes(n: number): string {
 
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n.toLocaleString('en-AU')} ${n === 1 ? one : many}`
+}
+
+/** "Version 0.10.0 · ae0f6f8 · built 9 Oct 2026": which build this copy is, at a glance. */
+export function versionLine(info: { version: string; commit: string; builtAt: string }): string {
+  const built = new Date(info.builtAt)
+  const when = Number.isNaN(built.getTime()) ? 'unknown date' : date.format(built)
+  return `Version ${info.version} · ${info.commit} · built ${when}`
 }

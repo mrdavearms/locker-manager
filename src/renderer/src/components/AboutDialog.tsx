@@ -1,4 +1,5 @@
 import type { AppInfo } from '@shared/ipc'
+import { formatDateTime } from '@renderer/lib/format'
 import { Button } from './Button'
 import { LockerMark } from './LockerMark'
 import { Modal } from './Modal'
@@ -24,6 +25,12 @@ export function AboutDialog({ open, onOpenChange, info }: Props): React.JSX.Elem
           <dd data-testid="about-version" className="font-mono">
             {info?.version ?? '…'}
           </dd>
+          <dt className="text-ink-muted">Build</dt>
+          <dd data-testid="about-build" className="font-mono">
+            {info?.commit ?? '…'}
+          </dd>
+          <dt className="text-ink-muted">Built on</dt>
+          <dd data-testid="about-built">{info ? formatDateTime(info.builtAt) : '…'}</dd>
           <dt className="text-ink-muted">Licence</dt>
           <dd>{info?.licence ?? '…'}</dd>
           <dt className="text-ink-muted">Platform</dt>

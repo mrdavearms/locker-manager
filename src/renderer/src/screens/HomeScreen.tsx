@@ -4,6 +4,7 @@ import { Banner } from '@renderer/components/Banner'
 import { ReadOnlyBanner } from '@renderer/components/ReadOnlyBanner'
 import { Button } from '@renderer/components/Button'
 import { DemoBadge } from '@renderer/components/DemoBadge'
+import { VersionLabel } from '@renderer/components/VersionLabel'
 import { TaskGrid } from '@renderer/components/TaskGrid'
 import { ProblemsPanel } from '@renderer/components/ProblemsPanel'
 import { GettingStarted } from '@renderer/onboarding/GettingStarted'
@@ -116,9 +117,12 @@ export function HomeScreen({
           aria-hidden
         />
         <div className="relative">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] opacity-75">
-            Your school
-          </p>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] opacity-75">
+              Your school
+            </p>
+            <VersionLabel className="text-xs opacity-75" />
+          </div>
           <div className="mt-1.5">
             <SchoolName key={state.summary.schoolName} state={state} onError={onError} />
           </div>

@@ -24,7 +24,7 @@ Locker Manager is free and open source, and is not yet registered with Apple or 
 3. Open **System Settings**, then **Privacy & Security**, scroll to the bottom and click **Open Anyway**, then **Open Anyway** again.
 4. You only do this once. After that, open it like any other app.
 
-On a Mac, until the app is signed with an Apple certificate, it tells you when a new version is out and opens this download page; you install the new version over the old one. On Windows, updates install themselves.
+Updates install themselves on Windows and on a Mac. On a Mac this needs the app to be in your Applications folder and your account to be allowed to change it; otherwise the app tells you when a new version is out and opens this download page, and you install the new version over the old one. Copies older than 0.11.0 on a Mac cannot update themselves yet: install 0.11.0 or later from this page once, and from then on it updates itself.
 
 ## What's new in {{VERSION}}
 

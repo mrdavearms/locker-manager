@@ -35,6 +35,7 @@ import { exportWorkbook, importWorkbook } from './portable/workbook'
 import { exportSettings, importSettings, parseSettingsFile } from './portable/settingsFile'
 import { readManaged } from './managed'
 import { codesLocked, noteOpenFile } from './privacy'
+import { noteFileOpened } from './update/updater'
 import { pickOutputPath, saveOutput, stampDate, writeOutput } from './renderService'
 import { createDemoDatabase } from './demo/demoSchool'
 import { nodeFs } from './file/fsPort'
@@ -64,6 +65,7 @@ let recordedRecent = ''
 
 function broadcast(state: FileState): void {
   noteOpenFile(state.status === 'open' ? state.path : null)
+  if (state.status === 'open') noteFileOpened()
   // Keep the recent-files list showing the school's current name.
   if (state.status === 'open' && !state.summary.demo && !state.summary.practice) {
     const key = `${state.path}|${state.summary.schoolName}`

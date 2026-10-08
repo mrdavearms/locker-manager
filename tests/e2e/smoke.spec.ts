@@ -26,10 +26,19 @@ test('the version from package.json is shown', async () => {
   await expect(l.page.getByTestId('version-line')).toContainText(`Version ${pkg.version}`)
 })
 
+test('Welcome shows the version, build and build date', async () => {
+  await expect(l.page.getByTestId('version-line')).toContainText(
+    new RegExp(
+      `^Version ${pkg.version.replace(/\./g, '\\.')} · ([0-9a-f]{7}|unknown) · built \\d{1,2} \\w{3} \\d{4}`
+    )
+  )
+})
+
 test('About shows the version and the licence', async () => {
   await l.page.getByTestId('open-about').click()
   await expect(l.page.getByRole('dialog')).toBeVisible()
   await expect(l.page.getByTestId('about-version')).toHaveText(pkg.version)
+  await expect(l.page.getByTestId('about-build')).toHaveText(/^([0-9a-f]{7}|unknown)$/)
   await expect(l.page.getByRole('dialog')).toContainText('MIT')
   await l.page.keyboard.press('Escape')
   await expect(l.page.getByRole('dialog')).toBeHidden()

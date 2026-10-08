@@ -6,7 +6,11 @@ import {
   isDeveloperIdSigned,
   isNewer,
   releasePageUrl,
-  updateMode
+  updateMode,
+  macBlocker,
+  macZipFile,
+  releaseFileUrl,
+  installAtStartup
 } from '../../src/main/update/policy'
 
 describe('allowPrerelease', () => {
@@ -84,6 +88,16 @@ describe('updateMode', () => {
   it('installs on a signed Mac', () => {
     expect(updateMode({ platform: 'darwin', packaged: true, signed: true })).toBe('auto')
   })
+  it('installs itself on an unsigned Mac that can replace its own app', () => {
+    expect(
+      updateMode({ platform: 'darwin', packaged: true, signed: false, macBlocker: null })
+    ).toBe('auto')
+  })
+  it('only notifies on an unsigned Mac that cannot replace its own app', () => {
+    expect(
+      updateMode({ platform: 'darwin', packaged: true, signed: false, macBlocker: 'no' })
+    ).toBe('manual-download')
+  })
   it('installs on Windows even unsigned', () => {
     expect(updateMode({ platform: 'win32', packaged: true, signed: false })).toBe('auto')
   })
@@ -124,5 +138,80 @@ describe('whileBusy', () => {
     release()
     await slow
     expect(getBusyState().printing).toBe(false)
+  })
+})
+
+describe('macBlocker', () => {
+  const app = '/Applications/Locker Manager.app'
+  it('allows a writable copy in Applications', () => {
+    expect(macBlocker(app, true)).toBeNull()
+    expect(macBlocker('/Users/kim/Applications/Locker Manager.app', true)).toBeNull()
+  })
+  it('refuses when the account cannot change Applications', () => {
+    expect(macBlocker(app, false)).toMatch(/not allowed to change the Applications folder/)
+  })
+  it('refuses a copy macOS is running from a translocated folder', () => {
+    expect(
+      macBlocker('/private/var/folders/x/T/AppTranslocation/ABC/d/Locker Manager.app', true)
+    ).toMatch(/drag Locker Manager into Applications/)
+  })
+  it('refuses a copy running from the disk image', () => {
+    expect(macBlocker('/Volumes/Locker Manager 1.0.0/Locker Manager.app', true)).toMatch(
+      /disk image/
+    )
+  })
+  it('refuses a path that is not an app bundle', () => {
+    expect(macBlocker('/usr/local/bin', true)).not.toBeNull()
+  })
+})
+
+describe('macZipFile', () => {
+  it('picks the universal ZIP over the DMG', () => {
+    const files = [
+      { url: 'Locker-Manager-1.0.0-universal.dmg' },
+      { url: 'Locker-Manager-1.0.0-universal.zip' }
+    ]
+    expect(macZipFile(files)?.url).toBe('Locker-Manager-1.0.0-universal.zip')
+  })
+  it('finds nothing when there is no ZIP', () => {
+    expect(macZipFile([{ url: 'Locker-Manager-1.0.0-universal.dmg' }])).toBeUndefined()
+  })
+})
+
+describe('releaseFileUrl', () => {
+  it('builds the download address from the file name', () => {
+    expect(
+      releaseFileUrl(
+        'https://github.com/mrdavearms/locker-manager',
+        '1.0.0',
+        'Locker-Manager-1.0.0-universal.zip'
+      )
+    ).toBe(
+      'https://github.com/mrdavearms/locker-manager/releases/download/v1.0.0/Locker-Manager-1.0.0-universal.zip'
+    )
+  })
+  it('keeps a full address as it is', () => {
+    expect(releaseFileUrl('https://github.com/x/y', '1.0.0', 'https://example.org/a.zip')).toBe(
+      'https://example.org/a.zip'
+    )
+  })
+})
+
+describe('installAtStartup', () => {
+  it('installs when found at start, before any file is opened', () => {
+    expect(installAtStartup({ startup: true, fileOpenedSinceLaunch: false, skipped: false })).toBe(
+      true
+    )
+  })
+  it('waits once a file has been opened, Skip was pressed, or it is a later check', () => {
+    expect(installAtStartup({ startup: true, fileOpenedSinceLaunch: true, skipped: false })).toBe(
+      false
+    )
+    expect(installAtStartup({ startup: true, fileOpenedSinceLaunch: false, skipped: true })).toBe(
+      false
+    )
+    expect(installAtStartup({ startup: false, fileOpenedSinceLaunch: false, skipped: false })).toBe(
+      false
+    )
   })
 })

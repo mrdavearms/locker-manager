@@ -19,7 +19,9 @@ import { setFontDir } from './render/fonts'
 import { registerRpc } from './rpc/registry'
 import { buildMenu } from './menu'
 import { detectDeveloperIdSignature } from './signing'
-import { updateMode } from './update/policy'
+import { buildCommit } from './buildInfo'
+import { macBlocker, updateMode } from './update/policy'
+import { bundleWritable, readLastMacResult, runningBundle } from './update/macInstaller'
 import { setupUpdater } from './update/updater'
 import { initComputer, registerComputerHandlers, updatePrefs } from './computerService'
 import { createMainWindow, installContentSecurityPolicy } from './window'
@@ -77,9 +79,19 @@ if (!app.requestSingleInstanceLock()) {
       app.isPackaged && process.platform === 'darwin'
         ? await detectDeveloperIdSignature(process.execPath)
         : false
-    const mode = updateMode({ platform: process.platform, packaged: app.isPackaged, signed })
+    // An unsigned Mac copy replaces its own app bundle when macOS allows it (update/macInstaller.ts).
+    const unsignedMac = app.isPackaged && process.platform === 'darwin' && !signed
+    const bundle = unsignedMac ? runningBundle() : ''
+    const blocker = unsignedMac ? macBlocker(bundle, await bundleWritable(bundle)) : null
+    const mode = updateMode({
+      platform: process.platform,
+      packaged: app.isPackaged,
+      signed,
+      macBlocker: blocker
+    })
     log.info(
-      `${brand.name} ${app.getVersion()} starting; platform=${process.platform} signed=${signed} updates=${mode}`
+      `${brand.name} ${app.getVersion()} starting; build=${buildCommit} platform=${process.platform} signed=${signed} updates=${mode}` +
+        (unsignedMac ? ` mac-self-install=${blocker === null ? 'yes' : 'no'}` : '')
     )
 
     // Fonts for labels and letters: beside the app when packaged, in the project in development.
@@ -97,7 +109,12 @@ if (!app.requestSingleInstanceLock()) {
     registerDocumentHandlers()
     initComputer()
     registerComputerHandlers()
-    setupUpdater(mode, updatePrefs())
+    setupUpdater(mode, updatePrefs(), {
+      macSelfInstall: unsignedMac && blocker === null,
+      manualReason: blocker ?? undefined,
+      lastMacResult: unsignedMac ? await readLastMacResult() : null,
+      closeFile: () => fileSession().close()
+    })
     buildMenu()
     if (await noteStartAttempt(preferences())) {
       showRecovery(preferences())

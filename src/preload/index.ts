@@ -42,6 +42,7 @@ const api = {
   checkForUpdates: (): Promise<void> => ipcRenderer.invoke(channels.updateCheck),
   installUpdate: (): Promise<InstallResult> => ipcRenderer.invoke(channels.updateInstall),
   openDownloadPage: (): Promise<void> => ipcRenderer.invoke(channels.updateOpenDownloadPage),
+  skipStartupUpdate: (): Promise<void> => ipcRenderer.invoke(channels.updateSkipStartup),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke(channels.shellOpenExternal, { url }),
   onUpdateStatus: (listener: (status: UpdateStatus) => void) =>

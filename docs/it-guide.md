@@ -34,15 +34,26 @@ Applications. The app is ad-hoc signed and not notarised, so Gatekeeper blocks t
 launch: the user opens it once, then System Settings > Privacy & Security > **Open Anyway**.
 For managed Macs, an MDM profile that allows the bundle identifier
 `au.com.dandsarmstrong.lockermanager` avoids the prompt. Once an Apple Developer ID
-signature is in place the prompt disappears and Mac updates install themselves.
+signature is in place the prompt disappears.
 
 ## Updates
 
-- The app checks https://github.com/mrdavearms/locker-manager/releases 30 seconds after
+- The app checks https://github.com/mrdavearms/locker-manager/releases 3 seconds after
   launch and every 4 hours, and on demand from Help > Check for updates.
-- Windows: the update downloads in the background and installs when the user restarts the
-  app or closes it. The installed copy is replaced in place; data is untouched.
-- macOS: while unsigned, the app only reports the new version and opens the download page.
+- An update found at launch, before the user opens a data file, downloads and installs
+  straight away and the app restarts into it. The user can press Skip for now. An update
+  found later downloads in the background and installs when the user restarts or closes
+  the app. The app never restarts during a save, print or import.
+- Windows: the installed copy is replaced in place by the NSIS installer; data is untouched.
+- macOS: Squirrel.Mac (the usual Electron Mac updater) refuses unsigned builds, so the app
+  installs its own updates. It downloads the universal ZIP, checks its SHA-512 against
+  `latest-mac.yml`, unpacks it with `ditto`, checks the bundle identifier, version and code
+  signature, and after quitting swaps the app bundle with two renames, putting the old one
+  back if anything fails. It needs write access to the folder holding the app (usually
+  /Applications). Where the user cannot write there, or runs the app from the disk image or
+  a translocated copy, the app reports the new version and opens the download page instead.
+  On managed Macs, either give users write access to the app, or deploy updates yourself
+  and set `autoUpdate` to `false`.
 - A failed check (proxy, firewall, offline) is logged and never shown, unless the user
   asked for the check by hand.
 - Versions below 1.0.0 are pre-releases and accept pre-release updates. From 1.0.0 the app

@@ -25,6 +25,8 @@ describe('IPC schemas', () => {
     const ok = AppInfoSchema.safeParse({
       name: 'Locker Manager',
       version: '0.0.1',
+      commit: 'ae0f6f8',
+      builtAt: '2026-10-09T06:00:00.000Z',
       platform: 'win32',
       arch: 'x64',
       packaged: true,

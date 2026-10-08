@@ -3,7 +3,7 @@
 This guide is for school office staff and year level leaders. Each section is one task.
 The same guide is inside the app: click **Guide** at the top.
 
-_Last updated: 7 October 2026 (after version 0.10.0)._
+_Last updated: 9 October 2026 (after version 0.10.0)._
 
 ## Getting started
 
@@ -51,24 +51,39 @@ any task, and click **Show me** to go to the right screen.
 
 ## Updates
 
-You do not need to do anything. Thirty seconds after Locker Manager opens, and every four
-hours, it checks for a newer version.
+You do not need to do anything. A few seconds after Locker Manager opens, and every four
+hours, it checks for a newer version. It updates itself on Windows and on a Mac.
 
-On Windows the new version downloads in the background. A green bar appears saying it is
-ready. Click **Restart and update**, or just close the app when you finish and it updates
-then.
+If it finds a new version when it opens, before you have opened your school's file, it
+downloads it straight away and restarts into the new version by itself. A blue bar shows
+the download. Click **Skip for now** if you need to start work at once; the update then
+installs when you next close the app.
 
-On a Mac a blue bar appears saying a new version is available, with an **Open the download
-page** button. Download the new version and install it exactly as above. Your settings and
-data are kept. (Once the app is registered with Apple, Mac updates will install themselves
-too.)
+If it finds a new version while you are working, it downloads in the background. A green
+bar appears saying it is ready. Click **Restart and update**, or just close the app when you
+finish and it updates then. It never restarts in the middle of a save, a print or an
+import, and your changes are saved first.
+
+On a Mac the app can only replace itself when it lives in your **Applications** folder and
+your Mac account is allowed to change that folder. If not, the blue bar says why and offers
+**Open the download page**. Download the new version and install it exactly as above. Your
+settings and data are kept. The most common fix is to drag Locker Manager into
+Applications once and open it from there.
 
 To check by hand, open the **Help** menu (on a Mac, the **Locker Manager** menu) and choose
 **Check for updates**.
 
 ## Find out which version you have
 
-Click **About** at the top right of the Home screen. The version number is the first line.
+The version shows in three places:
+
+- at the top right of the Home screen,
+- in the bar along the bottom of the window (in a wide window),
+- under the welcome screen, before a file is open.
+
+It reads like **Version 0.11.0 · 3f2c1ab · built 9 Oct 2026**. The short code after the
+version (here 3f2c1ab) names the exact build. If you report a problem, quote the whole line.
+**About** at the top right gives the same details, with the time of the build.
 
 ## Tell the app who you are
 

@@ -51,14 +51,17 @@ export function UpdateBanner({ status }: Props): React.JSX.Element | null {
           <span className="flex-1">
             Version {status.version} is available.
             {status.mode === 'manual-download'
-              ? ' This copy cannot update itself yet, so download the new version from the download page and install it over the top.'
-              : ' It is downloading in the background.'}
+              ? ` ${status.manualReason ?? 'This copy cannot update itself, so download the new version from the download page and install it over the top.'}`
+              : status.atStartup
+                ? ' Downloading it now. Locker Manager restarts by itself when it is ready.'
+                : ' It is downloading in the background.'}
           </span>
           {status.mode === 'manual-download' && (
             <Button size="sm" onClick={() => void window.api.openDownloadPage()}>
               Open the download page
             </Button>
           )}
+          {status.atStartup && <SkipButton />}
         </div>
       )
     case 'downloading':
@@ -67,13 +70,25 @@ export function UpdateBanner({ status }: Props): React.JSX.Element | null {
           <Loader2 className="animate-spin" size={18} />
           <span className="flex-1">
             Downloading version {status.version}… {status.percent}%
+            {status.atStartup ? ' Locker Manager restarts by itself when it is ready.' : ''}
           </span>
           <div className="h-2 w-40 overflow-hidden rounded-full bg-surface-muted" aria-hidden>
             <div className="h-full bg-brand" style={{ width: `${status.percent}%` }} />
           </div>
+          {status.atStartup && <SkipButton />}
         </div>
       )
     case 'ready':
+      if (status.atStartup) {
+        return (
+          <div role="status" className={tone('good')} data-testid="update-banner">
+            <Loader2 className="animate-spin" size={18} />
+            <span className="flex-1">
+              Restarting to finish installing version {status.version}…
+            </span>
+          </div>
+        )
+      }
       return (
         <div role="status" className={tone('good')} data-testid="update-banner">
           <RefreshCw size={18} />
@@ -99,4 +114,18 @@ export function UpdateBanner({ status }: Props): React.JSX.Element | null {
         </div>
       )
   }
+}
+
+/** Carry on now; the update still downloads and installs when the app next closes. */
+function SkipButton(): React.JSX.Element {
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      title="Keep working now. The update installs when you next close Locker Manager."
+      onClick={() => void window.api.skipStartupUpdate()}
+    >
+      Skip for now
+    </Button>
+  )
 }

@@ -6,6 +6,7 @@ export const channels = {
   updateCheck: 'update:check',
   updateInstall: 'update:install',
   updateOpenDownloadPage: 'update:openDownloadPage',
+  updateSkipStartup: 'update:skipStartup',
   shellOpenExternal: 'shell:openExternal',
   operatorGet: 'operator:get',
   operatorSet: 'operator:set',

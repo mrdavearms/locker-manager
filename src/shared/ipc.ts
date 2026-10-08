@@ -8,6 +8,10 @@ export { channels } from './channels'
 export const AppInfoSchema = z.object({
   name: z.string(),
   version: z.string(),
+  /** Short Git commit the build was made from, for example "ae0f6f8". */
+  commit: z.string(),
+  /** When the build was made (ISO 8601). */
+  builtAt: z.string(),
   platform: z.enum(['darwin', 'win32', 'linux']),
   arch: z.string(),
   packaged: z.boolean(),
@@ -24,9 +28,9 @@ export type AppInfo = z.infer<typeof AppInfoSchema>
 
 /** How this install receives updates. */
 export const UpdateModeSchema = z.enum([
-  /** Download in the background and install on restart (Windows, and macOS once signed). */
+  /** Download in the background and install on restart (Windows, and macOS where the app can replace itself). */
   'auto',
-  /** Only tell the operator and open the download page (unsigned macOS). */
+  /** Only tell the operator and open the download page (a Mac copy that cannot replace itself). */
   'manual-download',
   /** Development build: no updates. */
   'disabled'
@@ -48,19 +52,25 @@ export const UpdateStatusSchema = z.discriminatedUnion('state', [
     version: z.string(),
     releaseNotes: z.string().optional(),
     releaseDate: z.string().optional(),
-    downloadPageUrl: z.string().url()
+    downloadPageUrl: z.string().url(),
+    /** Why this copy cannot install it by itself (shown with the download button). */
+    manualReason: z.string().optional(),
+    /** Found when the app started, before any file was opened: it installs straight away. */
+    atStartup: z.boolean().optional()
   }),
   z.object({
     state: z.literal('downloading'),
     mode: UpdateModeSchema,
     version: z.string(),
-    percent: z.number().min(0).max(100)
+    percent: z.number().min(0).max(100),
+    atStartup: z.boolean().optional()
   }),
   z.object({
     state: z.literal('ready'),
     mode: UpdateModeSchema,
     version: z.string(),
-    releaseNotes: z.string().optional()
+    releaseNotes: z.string().optional(),
+    atStartup: z.boolean().optional()
   }),
   z.object({
     state: z.literal('error'),

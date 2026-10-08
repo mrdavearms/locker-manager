@@ -52,10 +52,10 @@ git tag -d v0.0.2 && git push origin :refs/tags/v0.0.2
 
 1. Open https://github.com/mrdavearms/locker-manager/releases and read the notes as a
    school office worker would.
-2. On a Windows PC with the previous version installed: open the app, wait 30 seconds,
-   and confirm it reports the new version, downloads it, and installs on restart.
-3. On a Mac with the previous version installed: confirm it reports the new version and
-   that "Open the download page" opens this release (until signing exists).
+2. On a Windows PC with the previous version installed: open the app and do not open a
+   file. Confirm it reports the new version, downloads it and restarts into it by itself.
+3. On a Mac with the previous version (0.11.0 or later) in Applications: the same as
+   Windows. A Mac copy of 0.10.0 or older only offers the download page.
 4. From M5 onwards, before any minor release: print one real label sheet on a laser
    printer and check it against the calibration page.
 5. Note anything learned in CLAUDE.md.

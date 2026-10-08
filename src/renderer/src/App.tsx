@@ -23,6 +23,7 @@ import { UpdateBanner } from './components/UpdateBanner'
 import { ImportWizard } from './import/ImportWizard'
 import { AppContextProvider } from './lib/appContext'
 import { useAppInfo } from './lib/useAppInfo'
+import { versionLine } from './lib/format'
 import { useFileState } from './lib/useFileState'
 import { useUpdateStatus } from './lib/useUpdateStatus'
 import { useComputer } from './lib/useComputer'
@@ -418,9 +419,9 @@ export function App(): React.JSX.Element {
                     managed={computer?.managed}
                   />
                 )}
-                {info && (
+                {info && !open && (
                   <p className="pb-6 text-center text-xs text-ink-muted" data-testid="version-line">
-                    Version {info.version}
+                    {versionLine(info)}
                     {info.signed ? '' : ' · unsigned build'} · Free and open source · Your data
                     never leaves your school
                   </p>

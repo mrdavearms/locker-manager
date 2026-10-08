@@ -2,6 +2,7 @@ import { Archive, Eye, FolderOpen, PencilLine, X } from 'lucide-react'
 import type { OpenFileState } from '@renderer/lib/useFileState'
 import { formatWhen } from '@renderer/lib/format'
 import { cn } from '@renderer/lib/cn'
+import { VersionLabel } from './VersionLabel'
 
 interface Props {
   state: OpenFileState
@@ -50,6 +51,7 @@ export function StatusBar({ state, onBackups, onClose }: Props): React.JSX.Eleme
         <span className="hidden shrink-0 text-ink-muted tabular-nums lg:inline">
           {state.lastBackupAt ? `Last backup ${formatWhen(state.lastBackupAt)}` : 'No backups yet'}
         </span>
+        <VersionLabel className="hidden shrink-0 text-xs text-ink-muted xl:inline" />
         <span className="ml-auto flex shrink-0 items-center gap-1">
           <button
             className={barButton}

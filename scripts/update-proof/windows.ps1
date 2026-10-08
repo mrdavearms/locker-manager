@@ -26,16 +26,25 @@ $v = Installed-Version
 Write-Host "Installed version: $v"
 if ($v -ne $prev) { throw "Expected $prev to be installed, found $v" }
 
-Write-Host "Starting $prev; it checks for updates 30 seconds after launch"
+Write-Host "Starting $prev; it checks for updates soon after launch"
 if (Test-Path $log) { Remove-Item $log }
 Start-Process -FilePath $exe
 Wait-For { (Test-Path $log) -and (Select-String -Path $log -Pattern "has been downloaded" -Quiet) } 600 "version $new to download"
 Select-String -Path $log -Pattern "Found version|has been downloaded" | ForEach-Object { Write-Host $_.Line }
 
-Write-Host 'Closing the app normally; the update installs on quit'
-taskkill /IM "Locker Manager.exe" | Out-Null
+if (Select-String -Path $log -Pattern 'restarting to install it' -Quiet) {
+  # Since 0.11 an update found at start-up, before any file is open, installs straight away.
+  Write-Host 'The app is restarting by itself to install the update'
+  Wait-For { (Installed-Version) -eq $new } 300 "the installed version to become $new"
+  Start-Sleep -Seconds 10
+  taskkill /IM "Locker Manager.exe" 2>$null | Out-Null
+} else {
+  Write-Host 'Closing the app normally; the update installs on quit'
+  taskkill /IM "Locker Manager.exe" | Out-Null
+  Wait-For { -not (Get-Process -Name 'Locker Manager' -ErrorAction SilentlyContinue) } 60 'the app to close'
+  Wait-For { (Installed-Version) -eq $new } 300 "the installed version to become $new"
+}
 Wait-For { -not (Get-Process -Name 'Locker Manager' -ErrorAction SilentlyContinue) } 60 'the app to close'
-Wait-For { (Installed-Version) -eq $new } 300 "the installed version to become $new"
 
 Write-Host "Starting $new to check it runs"
 Remove-Item $log -ErrorAction SilentlyContinue
