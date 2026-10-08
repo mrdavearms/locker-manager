@@ -13,10 +13,14 @@ files:
   - out/**
   - package.json
   - '!**/*.map'
+  - '!out/notices/**'
 asar: true
 extraResources:
   - from: resources/fonts
     to: fonts
+  # Made by scripts/third-party-notices.mjs during `npm run build`; About opens it.
+  - from: out/notices/THIRD-PARTY-NOTICES.txt
+    to: THIRD-PARTY-NOTICES.txt
 
 # Draft first; the release workflow verifies every asset, then publishes.
 publish:
@@ -46,6 +50,11 @@ mac:
   hardenedRuntime: true
   entitlements: resources/build/entitlements.mac.plist
   entitlementsInherit: resources/build/entitlements.mac.plist
+  # electron-builder deletes Electron's LICENSE and LICENSES.chromium.html from a Mac
+  # app (Windows keeps them beside Locker Manager.exe), so put them back as resources.
+  extraResources:
+    - from: node_modules/electron/dist/LICENSES.chromium.html
+      to: LICENSES.chromium.html
   # mac.identity is set on the command line by the release workflow:
   #   "-"  (ad-hoc) when there is no certificate, so Apple silicon does not call the app damaged;
   #   unset when CSC_LINK is present, so electron-builder finds the Developer ID certificate.

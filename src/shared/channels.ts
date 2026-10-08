@@ -8,6 +8,8 @@ export const channels = {
   updateOpenDownloadPage: 'update:openDownloadPage',
   updateSkipStartup: 'update:skipStartup',
   shellOpenExternal: 'shell:openExternal',
+  appNotices: 'app:notices',
+  appOpenChromiumLicences: 'app:openChromiumLicences',
   operatorGet: 'operator:get',
   operatorSet: 'operator:set',
   fileGetState: 'file:getState',

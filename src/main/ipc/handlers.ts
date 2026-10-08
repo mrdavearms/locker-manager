@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { app, ipcMain, shell } from 'electron'
 import log from 'electron-log/main'
 import { brand } from '@shared/brand'
@@ -5,6 +6,7 @@ import { isAllowedExternalUrl } from '@shared/externalUrls'
 import { AppInfoSchema, channels, OpenExternalSchema, type AppInfo } from '@shared/ipc'
 import { buildCommit, buildDate } from '../buildInfo'
 import { fileSession } from '../fileService'
+import { chromiumLicencesPath, noticesPath, type NoticePlaces } from '../notices'
 import {
   checkForUpdates,
   getUpdateStatus,
@@ -31,6 +33,29 @@ export function registerIpcHandlers(signed: boolean): void {
       repoUrl: brand.repoUrl,
       releasesUrl: brand.releasesUrl
     })
+  })
+
+  const places = (): NoticePlaces => ({
+    packaged: app.isPackaged,
+    platform: process.platform,
+    resourcesPath: process.resourcesPath,
+    execPath: process.execPath,
+    appPath: app.getAppPath()
+  })
+  // Third-party software (About): the notices text, read-only in the window.
+  ipcMain.handle(channels.appNotices, async (): Promise<{ text: string | null }> => {
+    try {
+      return { text: await readFile(noticesPath(places()), 'utf8') }
+    } catch (error) {
+      log.warn('third-party notices not found', String(error))
+      return { text: null }
+    }
+  })
+  // Chromium's licences are a 20 MB web page, so they open in the default browser.
+  ipcMain.handle(channels.appOpenChromiumLicences, async (): Promise<{ ok: boolean }> => {
+    const problem = await shell.openPath(chromiumLicencesPath(places()))
+    if (problem) log.warn('could not open Chromium licences', problem)
+    return { ok: problem === '' }
   })
 
   ipcMain.handle(channels.updateGetStatus, () => getUpdateStatus())

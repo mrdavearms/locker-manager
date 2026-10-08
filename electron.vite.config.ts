@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { relative, resolve } from 'node:path'
 import { defineConfig } from 'electron-vite'
+import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -18,6 +20,32 @@ function buildCommit(): string {
 const buildStamp = {
   __BUILD_COMMIT__: JSON.stringify(buildCommit()),
   __BUILD_DATE__: JSON.stringify(new Date().toISOString())
+}
+
+// Records which npm packages the window bundle uses, so
+// scripts/third-party-notices.mjs can list their licences (the packages
+// themselves do not ship; only their code does, inside out/renderer).
+function recordRendererPackages(): Plugin {
+  return {
+    name: 'record-renderer-packages',
+    apply: 'build',
+    generateBundle() {
+      const dirs = new Set<string>()
+      for (const id of this.getModuleIds()) {
+        const path = relative(process.cwd(), id.replace(/^\0/, '').split('?')[0] ?? '')
+        const parts = path.split(/[\\/]/)
+        const last = parts.lastIndexOf('node_modules')
+        if (last < 0 || parts.slice(0, last).includes('..')) continue
+        const nameParts = parts[last + 1]?.startsWith('@') ? 2 : 1
+        dirs.add(parts.slice(0, last + 1 + nameParts).join('/'))
+      }
+      mkdirSync(resolve('out/notices'), { recursive: true })
+      writeFileSync(
+        resolve('out/notices/renderer-packages.json'),
+        JSON.stringify([...dirs].sort(), null, 2)
+      )
+    }
+  }
 }
 
 // Three Vite builds: main (Node, Electron main process), preload (the typed bridge)
@@ -54,6 +82,6 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
-    plugins: [react(), tailwindcss()]
+    plugins: [react(), tailwindcss(), recordRendererPackages()]
   }
 })

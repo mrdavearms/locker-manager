@@ -37,7 +37,7 @@ any task, and click **Show me** to go to the right screen.
 2. Under the newest version, click the file whose name starts with **Locker-Manager-Setup**.
 3. When the download finishes, open it. If the browser asks whether to keep the file, choose **Keep**.
 4. If a blue screen says "Windows protected your PC", click the small **More info** link, then **Run anyway**. This appears only because the app is not yet registered with Microsoft. It is safe.
-5. Follow the installer. It installs for your user only, so you do not need an administrator.
+5. Follow the installer. Leave **Only for me** chosen: you then do not need an administrator. (**Anyone who uses this computer** needs one.)
 6. Locker Manager opens when the installer finishes, and appears in the Start menu.
 
 ## Install Locker Manager on a Mac
@@ -55,8 +55,8 @@ You do not need to do anything. A few seconds after Locker Manager opens, and ev
 hours, it checks for a newer version. It updates itself on Windows and on a Mac.
 
 If it finds a new version when it opens, before you have opened your school's file, it
-downloads it straight away and restarts into the new version by itself. A blue bar shows
-the download. Click **Skip for now** if you need to start work at once; the update then
+downloads it straight away and restarts into the new version by itself. A bar at the top
+shows the download. Click **Skip for now** if you need to start work at once; the update then
 installs when you next close the app.
 
 If it finds a new version while you are working, it downloads in the background. A green
@@ -65,7 +65,7 @@ finish and it updates then. It never restarts in the middle of a save, a print o
 import, and your changes are saved first.
 
 On a Mac the app can only replace itself when it lives in your **Applications** folder and
-your Mac account is allowed to change that folder. If not, the blue bar says why and offers
+your Mac account is allowed to change that folder. If not, the bar at the top says why and offers
 **Open the download page**. Download the new version and install it exactly as above. Your
 settings and data are kept. The most common fix is to drag Locker Manager into
 Applications once and open it from there.
@@ -83,7 +83,8 @@ The version shows in three places:
 
 It reads like **Version 0.11.0 · 3f2c1ab · built 9 Oct 2026**. The short code after the
 version (here 3f2c1ab) names the exact build. If you report a problem, quote the whole line.
-**About** at the top right gives the same details, with the time of the build.
+**About** at the top right (also in the **Help** menu, and on a Mac in the **Locker Manager**
+menu) gives the same details, with the time of the build.
 
 ## Tell the app who you are
 
@@ -143,7 +144,7 @@ bar says **Read-only**.
 
 If their computer has gone quiet for more than 10 minutes (for example it crashed or was
 put to sleep), the box offers **Take over editing**. Only click it if you are sure they are
-not working on the file. Anything they had not saved is kept as a backup.
+not working on the file. Anything they had not saved stays on their computer as a backup.
 
 ## The message strip and Undo
 
@@ -296,9 +297,9 @@ To give a student a different locker, use **Move** instead.
 ## Change the kind of lock
 
 1. Go to **Settings**, then **Locks**.
-2. **Usual lock** is used for new lockers.
+2. **Usual lock** is used for new lockers. Choose it and click **Save usual lock**.
 3. To change a whole bank, click **Change the lock for this bank**, choose the kind of lock,
-   and click **Apply**. Any codes those locks had are cleared, because they no longer apply.
+   and click **Apply to N lockers**. Any codes those locks had are cleared, because they no longer apply.
 
 ## Get an export from Compass
 
@@ -325,13 +326,13 @@ with a student ID, first name and last name.
    - Grey: for your information (for example names to check).
    Change how each Homeroom code shows (07A becomes 7A by itself).
    Tick **These files list every student in the school** only if they do.
-6. **Compare and import**: four lists.
+6. **Compare and import**: three lists, and a line saying how many students are unchanged.
    - **New students** are ticked. A student whose year level looks wrong is not ticked:
      decide, then tick or leave them.
    - **Changed** shows exactly what changes (for example Homeroom 7B to 7D).
    - **Possible leavers** are in your file but not in this import. Nobody is removed:
      ticked students go on the Possible leavers list for you to check.
-7. Click **Import**. A backup is kept first.
+7. Click **Import N changes** (N is how many are ticked). A backup is kept first.
 
 Next time you import the same export, the columns are remembered.
 
@@ -363,9 +364,9 @@ click them and choose **Never give a locker…**.
 
 ## Find a student or locker
 
-Press **Ctrl+K** (on a Mac, **Cmd+K**), or click **Find** at the top. Type part of a name, a
-student ID, a locker number, a lock serial or a key number. Use the arrow keys and **Enter**,
-or click a result.
+Press **Ctrl+K** (on a Mac, **Cmd+K**), or click **Find** at the top (in a narrow window the
+button is hidden, but Ctrl+K still works). Type part of a name or student ID, or a whole
+locker number, lock serial or key number. Use the arrow keys and **Enter**, or click a result.
 
 ## See a student's code
 
@@ -387,7 +388,8 @@ Do this after importing students.
    Every line uses it unless you give that line its own order (see below).
 4. Click **Make a draft**. Check the summary: if any students did not fit, they are listed.
 5. Look at the draft. To change two students' places, click one locker, then the other.
-6. Leave **Issue a code to each locker now** ticked, and click **Give out … lockers**.
+6. If any locker in the draft takes a code, leave **Issue a code to each locker now** ticked.
+   (Locks with no code, such as keyed locks, never show this.) Click **Give out … lockers**.
 
 Students on the **Who never gets a locker** list are skipped. If you change your mind straight
 away, **Undo** (Ctrl+Z, or the History screen) puts everything back.
@@ -438,7 +440,7 @@ replaces these with the student system's values.
 Click **Save** to keep the change, or **Put back** to go back to what is stored.
 
 If their locker is no longer on the right side for their year level, the app offers to
-move them: click **Move to** and the locker number, or leave them where they are. After a
+move them: click **Move to** and the locker number, or **Not now** to leave them where they are. After a
 move the app shows the new code, as **Move…** does. If there is no spare locker on their
 side, the message says so: use **Move…** when one is free.
 
@@ -461,7 +463,8 @@ Their locker becomes a spare. Because they know its code, the lock goes on **Loc
 
 ## Move or swap students
 
-On Home, click **Move or swap** and choose **Move to a spare locker** or **Swap with another student**. Or find the student and, in their
+On Home, click **Move or swap**, find the student, and choose **Move to a spare locker** or
+**Swap with another student**. Or find the student and, in their
 panel, click **Move…** (choose the new locker) or **Swap…** (find the other student). A swap
 shows both lockers before anything changes. Whole student records move, never just names. The codes change,
 because each student knows their old locker's code, and the locks go on **Locks to reset**.
@@ -483,15 +486,18 @@ To do many at once:
 
 - Tick each lock you have reset, or click **Tick all**.
 - Click **Mark N as reset** (N is how many are ticked).
-- Click **Print this list** to take a paper copy round the lockers.
+- Click **Print this list** to open the **Locks to reset** report, then print it or save it
+  as a PDF to take round the lockers.
 
 On the Lockers screen the list is folded to one line. Click **Show** to open it.
 
 ## Undo a mistake
 
-Press **Ctrl+Z** (Cmd+Z on a Mac) to undo the last change, and **Ctrl+Shift+Z** to redo it.
+Press **Ctrl+Z** (Cmd+Z on a Mac) to undo the last change, and **Ctrl+Shift+Z** or **Ctrl+Y**
+to redo it.
 The History screen also has **Undo** and **Redo** buttons, and lists every change: who made
-it, on which computer, and when. Up to 50 changes can be undone while the file is open.
+it, on which computer, and when. Up to 50 changes can be undone while the file is open (fewer
+in a very large file). Setting or changing the PIN clears the list of changes to undo.
 
 **Put one student or locker back**: on the History screen, find the change and click **Put
 back to before this…** under the student's or locker's name. The app finds that record in the
@@ -500,7 +506,7 @@ that record's own details change; lockers given out, codes and history stay as t
 
 ## Print locker labels
 
-1. Click **Print** in the left-hand menu.
+1. Click **Labels** in the left-hand menu.
 2. Under **Which labels**, choose every locker, one Homeroom, one bank, chosen locker numbers
    (for example `1-10, 15`), lockers changed since the last print, or spare lockers only.
 3. Check the preview on the right. It is the real sheet, exactly as it will print.
@@ -690,7 +696,7 @@ between steps.
    then click the button. Those locks now have no code.
 3. **Check everything**: read the list. Nothing changes yet.
 4. **Archive this year**: type the words shown (for example `START 2027`), then click
-   **Archive**. Every student's locker is given back, this year becomes read-only history,
+   **Archive 2026 and start 2027**. Every student's locker is given back, this year becomes read-only history,
    and next year starts. A backup called "Before starting 2027" is kept first. Locks still
    on a student's code go on **Locks to reset**.
 5. **Move students up (optional)**: most schools skip this and import instead. If your
@@ -719,7 +725,9 @@ For lockers with keyed locks, click the locker on the Lockers screen.
 
 Home lists everything that needs looking at: students without a locker, possible leavers,
 names to check, locks waiting for a reset, letters not yet printed, spare codes running
-low, and locks that share a code. Click the button beside each one to go where it is fixed.
+low, and locks that share a code. Where a line has a button, click it to go where it is
+fixed; locks waiting for a reset are listed under **Locks to reset** further down Home.
+**Letters not yet printed** appears only after letters have been printed once.
 When the list is empty, Home says **Nothing needs attention**.
 
 ## Protect codes with a PIN
@@ -770,7 +778,7 @@ that it was made.
 In **Settings**, **School**, under **Share your set-up**:
 
 - **Save a settings file…** saves your words, code rules, lock settings, label sheets and
-  layout, printer nudges, letter and pictures. It has no students, lockers, codes, PIN or
+  layout, printer nudges, letter and pictures, import options and saved column matches. It has no students, lockers, codes, PIN or
   history.
 - **Use a settings file…** puts another school's set-up into your file. Its pictures are
   added; your students, lockers and codes are not touched. Press Ctrl+Z straight away to

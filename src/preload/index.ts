@@ -43,6 +43,10 @@ const api = {
   installUpdate: (): Promise<InstallResult> => ipcRenderer.invoke(channels.updateInstall),
   openDownloadPage: (): Promise<void> => ipcRenderer.invoke(channels.updateOpenDownloadPage),
   skipStartupUpdate: (): Promise<void> => ipcRenderer.invoke(channels.updateSkipStartup),
+  thirdPartyNotices: (): Promise<{ text: string | null }> =>
+    ipcRenderer.invoke(channels.appNotices),
+  openChromiumLicences: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke(channels.appOpenChromiumLicences),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke(channels.shellOpenExternal, { url }),
   onUpdateStatus: (listener: (status: UpdateStatus) => void) =>

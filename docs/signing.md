@@ -174,7 +174,8 @@ The build signs as an "app registration", a robot identity with its own secret.
 
 Tag the next release. The "Build Windows" log should say "Azure Artifact Signing secrets
 found". On a Windows PC, right-click the downloaded installer, **Properties**, and the
-**Digital Signatures** tab lists the organisation. The blue SmartScreen screen disappears
+**Digital Signatures** tab lists the organisation. Once installed, the app's **About** shows
+**Signed: Yes** (it reads the signature from its own program file). The blue SmartScreen screen disappears
 after Microsoft has seen enough installs, usually within days for a cloud-signed app.
 
 Set a reminder for the client secret's expiry (24 months): make a new secret in Part D
