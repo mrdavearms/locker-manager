@@ -215,6 +215,15 @@
         font-size: clamp(28px, 4vw, 38px);
         margin: 0 0 20px;
       }
+      .hero p.status {
+        display: inline-block;
+        margin: 4px 0 0;
+        padding: 6px 14px;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        font-size: 15px;
+        opacity: 1;
+      }
       .privacy {
         background: var(--soft);
         border-radius: 22px;
@@ -279,6 +288,10 @@
           letters, and keep it right through the year. Windows and Mac. Your data stays in your
           school’s own folder.
         </p>
+        <p class="status">
+          Pre-release (version 0.x): ready to try. Version 1.0 follows once printing, letters and a
+          Windows install have been checked by hand at a school.
+        </p>
         <div class="buttons">
           <a class="btn primary" href="https://github.com/mrdavearms/locker-manager/releases"
             >Download</a
@@ -325,8 +338,8 @@
             <div class="num">03</div>
             <h3>Codes done properly</h3>
             <p>
-              Codes follow lock makers’ advice, never repeat, stay hidden until asked for, and every
-              reveal is recorded.
+              Codes follow lock makers’ advice, are not given back to a lock that had them in the
+              last three years, stay hidden until asked for, and every reveal is recorded.
             </p>
           </div>
           <div class="card">
@@ -341,18 +354,29 @@
             <div class="num">05</div>
             <h3>Letters, one per page</h3>
             <p>
-              Each student’s locker and code, with the right steps for their lock, in more than one
-              language.
+              Each student’s locker (and code, when their lock has one), with the right steps for
+              their lock, in more than one language.
             </p>
           </div>
           <div class="card">
             <div class="num">06</div>
             <h3>The whole year</h3>
             <p>
-              New students, leavers, swaps, lost codes, reports, and a guided start to next year.
+              New students (imported or added by hand), leavers, moves and swaps, locks to reset,
+              lost codes, reports, Undo after every change, and a guided start to next year.
             </p>
           </div>
         </div>
+      </section>
+
+      <section>
+        <h2>Big school or small</h2>
+        <p>
+          A school that only needs to record who has which locker can do just that. Quick start
+          makes an area, a bank and its lockers in one step. Keyed locks, or no locks, mean no codes
+          to manage. Students can be added by hand, without an import, and labels and letters can be
+          set aside with “We don’t use this”.
+        </p>
       </section>
 
       <section class="privacy">
@@ -360,7 +384,10 @@
         <ul>
           <li>One data file in a folder your school chooses, with backups beside it.</li>
           <li>No server, no accounts, no data sent anywhere. Updates come from GitHub.</li>
-          <li>Lock codes are stored scrambled, and can be protected with a PIN.</li>
+          <li>
+            Lock codes are stored encrypted in the file and hidden on screen, and the school can add
+            a PIN.
+          </li>
           <li>Open source under the MIT licence: anyone can check what it does.</li>
         </ul>
       </section>
