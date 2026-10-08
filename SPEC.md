@@ -367,7 +367,7 @@ Shows both versions side by side as lists of differences (lockers, assignments, 
 
 ### 6.5 Backups
 
-- Every save keeps the previous version in `<folder>/Locker Manager backups/<name>/` with a timestamp. Keep all from the last 7 days, daily for 3 months, then weekly, up to a size cap (default 500 MB), all configurable.
+- Every save keeps the previous version in `<folder>/Locker Manager backups/<name>/` with a timestamp, compressed with gzip (`.lockers.gz`). Keep all from the last day, hourly to 7 days, daily to 99 days, then weekly, up to a size cap (default 500 MB), all configurable.
 - A local backup copy also goes into the app's own data folder on each computer, so a mistake in the shared folder can be recovered from any computer that has opened the file.
 - Before any schema migration, rollover or restore, take a named backup ("before update to 1.4.0").
 - Backups of a file with codes hold codes: the backup folder sits beside the data file and inherits its permissions.

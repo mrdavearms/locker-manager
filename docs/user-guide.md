@@ -195,10 +195,19 @@ Only the person editing the file can restore.
 Go to **Settings**, then **Storage**. It shows where the data file is, and how many backups
 are kept beside it and on this computer.
 
-Every backup is kept for 7 days, then one a day until 92 days old, then one a week, and the
-backups folder is kept under 500 MB. To change this, type new numbers and click **Save
-backup rules**. The rules are kept in the data file, so every computer follows them. Named
-backups, such as "Before starting 2027", are always kept.
+Every backup is kept for 1 day, then one an hour until 7 days old, then one a day until 99
+days old, then one a week while there is room, and the backups folder is kept under 500 MB.
+To change this, type new numbers and click **Save backup rules**. The rules are kept in the
+data file, so every computer follows them. Named backups, such as "Before starting 2027",
+are the last to go if a folder runs out of room.
+
+Backups are compressed to about a third of the file's size, so more of them fit. Open them
+through **Backups** in Locker Manager, not by double-clicking them.
+
+Next to each place, Storage shows how far back its backups really go. If a large file fills
+the 500 MB limit before the backups reach back 99 days, a warning says so. To keep backups
+for longer, raise **Keep the backups folder under** if the drive has room, or move the data
+file (with its Locker Manager backups folder) to a folder with more space.
 
 ## Close the file
 
@@ -770,3 +779,5 @@ In **Settings**, **School**, under **Share your set-up**:
 If a new version stops before it opens twice in a row, Locker Manager shows a page instead
 of trying again. Your school's file is safe. The page has links to try again, to download
 the previous version, and to open this computer's backups folder. Tell your IT team.
+Backups ending in `.lockers.gz` are compressed: unzip one (double-click it on a Mac, or use
+a tool such as 7-Zip on Windows) to get a `.lockers` file you can open.
