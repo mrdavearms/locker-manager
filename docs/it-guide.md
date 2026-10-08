@@ -137,10 +137,22 @@ Each save keeps the version it replaced in two places:
 | Beside the data file | `<folder>/Locker Manager backups/<file name>/` |
 | On each computer that opened it | Windows `%AppData%\Locker Manager\backups\<file id>\`, macOS `~/Library/Application Support/Locker Manager/backups/<file id>/` |
 
-Retention: everything from the last 7 days, the newest of each day for 3 months, then the
-newest of each week, up to 500 MB per place. Named backups (before an update to the file
-format, before a restore, a version set aside in a conflict) are kept regardless of age
-and removed last. **Backups contain lock codes** (from M4 onwards): the backup folder sits
+Backups are compressed with gzip and end in `.lockers.gz` (in versions after 0.11.0; older
+backups are plain `.lockers` copies and still work). A real data file compresses to about a
+third of its size (a 22.5 MB file gives a 7.9 MB backup). Restore them through the app's
+**Backups** button, not by double-clicking. To open one outside the app, unzip it first
+(macOS Archive Utility, or 7-Zip on Windows) to get a `.lockers` file.
+
+Retention: everything from the last day, the newest of each hour to 7 days, the newest of
+each day to 99 days, then the newest of each week while there is room, up to 500 MB per
+place (the limit can be raised to 5000 MB in Settings, Storage). Named backups (before an
+update to the file format, before a restore, a version set aside in a conflict) are kept
+regardless of age and removed last. When the limit is reached, the weekly backups older
+than 99 days go first, then busy stretches of the last day are thinned to one per 10
+minutes, then the oldest backups go. Settings, Storage shows how far back each place
+really reaches, and warns when the limit cuts it short of 99 days. A school of about 2,000
+students has a file of about 24 MB after five years; it needs roughly 1 GB per place to
+keep 99 days of backups at about 30 saves a school day. **Backups contain lock codes** (from M4 onwards): the backup folder sits
 beside the data file and has the same permissions, so restrict the shared folder to staff
 who should see codes.
 

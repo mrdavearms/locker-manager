@@ -52,7 +52,9 @@ the app only changes it while it is working, and backups are kept.</p>
 <li><a href="lmrecovery:retry" target="_blank">Try again</a>.</li>
 <li>If it still does not open, <a href="${brand.releasesUrl}" target="_blank">download the previous version</a>
 and install it over this one.</li>
-<li>If you need an earlier copy of your file, <a href="lmrecovery:backups" target="_blank">open this computer’s backups folder</a>.</li>
+<li>If you need an earlier copy of your file, <a href="lmrecovery:backups" target="_blank">open this computer’s backups folder</a>.
+Backups ending in <code>.lockers.gz</code> are compressed: unzip one (double-click it on a Mac, or use a tool
+such as 7-Zip on Windows) to get a <code>.lockers</code> file you can open.</li>
 <li>Tell your IT team. The log file is in <code>${esc(logs)}</code>.</li>
 </ol></main></body></html>`
   const win = new BrowserWindow({

@@ -231,6 +231,15 @@ test('a backup can be previewed and restored', async () => {
   await l.page.getByLabel('School name').fill('SYNTHETIC Wrong Name')
   await l.page.getByRole('button', { name: 'Save' }).click()
   await expect(l.page.getByTestId('save-status')).toContainText('Saved', { timeout: 10_000 })
+  // Backups are compressed (SPEC.md 6.5), and Storage says how far back they go.
+  expect(readdirSync(join(share, 'Locker Manager backups', 'Locker data'))).toEqual([
+    expect.stringMatching(/\.lockers\.gz$/)
+  ])
+  await l.page.getByTestId('nav-settings').click()
+  await l.page.getByRole('tab', { name: 'Storage' }).click()
+  await expect(l.page.getByTestId('storage-reach-shared')).toContainText('back to')
+  await expect(l.page.getByTestId('storage-short')).toHaveCount(0)
+  await l.page.getByTestId('nav-home').click()
 
   await l.page.getByRole('button', { name: 'Backups' }).click()
   const dialog = l.page.getByTestId('backups-dialog')

@@ -129,6 +129,49 @@ describe('saveAtomically', () => {
     expect(kept).toBe('ORIGINAL VERSION')
   })
 
+  it('starts the backup while the new version is written, and waits for it before the swap', async () => {
+    const { path, hash } = setup()
+    const fs = faultyFs()
+    let callsAtStart: string[] = []
+    let finished = false
+    const out = await saveAtomically({
+      fs,
+      path,
+      bytes: enc('NEW'),
+      expectedHash: hash,
+      randomSuffix: suffix,
+      backupPrevious: async () => {
+        callsAtStart = [...fs.calls]
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        finished = true
+        expect(fs.calls.some((c) => c.startsWith('rename'))).toBe(false)
+      }
+    })
+    expect(out.kind).toBe('saved')
+    expect(finished).toBe(true)
+    // Compressing a large backup takes time: it overlaps the write of the new version.
+    expect(callsAtStart.some((c) => c.startsWith('writeNewFileDurable'))).toBe(false)
+  })
+
+  it('waits for the backup before reporting a failed write', async () => {
+    const { path, hash } = setup()
+    let finished = false
+    await expect(
+      saveAtomically({
+        fs: faultyFs([{ method: 'writeNewFileDurable' }]),
+        path,
+        bytes: enc('NEW'),
+        expectedHash: hash,
+        randomSuffix: suffix,
+        backupPrevious: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 30))
+          finished = true
+        }
+      })
+    ).rejects.toThrow()
+    expect(finished).toBe(true)
+  })
+
   it('still saves when the backup fails, and says so', async () => {
     const { path, hash } = setup()
     const out = await saveAtomically({

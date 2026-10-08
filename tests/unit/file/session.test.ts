@@ -201,7 +201,10 @@ describe('saving', () => {
     await dave.session.flush()
     expect(openState(dave)).toMatchObject({ dirty: false, problems: [] })
     expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC Renamed')
-    expect(readdirSync(join(dir, BACKUP_FOLDER_NAME, 'Locker data'))).toHaveLength(1)
+    const shared = readdirSync(join(dir, BACKUP_FOLDER_NAME, 'Locker data'))
+    expect(shared).toHaveLength(1)
+    // Backups are kept compressed (SPEC.md 6.5).
+    expect(shared[0]).toMatch(/\.lockers\.gz$/)
     const local = join(dir, 'local-backups-DAVE-MAC')
     expect(readdirSync(local)).toHaveLength(1)
   })
@@ -582,6 +585,46 @@ describe('restoring a backup (SPEC.md 4.12)', () => {
     expect(openState(dave).summary.lastChange?.action).toBe('file.restored')
     const after = await dave.session.listAllBackups()
     expect(after.some((b) => b.label?.startsWith('before restoring'))).toBe(true)
+  })
+
+  it('previews and restores an older, uncompressed backup', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    await dave.session.open(path)
+    // A backup kept by version 0.11.0 or earlier: a plain copy of the file.
+    const folder = join(dir, BACKUP_FOLDER_NAME, 'Locker data')
+    mkdirSync(folder, { recursive: true })
+    const oldName = 'Locker data 2026-10-01 080000.lockers'
+    writeFileSync(join(folder, oldName), readFileSync(path))
+    rename(dave, 'SYNTHETIC Renamed')
+    await dave.session.flush()
+    const ref = { source: 'shared' as const, name: oldName }
+    const preview = await dave.session.previewBackup(ref)
+    if ('error' in preview) throw new Error(preview.error)
+    expect(preview.backupSummary.schoolName).toBe('SYNTHETIC High School')
+    expect(await dave.session.restoreBackup(ref)).toEqual({ ok: true })
+    expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC High School')
+    const labels = (await dave.session.listAllBackups()).map((b) => b.label)
+    expect(labels).toContain('before restoring Locker data 2026-10-01 080000')
+  })
+
+  it('says a damaged compressed backup is damaged and leaves the file alone', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    await dave.session.open(path)
+    const folder = join(dir, BACKUP_FOLDER_NAME, 'Locker data')
+    mkdirSync(folder, { recursive: true })
+    const name = 'Locker data 2026-10-01 080000.lockers.gz'
+    writeFileSync(join(folder, name), new Uint8Array([0x1f, 0x8b, 8, 0, 1, 2, 3, 4, 5, 6, 7]))
+    const ref = { source: 'shared' as const, name }
+    expect(await dave.session.previewBackup(ref)).toEqual({
+      error: expect.stringMatching(/damaged/)
+    })
+    expect(await dave.session.restoreBackup(ref)).toMatchObject({ ok: false })
+    expect(await dave.session.loadBackup(ref)).toBeNull()
+    expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC High School')
   })
 
   it('refuses a backup name that tries to leave the backups folder', async () => {
