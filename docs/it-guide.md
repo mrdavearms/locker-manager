@@ -1,6 +1,6 @@
 # Locker Manager: guide for school IT
 
-_Last updated: 6 October 2026 (version 0.1.0). Managed settings arrive with milestone M8._
+_Last updated: 9 October 2026 (version 0.11.0)._
 
 ## What it is
 
@@ -21,7 +21,11 @@ both x64 and arm64 builds and picks the right one.
 | Per machine, silent, for deployment | `Locker-Manager-Setup-<version>.exe /S /allusers` | `C:\Program Files\Locker Manager` |
 
 Uninstall through Settings > Apps, or run `Uninstall Locker Manager.exe` in the install
-folder with `/S` for silent.
+folder with `/S` for silent. Uninstalling leaves the app folder in `%AppData%` (see Other
+files on each computer); delete it by hand when a computer leaves the school.
+
+The installer registers the `.lockers` file type (double-click opens the app) and
+`lockermanager://` links, which the QR codes on labels use to open a locker.
 
 The installer is not yet code-signed, so SmartScreen shows "Windows protected your PC" on
 first run. Staff click **More info**, then **Run anyway**. Signing is planned
@@ -57,7 +61,8 @@ signature is in place the prompt disappears.
 - A failed check (proxy, firewall, offline) is logged and never shown, unless the user
   asked for the check by hand.
 - Versions below 1.0.0 are pre-releases and accept pre-release updates. From 1.0.0 the app
-  takes only stable releases.
+  takes only stable releases, unless the user chooses **Test versions too** in Settings,
+  This computer. To prevent that, set `updateChannel` to `stable` in managed settings.
 
 ### Network needs
 
@@ -65,8 +70,13 @@ Allow outbound HTTPS (port 443) to:
 
 | Host | Used for |
 |---|---|
-| `github.com` | update check (`/mrdavearms/locker-manager/releases.atom` and `/releases/download/...`) |
-| `objects.githubusercontent.com` | the installer download, by redirect from the address above |
+| `github.com` | update check: `/mrdavearms/locker-manager/releases.atom`, `/mrdavearms/locker-manager/releases/latest`, and `/mrdavearms/locker-manager/releases/download/...` |
+| `release-assets.githubusercontent.com` | GitHub redirects every `/releases/download/...` address here: `latest.yml`, `latest-mac.yml` and the installers |
+
+Checked on 9 October 2026: a request for a release file on `github.com` answers with a
+redirect to `release-assets.githubusercontent.com`, which serves the file. GitHub has
+changed this host before (it was `objects.githubusercontent.com`); if updates stop at a
+firewall, check where the redirect now points.
 
 The app uses the system proxy. Nothing else is contacted.
 
@@ -184,8 +194,9 @@ ordinary users cannot change:
 | Windows | `%ProgramData%\Locker Manager\managed.json` |
 | macOS | `/Library/Application Support/Locker Manager/managed.json` |
 
-Every key is optional. A key that is present is locked in the app, marked "Set by your IT
-team".
+Every key is optional. A key that is present cannot be changed in the app. The update
+settings are marked "Set by your IT team"; a required PIN shows "Required by your IT team";
+the default file appears on the Welcome screen; the demo school is simply not offered.
 
 ```json
 {
@@ -201,7 +212,7 @@ team".
 |---|---|
 | `autoUpdate` | `false` stops automatic update checks and installs. A user can still check by hand and is sent to the download page. |
 | `updateChannel` | `stable` or `beta`. |
-| `defaultDataFile` | Shows "Your school's file, set by your IT team" with an Open button on the Welcome screen. |
+| `defaultDataFile` | Shows "Your school's file, set by your IT team" with an **Open it** button on the Welcome screen. |
 | `demoEnabled` | `false` hides the demo school. |
 | `requirePinForCodes` | `true` means codes cannot be shown, printed or exported until a PIN is set for the file and entered. The PIN cannot then be removed. |
 
@@ -243,13 +254,14 @@ backups folder. The count is kept in `preferences.json` (`failedStarts`).
 
 | What | Windows | macOS |
 |---|---|---|
-| Preferences (operator name, recent files) | `%AppData%\Locker Manager\preferences.json` | `~/Library/Application Support/Locker Manager/preferences.json` |
+| Preferences (operator name, recent files with school names, appearance, update choices, copies the user chose to ignore, start-up counts, whether the tour and getting-started list were seen or hidden) | `%AppData%\Locker Manager\preferences.json` | `~/Library/Application Support/Locker Manager/preferences.json` |
 | Practice copy (replaced each time practice starts) | `%AppData%\Locker Manager\Practice\` | `~/Library/Application Support/Locker Manager/Practice/` |
 | Demo school (rebuilt every time it is opened) | `%AppData%\Locker Manager\Demo\` | `~/Library/Application Support/Locker Manager/Demo/` |
 
 ## Logs
 
-No student names or lock codes are ever written to logs.
+No student names or lock codes are written to logs. Log lines can include file paths, and
+so the name of the school's file.
 
 | Platform | Log file |
 |---|---|
@@ -266,3 +278,12 @@ Logs rotate at 2 MB.
   process.
 - The app opens external links only on its own GitHub pages.
 - One instance per user: opening the app again focuses the running copy.
+
+## Third-party software
+
+The app is built with other open-source software (Electron and Chromium, about 190 npm
+packages, and four font families), all under licences that allow it to be shared. The full
+list with each licence is in About, **Third-party software**, and in the file
+`THIRD-PARTY-NOTICES.txt` in the app's resources folder (Windows: `resources\` in the
+install folder; Mac: `Locker Manager.app/Contents/Resources/`). Chromium's own licences are
+in `LICENSES.chromium.html` (Windows: the install folder; Mac: the same resources folder).
