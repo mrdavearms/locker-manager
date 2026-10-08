@@ -14,7 +14,10 @@ import { historyOnlyIn, summarise } from '../db/summary'
 import { saveAtomically, SaveFailedError } from './atomicSave'
 import {
   BACKUP_FOLDER_NAME,
+  backupStem,
+  compressBackup,
   listBackups,
+  readBackupFile,
   sharedBackupDir,
   writeBackup,
   type BackupPolicy
@@ -33,7 +36,7 @@ import {
   type LockInfo
 } from './lockFile'
 import { readDataFile, readProblemMessage } from './readDataFile'
-import { BackupRulesSchema, DEFAULT_BACKUP_RULES } from '@shared/storage'
+import { BackupRulesSchema, DEFAULT_BACKUP_RULES, fullBackupRules } from '@shared/storage'
 import { getSetting } from '../repos/settings'
 import {
   baseName,
@@ -124,8 +127,15 @@ const DAY = 24 * 60 * 60 * 1000
 
 /** The school's backup rules from the file (Settings, Storage), else the defaults. */
 export function backupPolicyFor(db: LockerDb): BackupPolicy {
-  const r = getSetting(db, 'storage.backupRules', BackupRulesSchema, DEFAULT_BACKUP_RULES)
-  return { keepAllDays: r.keepAllDays, dailyDays: r.dailyDays, maxBytes: r.maxMb * 1024 * 1024 }
+  const r = fullBackupRules(
+    getSetting(db, 'storage.backupRules', BackupRulesSchema, DEFAULT_BACKUP_RULES)
+  )
+  return {
+    keepAllDays: r.keepAllDays,
+    hourlyDays: r.hourlyDays,
+    dailyDays: r.dailyDays,
+    maxBytes: r.maxMb * 1024 * 1024
+  }
 }
 
 export class DataFileSession {
@@ -569,15 +579,30 @@ export class DataFileSession {
     const base = baseName(basename(c.path))
     const at = this.d.now()
     const policy = this.d.backupPolicy ?? backupPolicyFor(c.db)
-    const opts = { randomSuffix: this.d.randomSuffix, policy, ...(label ? { label } : {}) }
+    // Compressed once for both copies (SPEC.md 6.5). If compressing ever fails, a
+    // plain copy is kept instead: a backup must never stop a save (decision 12).
+    let payload = bytes
+    let compressed = false
+    try {
+      payload = await compressBackup(bytes)
+      compressed = true
+    } catch {
+      // keep the plain bytes
+    }
+    const opts = {
+      randomSuffix: this.d.randomSuffix,
+      policy,
+      compressed,
+      ...(label ? { label } : {})
+    }
     const errors: string[] = []
     try {
-      await writeBackup(this.d.fs, sharedBackupDir(c.path), base, bytes, at, opts)
+      await writeBackup(this.d.fs, sharedBackupDir(c.path), base, payload, at, opts)
     } catch (error) {
       errors.push(`the shared folder (${errorCode(error) ?? 'error'})`)
     }
     try {
-      await writeBackup(this.d.fs, this.localBackupDir(), base, bytes, at, opts)
+      await writeBackup(this.d.fs, this.localBackupDir(), base, payload, at, opts)
     } catch (error) {
       errors.push(`this computer (${errorCode(error) ?? 'error'})`)
     }
@@ -1070,7 +1095,7 @@ export class DataFileSession {
 
   /** Opens a backup as a database for reading. The caller closes it. */
   async loadBackup(b: { source: BackupView['source']; name: string }): Promise<LockerDb | null> {
-    const r = await readDataFile(this.d.fs, this.backupPath(b))
+    const r = await readBackupFile(this.d.fs, this.backupPath(b))
     if (!r.ok) return null
     const db = await LockerDb.fromBytes(r.bytes).catch(() => null)
     if (db && schemaState(db).kind === 'older') migrate(db)
@@ -1086,7 +1111,7 @@ export class DataFileSession {
     const all = await this.listAllBackups()
     const entry = all.find((x) => x.source === b.source && x.name === b.name)
     if (!entry) return { error: 'That backup is no longer there.' }
-    const r = await readDataFile(this.d.fs, this.backupPath(b))
+    const r = await readBackupFile(this.d.fs, this.backupPath(b))
     if (!r.ok) return { error: readProblemMessage(r.problem) }
     const old = await LockerDb.fromBytes(r.bytes).catch(() => null)
     if (!old) return { error: readProblemMessage('not_a_data_file') }
@@ -1109,7 +1134,7 @@ export class DataFileSession {
     if (!c) return { ok: false, message: 'No file is open.' }
     if (c.mode !== 'edit')
       return { ok: false, message: 'Only the person editing can restore a backup.' }
-    const r = await readDataFile(this.d.fs, this.backupPath(b))
+    const r = await readBackupFile(this.d.fs, this.backupPath(b))
     if (!r.ok) return { ok: false, message: readProblemMessage(r.problem) }
     const candidate = await LockerDb.fromBytes(r.bytes).catch(() => null)
     if (!candidate || candidate.integrityProblems().length > 0) {
@@ -1122,7 +1147,7 @@ export class DataFileSession {
       return { ok: false, message: 'That backup was made by a newer version of the app.' }
     await this.flush()
     if (c.conflict) return { ok: false, message: 'Sort out the conflict first.' }
-    await this.backupBytes(c.db.export(), `before restoring ${b.name.replace(/\.lockers$/i, '')}`)
+    await this.backupBytes(c.db.export(), `before restoring ${backupStem(b.name)}`)
     await this.replaceInMemory(r.bytes)
     // replaceInMemory reset the hash to the backup's; the disk still holds the current version.
     const disk = await readDataFile(this.d.fs, c.path)

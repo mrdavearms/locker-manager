@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react'
 import { FolderOpen, Lock } from 'lucide-react'
-import { DEFAULT_BACKUP_RULES, type BackupRules, type StorageView } from '@shared/storage'
+import {
+  DEFAULT_BACKUP_RULES,
+  type BackupReachView,
+  type FullBackupRules,
+  type StorageView
+} from '@shared/storage'
+import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, TextInput } from '@renderer/components/Field'
 import { useAction, useCanEdit, useRevision } from '@renderer/lib/appContext'
+import { formatDateTime } from '@renderer/lib/format'
 import { call } from '@renderer/lib/rpc'
 
-const LIMITS: Record<keyof BackupRules, [number, number]> = {
+const LIMITS: Record<keyof FullBackupRules, [number, number]> = {
   keepAllDays: [1, 90],
+  hourlyDays: [1, 90],
   dailyDays: [7, 730],
   maxMb: [50, 5000]
 }
@@ -18,7 +26,7 @@ export function StorageForm(): React.JSX.Element {
   const canEdit = useCanEdit()
   const revision = useRevision()
   const [view, setView] = useState<StorageView | null>(null)
-  const [draft, setDraft] = useState<BackupRules | null>(null)
+  const [draft, setDraft] = useState<FullBackupRules | null>(null)
   useEffect(() => {
     let cancelled = false
     void window.api.storage().then((v) => !cancelled && setView(v))
@@ -28,10 +36,22 @@ export function StorageForm(): React.JSX.Element {
   }, [revision])
   if (!view) return <SectionCard title="Storage">Loading…</SectionCard>
   const r = draft ?? view.rules
-  const valid = (Object.keys(LIMITS) as (keyof BackupRules)[]).every(
-    (k) => Number.isInteger(r[k]) && r[k] >= LIMITS[k][0] && r[k] <= LIMITS[k][1]
+  const valid =
+    (Object.keys(LIMITS) as (keyof FullBackupRules)[]).every(
+      (k) => Number.isInteger(r[k]) && r[k] >= LIMITS[k][0] && r[k] <= LIMITS[k][1]
+    ) &&
+    r.keepAllDays <= r.hourlyDays &&
+    r.hourlyDays <= r.dailyDays
+  const usual = (Object.keys(LIMITS) as (keyof FullBackupRules)[]).every(
+    (k) => r[k] === DEFAULT_BACKUP_RULES[k]
   )
-  const field = (k: keyof BackupRules, label: string, hint: string): React.JSX.Element => (
+  const reachText = (x: BackupReachView): string =>
+    x.oldest ? `back to ${formatDateTime(x.oldest)}` : 'none yet'
+  const short = [
+    ...(view.reach.shared.short ? ['beside the file'] : []),
+    ...(view.reach.thisComputer.short ? ['on this computer'] : [])
+  ]
+  const field = (k: keyof FullBackupRules, label: string, hint: string): React.JSX.Element => (
     <Field label={label} hint={hint} htmlFor={`st-${k}`}>
       <TextInput
         id={`st-${k}`}
@@ -63,8 +83,23 @@ export function StorageForm(): React.JSX.Element {
 
       <SectionCard
         title="Backups"
-        description="A backup is kept every time the file is saved: one in the Locker Manager backups folder beside the file, and one on this computer. Older backups are thinned out by these rules. Backups you name (for example before starting next year) are always kept."
+        description="A backup is kept every time the file is saved: one in the Locker Manager backups folder beside the file, and one on this computer. Backups are compressed to about a third of the file's size, so they open through Backups in Locker Manager, not by double-clicking them. Older backups are thinned out by these rules. Backups you name (for example before starting next year) are the last to go if a folder runs out of room."
       >
+        {short.length > 0 && (
+          <div className="mb-5">
+            <Banner
+              tone="warn"
+              title={`Backups do not reach back ${view.rules.dailyDays} days`}
+              testId="storage-short"
+            >
+              The backups folder {short.join(' and the one ')} has reached its limit of{' '}
+              {view.rules.maxMb} MB, so older backups have been deleted sooner than these rules
+              promise. To keep backups for longer, raise &ldquo;Keep the backups folder under&rdquo;
+              below if the drive has room, or move the data file (with its Locker Manager backups
+              folder) to a folder with more space.
+            </Banner>
+          </div>
+        )}
         <table className="mb-5 text-sm">
           <tbody>
             <tr>
@@ -72,26 +107,37 @@ export function StorageForm(): React.JSX.Element {
               <td className="tabular-nums">
                 {view.backups.shared} backups, {view.backups.sharedMb} MB
               </td>
+              <td className="pl-6 tabular-nums" data-testid="storage-reach-shared">
+                {reachText(view.reach.shared)}
+              </td>
             </tr>
             <tr>
               <td className="pr-6 py-1">On this computer</td>
               <td className="tabular-nums">
                 {view.backups.thisComputer} backups, {view.backups.thisComputerMb} MB
               </td>
+              <td className="pl-6 tabular-nums">{reachText(view.reach.thisComputer)}</td>
             </tr>
           </tbody>
         </table>
-        <div className="grid gap-4 md:grid-cols-3">
-          {field('keepAllDays', 'Keep every backup for (days)', '1 to 90. Usually 7.')}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {field('keepAllDays', 'Keep every backup for (days)', '1 to 90. Usually 1.')}
+          {field('hourlyDays', 'Then one an hour until (days old)', '1 to 90. Usually 7.')}
           {field(
             'dailyDays',
             'Then one a day until (days old)',
-            '7 to 730. After that, one a week.'
+            '7 to 730. Usually 99. After that, one a week while there is room.'
           )}
           {field('maxMb', 'Keep the backups folder under (MB)', '50 to 5000. Usually 500.')}
         </div>
+        {draft && !valid && (
+          <p className="mt-3 text-sm text-bad">
+            Use whole numbers within the ranges shown, with each number of days at least as large as
+            the one before it.
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap justify-end gap-2">
-          {JSON.stringify(r) !== JSON.stringify(DEFAULT_BACKUP_RULES) && (
+          {!usual && (
             <Button
               variant="ghost"
               disabled={!canEdit}

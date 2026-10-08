@@ -41,8 +41,15 @@ import { createDemoDatabase } from './demo/demoSchool'
 import { nodeFs } from './file/fsPort'
 import { HEARTBEAT_MS, STALE_AFTER_MS } from './file/lockFile'
 import { getSetting } from './repos/settings'
-import { BackupRulesSchema, DEFAULT_BACKUP_RULES, type StorageView } from '@shared/storage'
-import { DataFileSession } from './file/session'
+import {
+  BackupRulesSchema,
+  DEFAULT_BACKUP_RULES,
+  fullBackupRules,
+  type BackupReachView,
+  type StorageView
+} from '@shared/storage'
+import { backupReach } from './file/backups'
+import { backupPolicyFor, DataFileSession } from './file/session'
 import { machineName, Preferences, suggestedOperatorName } from './prefs/preferences'
 import { savedMappings, setSavedMappingsReader } from './rpc/studentHandlers'
 import { replayChange } from './rpc/registry'
@@ -517,9 +524,25 @@ export function registerFileHandlers(): void {
     const mb = (n: number): number => Math.round((n / 1024 / 1024) * 10) / 10
     const shared = all.filter((b) => b.source === 'shared')
     const local = all.filter((b) => b.source === 'this_computer')
-    const rules = session.read((db) =>
-      getSetting(db, 'storage.backupRules', BackupRulesSchema, DEFAULT_BACKUP_RULES)
-    )
+    const { rules, policy } = session.read((db) => ({
+      rules: fullBackupRules(
+        getSetting(db, 'storage.backupRules', BackupRulesSchema, DEFAULT_BACKUP_RULES)
+      ),
+      policy: backupPolicyFor(db)
+    }))
+    // How far back each folder really reaches, and whether the size limit cuts it short.
+    const reach = (list: typeof all): BackupReachView => {
+      const r = backupReach(
+        list.map((b) => ({ name: b.name, at: new Date(b.at), label: b.label, size: b.size })),
+        new Date(),
+        policy
+      )
+      return {
+        oldest: r.oldest?.toISOString() ?? null,
+        promisedDays: r.promisedDays,
+        short: r.short
+      }
+    }
     return {
       path: st.path,
       rules,
@@ -529,6 +552,7 @@ export function registerFileHandlers(): void {
         sharedMb: mb(shared.reduce((n, b) => n + b.size, 0)),
         thisComputerMb: mb(local.reduce((n, b) => n + b.size, 0))
       },
+      reach: { shared: reach(shared), thisComputer: reach(local) },
       heartbeatSeconds: HEARTBEAT_MS / 1000,
       staleMinutes: STALE_AFTER_MS / 60_000
     }

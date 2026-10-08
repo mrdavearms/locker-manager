@@ -20,8 +20,15 @@ export type ReadResult =
   | { ok: true; bytes: Uint8Array; hash: string; size: number; mtimeMs: number }
   | { ok: false; problem: ReadProblem; detail?: string }
 
-/** Reads the whole file and checks it is a complete SQLite database. */
-export async function readDataFile(fs: FsPort, path: string): Promise<ReadResult> {
+/**
+ * Reads the whole file and checks it is a complete SQLite database. `decode` turns
+ * the bytes on disk into the database (a compressed backup); null means damaged.
+ */
+export async function readDataFile(
+  fs: FsPort,
+  path: string,
+  decode?: (bytes: Uint8Array) => Promise<Uint8Array | null>
+): Promise<ReadResult> {
   let bytes: Uint8Array
   let mtimeMs: number
   try {
@@ -33,6 +40,11 @@ export async function readDataFile(fs: FsPort, path: string): Promise<ReadResult
     if (code === 'ENOENT') return { ok: false, problem: 'not_found' }
     if (code === 'EACCES' || code === 'EPERM') return { ok: false, problem: 'no_permission' }
     return { ok: false, problem: 'unreadable', detail: code ?? String(error) }
+  }
+  if (decode) {
+    const decoded = await decode(bytes)
+    if (!decoded) return { ok: false, problem: 'not_a_data_file' }
+    bytes = decoded
   }
   const verdict = checkSqliteBytes(bytes)
   if (verdict === 'empty') return { ok: false, problem: 'not_synced' }
