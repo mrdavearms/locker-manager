@@ -1,0 +1,12 @@
+# Keeps the pinned GitHub Actions (full commit IDs in .github/workflows/) up to
+# date. Dependabot opens a pull request when a new version is out; it changes
+# the commit ID and the version comment together. npm packages are not listed
+# here on purpose: they are updated by hand and tested before a release.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci

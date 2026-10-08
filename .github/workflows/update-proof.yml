@@ -34,7 +34,15 @@ jobs:
       NEW_TAG: ${{ github.event.inputs.tag || github.event.workflow_run.head_branch }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      # NEW_TAG comes from a typed input or the triggering run's tag name; it is
+      # passed through env, never pasted into a command, and checked here.
+      - name: Check the tag
+        shell: bash
+        run: |
+          [[ "$NEW_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { echo "::error::Not a release tag: $NEW_TAG"; exit 1; }
       - name: Find the release before it
         id: prev
         shell: bash

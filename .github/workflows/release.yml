@@ -12,6 +12,16 @@ name: Release
 #   Windows: AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_ENDPOINT,
 #            AZURE_CODE_SIGNING_NAME, AZURE_CERT_PROFILE_NAME, AZURE_PUBLISHER_NAME
 #            (or WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD for a certificate file)
+#
+# Security (docs/signing.md, "GitHub settings only Dave can switch on"):
+# - Every job starts with a read-only token. Only create-draft and publish can
+#   write to the repository, and neither installs or runs any npm package.
+# - The build jobs run every dependency's code but hold only a read-only token
+#   and no stored git credentials. They hand the installers to the publish job
+#   as workflow artifacts; they never upload to the release themselves.
+# - The publish job uses the `release` environment, so when Dave adds himself as
+#   a required reviewer nothing reaches schools until he approves it.
+# - Actions are pinned to full commit IDs; the version tag is in the comment.
 
 on:
   push:
@@ -19,15 +29,17 @@ on:
       - 'v*.*.*'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify-version:
     name: Tag matches package.json
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      # electron-builder names and publishes from package.json; the tag names the
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      # electron-builder names the files from package.json; the tag names the
       # release. If they differ, installers land on the wrong release and every
       # installed copy is told it is up to date forever. Fail in seconds.
       - name: Compare versions
@@ -44,10 +56,15 @@ jobs:
     name: Create the draft release once
     needs: verify-version
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      # Both builders upload with --publish always, and electron-builder creates a
-      # release itself when it finds none. Run in parallel they can each create
-      # one, and the empty duplicate wins the download URLs. Create it here, once.
+      # Create the release once, here, before any builder runs. Two parallel
+      # electron-builder uploads once each created a release for the same tag,
+      # and the empty duplicate won the download URLs. The builders no longer
+      # upload at all (the publish job does), but keeping one early draft means a
+      # tag with a broken build is visible on the Releases page straight away.
+      # A draft is never offered to installed copies.
       - name: Create draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -55,7 +72,7 @@ jobs:
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $GITHUB_REF_NAME already exists; reusing it."
           else
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
               --title "Locker Manager ${GITHUB_REF_NAME#v}" \
               --notes "Installers are still building. This page fills in automatically."
           fi
@@ -72,21 +89,27 @@ jobs:
           - os: windows-latest
             name: Windows (x64 + arm64)
     runs-on: ${{ matrix.os }}
+    # Read-only: this job runs the code of about 900 npm packages.
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # No install scripts: Electron downloads its own binary when first used,
+      # and electron-builder fetches what it packages. Checked 9 Oct 2026.
+      - run: npm ci --ignore-scripts
       - name: Type-check and unit tests on the tagged commit
         run: npm run typecheck && npm test
       - run: npm run build
 
-      - name: Build and upload (macOS)
+      - name: Build (macOS)
         if: runner.os == 'macOS'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -107,13 +130,13 @@ jobs:
             echo "Developer ID certificate found: signing, and notarising if the Apple secrets are set."
             if [ -n "${APPLE_ID:-}" ]; then EXTRA+=("-c.mac.notarize=true"); fi
           fi
-          npx electron-builder --mac --publish always "${EXTRA[@]}"
+          # --publish never still writes latest-mac.yml beside the installers.
+          npx electron-builder --mac --publish never "${EXTRA[@]}"
 
-      - name: Build and upload (Windows)
+      - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -139,19 +162,68 @@ jobs:
           } else {
             Write-Host "No Windows signing secrets: the installer is unsigned (SmartScreen shows a warning on first run)."
           }
-          npx electron-builder --win --publish always @extra
+          # --publish never still writes latest.yml beside the installer.
+          npx electron-builder --win --publish never @extra
+
+      # Exactly the files the release carries (scripts/verify-release-assets.mjs
+      # checks the list again after upload).
+      - name: Hand the Mac files to the publish job
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: installers-macos
+          path: |
+            release/*.dmg
+            release/*.dmg.blockmap
+            release/*.zip
+            release/*.zip.blockmap
+            release/latest-mac.yml
+          if-no-files-found: error
+          retention-days: 5
+      - name: Hand the Windows files to the publish job
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: installers-windows
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+          if-no-files-found: error
+          retention-days: 5
 
   publish:
-    name: Verify assets and publish
+    name: Upload, verify and publish
     needs: build
     runs-on: ubuntu-latest
+    # Waits here for Dave's approval once the `release` environment has him as a
+    # required reviewer. Nothing has been uploaded to the release before this.
+    environment: release
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v5
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
+      # No npm install in this job: it holds a write token. The checker and the
+      # notes below use only Node itself, git and the gh command.
+      - name: Collect the installers
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: installers-*
+          path: dist
+          merge-multiple: true
+
+      - name: Upload the installers to the draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -l dist
+          gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
 
       # A missing latest-mac.yml breaks Mac updates silently; a wrong version in
       # latest.yml strands every installed copy. Nothing goes live until this passes.

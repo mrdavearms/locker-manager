@@ -17,12 +17,22 @@ on:
         required: true
         default: '20'
 
+# Once immutable releases are switched on (docs/signing.md), a published
+# release's files cannot be replaced, so this workflow fails with an error from
+# GitHub. That is the intended trade-off: no one, including a stolen login, can
+# swap the update files after publishing. A share can then only be set on a draft.
+
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   set:
     runs-on: ubuntu-latest
+    # Changes what installed copies download, so it waits for the same approval
+    # as publishing a release.
+    environment: release
+    permissions:
+      contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TAG: ${{ inputs.tag }}
