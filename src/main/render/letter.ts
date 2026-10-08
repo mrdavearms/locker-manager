@@ -10,7 +10,7 @@ import type { Terminology } from '@shared/terminology'
 import { codeParts, formatBody, formatLine, type MergeValues } from '../letters/text'
 import { fitText } from './fit'
 import { fontFaceCss } from './fonts'
-import { esc, mm } from './html'
+import { esc, mm, safeImageUrl } from './html'
 
 // Student letters as HTML pages in millimetres (SPEC.md 5.2 and 5.3). One student
 // per page: each letter is a page-sized box. The printing code measures every box
@@ -100,10 +100,12 @@ function pageCss(input: LetterBuildInput): string {
   const mono = input.template.colour === 'mono'
   const primary = mono ? '#000000' : input.school.primary
   const accent = mono ? '#000000' : input.school.accent
+  // Only plain base64 pictures reach the CSS; anything else could close the style.
   const imageCss = [...input.images.entries()]
-    .map(
-      ([id, img]) => `.i-${id.replace(/[^a-zA-Z0-9_-]/g, '')}{background-image:url(${img.dataUrl})}`
-    )
+    .flatMap(([id, img]) => {
+      const url = safeImageUrl(img.dataUrl)
+      return url ? [`.i-${id.replace(/[^a-zA-Z0-9_-]/g, '')}{background-image:url("${url}")}`] : []
+    })
     .join('\n')
   return `${fontFaceCss()}
 @page{size:${mm(page.width)} ${mm(page.height)};margin:0}
@@ -243,8 +245,8 @@ function renderBlock(
   const body = pick(block.body, lang, fallback)
   switch (block.type) {
     case 'header': {
-      const logo = input.school.logo
-      return `<div class="hdr">${logo ? `<div class="hlogo" style="background-image:url(${logo})"></div>` : ''}<div><div class="hschool">${esc(
+      const logo = safeImageUrl(input.school.logo)
+      return `<div class="hdr">${logo ? `<div class="hlogo" style="background-image:url(&quot;${esc(logo)}&quot;)"></div>` : ''}<div><div class="hschool">${esc(
         input.school.name
       )}</div><div class="htitle">${formatLine(heading, values)}</div>${
         body.trim() ? `<div class="hsub">${formatLine(body, values)}</div>` : ''

@@ -2,12 +2,26 @@ import { randomBytes } from 'node:crypto'
 import { unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, session, type Session } from 'electron'
 import { PDFDocument } from 'pdf-lib'
+import { guardRenderContents, renderRequestAllowed } from './guard'
 
 // Renders our own HTML to PDF in a hidden window (SPEC.md 5.3): no scripts, no
 // network, page size from CSS, zero margins. The page is written to a private
 // temporary file (data URLs that big are refused) and removed afterwards.
+
+let render: Session | null = null
+
+/** A session of their own for the hidden windows, where nothing but file and data loads. */
+function renderSession(): Session {
+  if (!render) {
+    render = session.fromPartition('locker-manager-render')
+    render.webRequest.onBeforeRequest((details, callback) =>
+      callback({ cancel: !renderRequestAllowed(details.url) })
+    )
+  }
+  return render
+}
 
 async function withPage<T>(
   html: string,
@@ -19,6 +33,7 @@ async function withPage<T>(
   const win = new BrowserWindow({
     show: false,
     webPreferences: {
+      session: renderSession(),
       // Only the letter measuring step turns this on, to run our own measuring code;
       // the page's own Content-Security-Policy still forbids any script in it.
       javascript,
@@ -29,6 +44,7 @@ async function withPage<T>(
     }
   })
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  guardRenderContents(win.webContents)
   try {
     // Fonts are embedded as data URLs, so they are ready when the page has loaded.
     await win.loadFile(file)
