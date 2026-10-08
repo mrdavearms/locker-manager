@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 7 October 2026 (v0.10.0 released; fix-before-1.0 branch in progress; 1.0 waits for Dave's hand checks)._
+_Last updated: 9 October 2026 (v0.11.0 releasing: Mac self-update, start-up install, build label; carries fix-before-1.0 and simple-schools; 1.0 waits for Dave's hand checks)._
 
 ## What this is
 
@@ -27,9 +27,10 @@ school in a shared folder, no server, no accounts, no internet except for update
 | Lint and format check | `npm run lint` and `npm run format:check` |
 | Type-check | `npm run typecheck` |
 | Unit tests (Vitest) | `npm test` |
+| All four checks in one go (lint, format, type-check, unit tests) | `npm run check` |
 | End-to-end tests (Playwright for Electron) | `npm run test:e2e` |
 | Build renderer, main and preload | `npm run build` |
-| Package installers locally (unsigned) | `npm run dist:mac`, `npm run dist:win`, or `npm run dist:dir` (unpacked app only, fastest) |
+| Package installers locally (unsigned) | `npm run dist:mac`, `npm run dist:win` (x64 only; releases build x64 and arm64 in one installer), or `npm run dist:dir` (unpacked app only, fastest) |
 | Check the repo for student data or secrets | `npm run check:no-student-data` (also runs on every commit) |
 | Check a GitHub Release has every updater file | `npm run verify:release-assets -- v0.0.2` |
 | Release | bump `version` in `package.json` and `package-lock.json`, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z` |
@@ -134,6 +135,10 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     locks or one kind, with words per language. This keeps every letter to one page and
     makes the WHS layout the default. Words use a tiny format: blank line, `- `, `1. `,
     `**bold**`, `{merge_field}`.
+15. **Anything with codes prints or exports only in edit mode** (Dave, 7 Oct 2026). Every
+    code that leaves the app is written to `code_reveal_log`, which needs a write. The rule
+    is stated next to every print button that can carry codes, in the user guide and in
+    the IT guide. The screen never shows codes in previews; they are masked.
 16. **PIN, not passphrase, for 1.0** (SPEC.md 17 item 5). An optional PIN (scrypt hash in
     setting `privacy`) gates showing, printing and exporting codes; unlock lasts 10 minutes in
     main-process memory and resets when another file opens. A passphrase that wraps the code
@@ -168,10 +173,34 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     written to `code_reveal_log`, and only the editing computer can write to the file, so a
     read-only computer cannot show, print or export codes. Every screen says who is editing
     and why; conflict and newer-version cases have their own wording.
-15. **Anything with codes prints or exports only in edit mode** (Dave, 7 Oct 2026). Every
-    code that leaves the app is written to `code_reveal_log`, which needs a write. The rule
-    is stated next to every print button that can carry codes, in the user guide and in
-    the IT guide. The screen never shows codes in previews; they are masked.
+23. **Small schools are first class** (Dave, 7 Oct 2026). A school that only records who has
+    which locker (no import, no codes, no labels or letters) must not be blocked or nagged.
+    Set-up has a quick start (`lockers.quickStart`, `QuickStartLockers.tsx`) that makes one
+    area, one bank and the lockers in one step, and saves the chosen lock kind as the usual
+    lock (`locks.defaults`). Home's getting-started list lets labels and letters be marked
+    "We don't use this" (setting `setup.notUsed`). `tests/e2e/small-school.spec.ts` runs the
+    whole simple path; any change that breaks it needs a reason.
+24. **Student ID stays required** (Dave, 7 Oct 2026), even for students added by hand. It is
+    how a hand-added student is matched on a later import.
+25. **Unsigned Macs install their own updates; updates found at start-up install at once**
+    (Dave, 9 Oct 2026). Squirrel.Mac refuses every ad-hoc build, so on an unsigned Mac
+    electron-updater only checks (`autoDownload` off) and `src/main/update/macInstaller.ts`
+    downloads the universal ZIP with `net.fetch`, checks its SHA-512 against latest-mac.yml,
+    unpacks it with `ditto`, checks bundle id, version and `codesign --verify`, and writes
+    `pending-update/install.sh` (`macInstallScript.ts`). After the app quits, the script swaps
+    the bundle with two renames and puts the old one back on any failure; the outcome goes to
+    `update-result.json` in userData, and a failed version is offered as a download, not
+    retried. `policy.macBlocker` sends the app to download-page mode when it runs from the
+    DMG, a translocated copy, or a folder the account cannot write. Checks start 3 seconds
+    after launch (SPEC.md 9.3 said 30); an update found before any file is opened downloads
+    and restarts into the new version (`installAtStartup`), with Skip for now. Not yet proven
+    on a real Mac: macOS 13+ App Management may block the swap. The first proof is the update
+    proof for 0.11.1 (scripts/update-proof/mac.sh looks for `mac-self-install=yes` in the log).
+    Mac copies of 0.10.0 or older still need one manual install.
+26. **Every copy shows its build** (Dave, 9 Oct 2026). electron.vite.config.ts stamps the
+    short commit (`GITHUB_SHA`, else `git rev-parse`) and build time into the main process
+    (`src/main/buildInfo.ts`, `AppInfo.commit` and `builtAt`). The line "Version X · commit ·
+    built date" shows on Home, in the bottom bar (wide windows), under Welcome, and in About.
 
 ## Known, accepted
 
@@ -199,9 +228,10 @@ From `~/Antigravity/redaction tool/CLAUDE.md` and `~/Antigravity/jacks iep gener
   platforms, every release, because staff reach the release page from the update prompt
   and never read the README.
 - Squirrel.Mac rejects an update whose signature does not match the running app, so an
-  unsigned Mac build can only detect updates and open the download page (SPEC.md 9.2).
+  unsigned Mac build cannot use it. Since 0.11.0 the app replaces its own bundle instead
+  (decision 25); SPEC.md 9.2 still describes the older download-page behaviour.
 
-## Where things live (M1)
+## Where things live
 
 - `src/main/db/`: sql.js wrapper (`db.ts`), migrations (`migrations/NNN_*.sql`, imported
   with `?raw`), audit and meta helpers (`context.ts`), new file (`newFile.ts`), summaries
@@ -237,10 +267,17 @@ All data reads and writes from the window go through ONE channel, `rpc`:
 - The window's words come from `useTerms()` (terminology); never hard-code "Homeroom",
   "Locker" and so on in UI text.
 
-## Gotchas found in M1
+## Gotchas
 
 - End-to-end test windows open in the background (`LOCKER_MANAGER_BACKGROUND=1`, set in
   `tests/e2e/launch.ts`) so they do not take focus while you work.
+
+- A test that passes the PID of its own child to a "wait until this process ends" check
+  waits forever: the child stays a zombie (still answers `kill -0`) until the parent reaps
+  it, and a synchronous call never lets Node reap it. Start the dummy through
+  `bash -c 'sleep 1 & echo $!'` so the system reaps it (tests/unit/update/).
+- `tests/e2e/onboarding.spec.ts` polls preferences.json: slow Windows runners read it before
+  the app had written it, which failed CI on the simple-schools merge.
 
 - React's `react-hooks/set-state-in-effect` lint rule forbids resetting form state in an
   effect when a dialog opens. Put the form in a child component inside the Radix dialog
@@ -383,7 +420,7 @@ locker, from `print_job.records`. A year code set made while lockers are out is 
 `archiveYear`. A PIN change empties the undo list. A practice copy is recorded in the real
 file. Workbook import drops logo types the app does not make.
 
-**Fix-before-1.0 (7 Oct 2026).** Branch `fix-before-1-0`. A message strip confirms each
+**Fix-before-1.0 (7 Oct 2026, merged).** A message strip confirms each
 change for 8 seconds with Undo. Students can be added by hand (matched by student ID on the
 next import), and their year level and group changed in their panel, with an offer to move
 them; new Settings tab "Year levels and groups". Home "Move or swap" asks which and a swap
@@ -392,3 +429,8 @@ Lock resets have tick boxes, Tick all, "Mark N as reset" and Print this list. Re
 screens say who is editing and why codes and letters are locked (decision 22). After
 allocating, Print labels and Print letters buttons; after an import, "Give out lockers now".
 The updater never restarts during a print or import. Letters show a progress bar and Cancel.
+
+**Simple schools (7 Oct 2026, merged).** Decision 23. Also: no Show code button where the
+lock has no code; the Year level list includes year levels current students already have;
+Allocate hides "Issue a code now" when no drafted locker takes a code; "School details"
+ticks once the school has a name.
