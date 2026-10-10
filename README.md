@@ -1,27 +1,81 @@
-# Locker Manager
+<p align="center">
+  <img src="resources/build/icon.png" width="104" alt="" />
+</p>
 
-A free, open-source desktop app for schools to manage student lockers, lock codes, locker
-labels and welcome letters. Windows and macOS. No server, no accounts, no internet
-connection needed except for updates.
+<h1 align="center">Locker Manager</h1>
 
-**Website: [mrdavearms.github.io/locker-manager](https://mrdavearms.github.io/locker-manager/)**
+<p align="center">
+  <strong>Every locker, every code, every student.</strong><br />
+  A free desktop app for school offices: give out lockers, issue lock codes, print labels and
+  welcome letters, and keep it right all year. Windows and Mac. Your data stays in your school.
+</p>
 
-**Status: pre-release (0.x).** Ready to try at a school. Version 1.0 follows after the hand
-checks in [the release checklist](docs/release-checklist.md): real label sheets on a laser
-printer, letters on paper, a Windows install at a school, and code signing once it is bought.
+<p align="center">
+  <a href="https://mrdavearms.github.io/locker-manager/download/"><img src="site/images/download-button.svg" width="420" alt="Download Locker Manager for Windows or Mac" /></a>
+</p>
 
-Not built yet, although the [specification](SPEC.md) mentions them: a passphrase that
-encrypts codes (an optional PIN is built instead), opt-in crash reports, release notes shown
-inside the app (they are on the release page), and screens in languages other than English
-(letters can already be in more than one language).
+<p align="center">
+  <a href="https://github.com/mrdavearms/locker-manager/releases"><img src="https://img.shields.io/github/v/release/mrdavearms/locker-manager?include_prereleases&label=newest%20version&color=0e4a57" alt="Newest version" /></a>
+  <img src="https://img.shields.io/badge/Windows%20%7C%20Mac-free-c4511c" alt="Windows and Mac, free" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-56616b" alt="MIT licence" /></a>
+</p>
+
+<p align="center">
+  <a href="https://mrdavearms.github.io/locker-manager/download/"><strong>Download and install help</strong></a> ·
+  <a href="https://mrdavearms.github.io/locker-manager/">Website</a> ·
+  <a href="docs/user-guide.md">User guide</a> ·
+  <a href="docs/it-guide.md">For school IT</a> ·
+  <a href="#your-data-for-privacy-assessments">Privacy</a>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/images/home-dark.png" />
+    <img src="site/images/home.png" width="860" alt="Locker Manager's Home screen for a demo school: 228 lockers, 227 students, 221 with a locker, and buttons for everyday jobs." />
+  </picture>
+</p>
+
+> [!NOTE]
+> **Pre-release (version 0.x), ready to try at a school.** Version 1.0 follows after the hand
+> checks in [the release checklist](docs/release-checklist.md): real label sheets on a laser
+> printer, letters on paper, a Windows install at a school, and code signing once it is bought.
 
 ## Download
 
-Get the newest installer from the **[Releases page](https://github.com/mrdavearms/locker-manager/releases)**:
-`Locker-Manager-Setup-<version>.exe` for Windows, `Locker-Manager-<version>-universal.dmg`
-for Mac. Every release page carries the exact first-time steps for the one-off security
-warning on each platform. Once installed, the app updates itself on Windows and on a Mac
-(on a Mac, keep it in the Applications folder).
+**[Go to the download page](https://mrdavearms.github.io/locker-manager/download/)**. It picks
+the right file for your computer and walks you through installing it.
+
+> [!IMPORTANT]
+> **The first time you open it, your computer shows a security warning.** Locker Manager is not
+> yet registered with Microsoft or Apple, so Windows says "Windows protected your PC" and a Mac
+> says it cannot check the app. This is expected and happens only once. The
+> [download page](https://mrdavearms.github.io/locker-manager/download/) shows exactly what to
+> click on each computer. In short:
+>
+> - **Windows:** click **More info**, then **Run anyway**. No administrator password needed.
+> - **Mac:** drag the app into **Applications**, try to open it once and click **Done**, then
+>   go to **System Settings**, **Privacy & Security**, and click **Open Anyway**.
+>
+> On a school-managed computer, ask your IT team first: many schools block new apps.
+
+Once installed, Locker Manager updates itself on Windows and on a Mac (on a Mac, keep it in the
+Applications folder). Every version, with its release notes, is on the
+[releases page](https://github.com/mrdavearms/locker-manager/releases).
+
+## See it
+
+<table>
+  <tr>
+    <td width="50%"><img src="site/images/lockers.png" alt="The Lockers screen: each bank of lockers with the student's first name on each door." /><br /><sub><strong>Lockers.</strong> Every bank at a glance, with who has each locker.</sub></td>
+    <td width="50%"><img src="site/images/students.png" alt="The Students screen: a list of students with year level, homeroom, locker and student ID." /><br /><sub><strong>Students.</strong> Imported from your student system, or added by hand.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="site/images/labels.png" alt="The Labels screen: a preview of an Avery label sheet with each student's name, homeroom and locker number." /><br /><sub><strong>Labels.</strong> Exact millimetre positions on Avery sheets.</sub></td>
+    <td width="50%"><img src="site/images/letters.png" alt="The Letters screen: a one-page welcome letter with the student's locker, a hidden code and steps for their lock." /><br /><sub><strong>Letters.</strong> One page per student, codes hidden on screen.</sub></td>
+  </tr>
+</table>
+
+<sub>All pictures show the demo school that comes with the app. Every student in it is made up.</sub>
 
 ## What it does
 
@@ -53,6 +107,11 @@ warning on each platform. Once installed, the app updates itself on Windows and 
   them.
 - **Help built in**: a short tour the first time, a getting-started list on Home, the guide
   inside the app, a demo school with made-up students, and a practice copy for training.
+
+Not built yet, although the [specification](SPEC.md) mentions them: a passphrase that
+encrypts codes (an optional PIN is built instead), opt-in crash reports, release notes shown
+inside the app (they are on the release page), and screens in languages other than English
+(letters can already be in more than one language).
 
 ## Your data (for privacy assessments)
 

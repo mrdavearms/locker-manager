@@ -97,6 +97,15 @@
         border-radius: 50%;
         background: var(--accent);
       }
+      .top-download {
+        margin-left: auto;
+        padding: 8px 16px;
+        border-radius: 12px;
+        background: var(--panel);
+        color: var(--on-panel);
+        font-weight: 700;
+        text-decoration: none;
+      }
       .brand {
         font-family: 'Bricolage Grotesque', sans-serif;
         font-weight: 700;
@@ -278,6 +287,7 @@
       <header class="top">
         <div class="mark" aria-hidden="true"><span></span></div>
         <span class="brand">Locker Manager</span>
+        <a class="top-download" href="download/">Download</a>
       </header>
 
       <div class="hero">
@@ -293,9 +303,7 @@
           Windows install have been checked by hand at a school.
         </p>
         <div class="buttons">
-          <a class="btn primary" href="https://github.com/mrdavearms/locker-manager/releases"
-            >Download</a
-          >
+          <a class="btn primary" href="download/">Download for Windows or Mac</a>
           <a
             class="btn ghost"
             href="https://github.com/mrdavearms/locker-manager/blob/main/docs/user-guide.md"
@@ -395,8 +403,14 @@
       <section class="steps">
         <h2>Getting started</h2>
         <ol>
-          <li>Download the installer for Windows or Mac from the releases page.</li>
-          <li>The first time, follow the short security steps on the release page.</li>
+          <li>
+            Download the installer for Windows or Mac from the
+            <a href="download/">download page</a>.
+          </li>
+          <li>
+            The first time, follow the short security steps on the
+            <a href="download/">download page</a>. You only do this once.
+          </li>
           <li>Try the demo school, then start your school’s file.</li>
         </ol>
         <p>

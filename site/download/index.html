@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Download Locker Manager</title>
+    <meta
+      name="description"
+      content="Download Locker Manager for Windows or Mac, free. Step-by-step help with the one-off security warning the first time you open it."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=Big+Shoulders+Stencil+Display:wght@700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --canvas: #f3efe6;
+        --surface: #fffdf8;
+        --ink: #17222b;
+        --muted: #56616b;
+        --line: #ddd5c6;
+        --panel: #0e4a57;
+        --on-panel: #fffdf8;
+        --accent: #c4511c;
+        --soft: #dceae9;
+        --warn-bg: #fbf1dc;
+        --warn-line: #e3c98f;
+        --win: #0b5cad;
+        --mac-bar: #e8e4dc;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --canvas: #0f1518;
+          --surface: #172026;
+          --ink: #ece7dc;
+          --muted: #a7b0b5;
+          --line: #29363e;
+          --panel: #123b44;
+          --on-panel: #eef4f3;
+          --accent: #f0915c;
+          --soft: #16343a;
+          --warn-bg: #2b2516;
+          --warn-line: #5c4b22;
+          --win: #1f6fc0;
+          --mac-bar: #222c32;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font:
+          17px/1.55 'Atkinson Hyperlegible Next',
+          system-ui,
+          sans-serif;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+        letter-spacing: -0.01em;
+        line-height: 1.15;
+      }
+      h2 {
+        font-size: clamp(26px, 4vw, 34px);
+        margin: 0 0 16px;
+      }
+      h3 {
+        font-size: 21px;
+        margin: 0 0 8px;
+      }
+      a {
+        color: inherit;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 16px;
+      }
+      header.top {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 20px 0;
+      }
+      header.top nav {
+        margin-left: auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        font-weight: 600;
+        font-size: 16px;
+      }
+      header.top nav a {
+        text-decoration: none;
+      }
+      header.top nav a:hover {
+        text-decoration: underline;
+      }
+      .home-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+      }
+      .mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--panel);
+        display: grid;
+        place-items: center;
+      }
+      .mark span {
+        width: 18px;
+        height: 24px;
+        border-radius: 3px;
+        background: var(--on-panel);
+        position: relative;
+      }
+      .mark span::after {
+        content: '';
+        position: absolute;
+        left: 6px;
+        bottom: 4px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+      .brand {
+        font-family: 'Bricolage Grotesque', sans-serif;
+        font-weight: 700;
+        font-size: 20px;
+      }
+
+      /* The download band */
+      .hero {
+        background: var(--panel);
+        color: var(--on-panel);
+        border-radius: 28px;
+        padding: 48px 40px;
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(rgb(255 255 255 / 0.1) 1.5px, transparent 1.6px);
+        background-size: 14px 14px;
+        mask-image: linear-gradient(90deg, transparent 40%, #000);
+      }
+      .hero > * {
+        position: relative;
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 13px;
+        font-weight: 700;
+        opacity: 0.8;
+        margin: 0;
+      }
+      .hero h1 {
+        font-size: clamp(34px, 6vw, 54px);
+        margin: 10px 0 8px;
+      }
+      .hero .version {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 18px;
+      }
+      .choices {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+        margin-top: 32px;
+      }
+      .choice {
+        background: rgb(255 255 255 / 0.08);
+        border: 1px solid rgb(255 255 255 / 0.22);
+        border-radius: 20px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .choice.yours {
+        background: rgb(255 255 255 / 0.14);
+        border: 2px solid var(--on-panel);
+      }
+      .choice .yours-tag {
+        display: none;
+        align-self: flex-start;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        background: var(--on-panel);
+        color: #0e4a57;
+        border-radius: 999px;
+        padding: 3px 10px;
+      }
+      .choice.yours .yours-tag {
+        display: inline-block;
+      }
+      .choice h2 {
+        font-size: 28px;
+        margin: 0;
+      }
+      .choice p {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 16px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 16px 22px;
+        border-radius: 14px;
+        font-weight: 700;
+        font-size: 18px;
+        text-decoration: none;
+        background: var(--on-panel);
+        color: #0e4a57;
+        margin-top: 6px;
+      }
+      .btn:hover {
+        filter: brightness(0.95);
+      }
+      .btn svg {
+        flex: none;
+      }
+      .filename {
+        font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 14px;
+        opacity: 0.85;
+        word-break: break-all;
+      }
+      .hero .after {
+        margin: 24px 0 0;
+        font-size: 16px;
+        opacity: 0.9;
+      }
+
+      section {
+        margin: 56px 0;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 28px;
+      }
+      .warn {
+        background: var(--warn-bg);
+        border: 1px solid var(--warn-line);
+        border-radius: 20px;
+        padding: 24px 28px;
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .warn svg {
+        flex: none;
+        margin-top: 3px;
+        color: var(--accent);
+      }
+      .warn h2 {
+        font-size: 24px;
+        margin: 0 0 6px;
+      }
+      .warn p {
+        margin: 6px 0 0;
+      }
+      .two {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+        align-items: start;
+      }
+      .muted {
+        color: var(--muted);
+      }
+
+      /* Numbered steps */
+      ol.steps {
+        list-style: none;
+        counter-reset: step;
+        padding: 0;
+        margin: 16px 0 0;
+      }
+      ol.steps > li {
+        counter-increment: step;
+        position: relative;
+        padding: 0 0 18px 52px;
+      }
+      ol.steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: -2px;
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: var(--panel);
+        color: var(--on-panel);
+        display: grid;
+        place-items: center;
+        font-family: 'Big Shoulders Stencil Display', sans-serif;
+        font-weight: 800;
+        font-size: 20px;
+      }
+      ol.steps > li > strong:first-child {
+        display: block;
+      }
+      ol.steps ul {
+        margin: 6px 0 0;
+        padding-left: 20px;
+      }
+      ol.steps ul li {
+        margin: 4px 0;
+      }
+      .ui {
+        display: inline-block;
+        padding: 0 8px;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 7px;
+        background: var(--canvas);
+        font-weight: 700;
+        font-size: 0.92em;
+        white-space: nowrap;
+      }
+
+      /* Small drawings of the warnings */
+      .shot {
+        margin: 10px 0 4px;
+        border-radius: 12px;
+        overflow: hidden;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        line-height: 1.4;
+        max-width: 420px;
+      }
+      .shot.win {
+        background: var(--win);
+        color: #fff;
+        padding: 16px 18px;
+      }
+      .shot.win .t {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .shot.win .link {
+        text-decoration: underline;
+        outline: 3px solid #ffd166;
+        outline-offset: 2px;
+        border-radius: 2px;
+      }
+      .shot.win .row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .shot.win .b {
+        border: 1px solid #fff;
+        padding: 5px 16px;
+      }
+      .shot.win .b.hi {
+        outline: 3px solid #ffd166;
+        outline-offset: 2px;
+      }
+      .shot.mac {
+        background: var(--surface);
+        border: 1px solid var(--line);
+      }
+      .shot.mac .bar {
+        background: var(--mac-bar);
+        padding: 7px 10px;
+        display: flex;
+        gap: 6px;
+      }
+      .shot.mac .bar i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #c9c3b8;
+      }
+      .shot.mac .body {
+        padding: 14px 16px;
+      }
+      .shot.mac .line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .shot.mac .b {
+        background: var(--canvas);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 4px 12px;
+        white-space: nowrap;
+        outline: 3px solid #ffb703;
+        outline-offset: 2px;
+      }
+      .shot-cap {
+        font-size: 14px;
+        color: var(--muted);
+        margin: 0 0 6px;
+      }
+
+      /* Questions */
+      details {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px 20px;
+        margin: 10px 0;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 700;
+      }
+      details p,
+      details ul {
+        margin: 10px 0 0;
+      }
+      code {
+        font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 0.9em;
+        background: var(--soft);
+        padding: 1px 6px;
+        border-radius: 6px;
+        word-break: break-word;
+      }
+      .it {
+        background: var(--soft);
+        border-radius: 22px;
+        padding: 28px;
+      }
+      .it ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+      .it li {
+        margin: 8px 0;
+      }
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 28px 0 48px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      @media (max-width: 640px) {
+        .hero {
+          padding: 32px 20px;
+          border-radius: 20px;
+        }
+        .card,
+        .it {
+          padding: 22px;
+        }
+        .warn {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <a class="home-link" href="../">
+          <div class="mark" aria-hidden="true"><span></span></div>
+          <span class="brand">Locker Manager</span>
+        </a>
+        <nav aria-label="Site">
+          <a href="../">Home</a>
+          <a href="https://github.com/mrdavearms/locker-manager/blob/main/docs/user-guide.md"
+            >Guide</a
+          >
+          <a href="https://github.com/mrdavearms/locker-manager">GitHub</a>
+        </nav>
+      </header>
+
+      <main>
+        <div class="hero">
+          <p class="eyebrow">Free for every school</p>
+          <h1>Download Locker Manager</h1>
+          <p class="version" id="version">
+            The newest version is on the
+            <a href="https://github.com/mrdavearms/locker-manager/releases">releases page</a>.
+          </p>
+
+          <div class="choices">
+            <div class="choice" id="choice-win">
+              <span class="yours-tag">Your computer</span>
+              <h2>Windows</h2>
+              <p>Windows 10 or 11, 64-bit. One installer for Intel, AMD and ARM computers.</p>
+              <a
+                class="btn"
+                id="dl-win"
+                href="https://github.com/mrdavearms/locker-manager/releases"
+                ><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 3v12m0 0-5-5m5 5 5-5M4 20h16"
+                  /></svg
+                >Download for Windows</a
+              >
+              <span class="filename" id="file-win">Locker-Manager-Setup-&lt;version&gt;.exe</span>
+            </div>
+            <div class="choice" id="choice-mac">
+              <span class="yours-tag">Your computer</span>
+              <h2>Mac</h2>
+              <p>One download for Apple silicon (M1 and later) and Intel Macs.</p>
+              <a
+                class="btn"
+                id="dl-mac"
+                href="https://github.com/mrdavearms/locker-manager/releases"
+                ><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 3v12m0 0-5-5m5 5 5-5M4 20h16"
+                  /></svg
+                >Download for Mac</a
+              >
+              <span class="filename" id="file-mac"
+                >Locker-Manager-&lt;version&gt;-universal.dmg</span
+              >
+            </div>
+          </div>
+
+          <p class="after">
+            Already using Locker Manager? You do not need to download anything: it updates itself.
+          </p>
+        </div>
+
+        <section>
+          <div class="warn" role="note">
+            <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linejoin="round"
+                d="M12 3 2 20h20L12 3Z"
+              />
+              <path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 10v4" />
+              <circle cx="12" cy="17" r="1.2" fill="currentColor" />
+            </svg>
+            <div>
+              <h2>Expect a security warning the first time</h2>
+              <p>
+                Locker Manager is free and open source, and it is not yet registered with Microsoft
+                or Apple. So the first time you download and open it, your computer warns you that
+                it does not recognise the app. This is expected. Follow the steps below for your
+                computer. You only do this once.
+              </p>
+              <p>
+                The app runs entirely on your own computer and sends no student data anywhere.
+                Download it only from this page or from the project's GitHub page.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Before you start</h2>
+          <div class="card">
+            <ul>
+              <li>
+                <strong>On a school-managed computer, check with your IT team first.</strong> Many
+                schools block new apps until IT allows them. IT can install Locker Manager for every
+                staff member at once (see the section for school IT below).
+              </li>
+              <li>
+                <strong>You do not need an administrator password on Windows.</strong> The installer
+                puts the app in your own account.
+              </li>
+              <li>
+                <strong
+                  >On a Mac, you need to be allowed to add apps to the Applications folder.</strong
+                >
+                If you are not, ask your IT team.
+              </li>
+              <li>
+                <strong>Your school's data is not in the download.</strong> Each school keeps its
+                own data file in a folder it chooses. You can try the app first with a demo school
+                of made-up students.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="two">
+          <div class="card" id="windows">
+            <h2>Installing on Windows</h2>
+            <ol class="steps">
+              <li>
+                <strong>Download the installer.</strong>
+                Click <span class="ui">Download for Windows</span> above.
+              </li>
+              <li>
+                <strong>If your browser warns you, keep the file.</strong>
+                <ul>
+                  <li>
+                    <strong>Microsoft Edge</strong> may say the file "isn't commonly downloaded".
+                    Point at the download, click the <span class="ui">…</span> button, then
+                    <span class="ui">Keep</span>. If it asks again, click
+                    <span class="ui">Show more</span>, then <span class="ui">Keep anyway</span>.
+                  </li>
+                  <li>
+                    <strong>Google Chrome</strong> may show a similar warning. Click the download,
+                    then <span class="ui">Keep</span> or <span class="ui">Download anyway</span>.
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <strong>Open the downloaded file.</strong> It is called
+                <code>Locker-Manager-Setup-…exe</code> and is in your Downloads folder.
+              </li>
+              <li>
+                <strong>Get past the blue "Windows protected your PC" screen.</strong> Click the
+                small <span class="ui">More info</span> link, then
+                <span class="ui">Run anyway</span>.
+                <div class="shot win" aria-hidden="true">
+                  <div class="t">Windows protected your PC</div>
+                  <div>
+                    Microsoft Defender SmartScreen prevented an unrecognised app from starting.
+                  </div>
+                  <div style="margin-top: 8px"><span class="link">More info</span></div>
+                  <div class="row">
+                    <span class="b hi">Run anyway</span><span class="b">Don't run</span>
+                  </div>
+                </div>
+                <p class="shot-cap">
+                  <strong>Run anyway</strong> only appears after you click
+                  <strong>More info</strong>.
+                </p>
+              </li>
+              <li>
+                <strong>Follow the installer.</strong> If it asks who to install for, choose
+                <span class="ui">Only for me</span>. That needs no administrator password.
+              </li>
+              <li>
+                <strong>Open Locker Manager</strong> from the Start menu. Windows does not warn you
+                again, and later versions install themselves.
+              </li>
+            </ol>
+          </div>
+
+          <div class="card" id="mac">
+            <h2>Installing on a Mac</h2>
+            <ol class="steps">
+              <li>
+                <strong>Download the disk image.</strong>
+                Click <span class="ui">Download for Mac</span> above. The file ends in
+                <code>.dmg</code>.
+              </li>
+              <li>
+                <strong>Open it and drag Locker Manager into Applications.</strong> Then eject the
+                disk image (click the eject button next to it in Finder).
+                <p class="shot-cap" style="margin-top: 6px">
+                  Always run the app from your Applications folder, not from the disk image.
+                  Otherwise it cannot update itself.
+                </p>
+              </li>
+              <li>
+                <strong>Try to open it once.</strong> Open <strong>Locker Manager</strong> from
+                Applications. macOS says it cannot check the app and offers only
+                <span class="ui">Done</span>. Click Done. This step is needed: it makes the next
+                step's button appear.
+              </li>
+              <li>
+                <strong>Allow it in System Settings.</strong> Open
+                <span class="ui">System Settings</span>, then
+                <span class="ui">Privacy &amp; Security</span>. Scroll to the bottom and click
+                <span class="ui">Open Anyway</span> next to the line about Locker Manager.
+                <div class="shot mac" aria-hidden="true">
+                  <div class="bar"><i></i><i></i><i></i></div>
+                  <div class="body">
+                    <div class="muted" style="margin-bottom: 8px; font-weight: 600">Security</div>
+                    <div class="line">
+                      <span>"Locker Manager" was blocked to protect your Mac.</span>
+                      <span class="b">Open Anyway</span>
+                    </div>
+                  </div>
+                </div>
+              </li>
+              <li>
+                <strong>Confirm.</strong> Click <span class="ui">Open Anyway</span> once more, and
+                enter your Mac password or use Touch ID if asked.
+              </li>
+              <li>
+                <strong>That's it.</strong> From now on, open it like any other app. Later versions
+                install themselves when you start the app.
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <section>
+          <h2>After it is installed</h2>
+          <div class="two">
+            <div class="card">
+              <h3>Try the demo school first</h3>
+              <p class="muted">
+                On the first screen, choose the demo school. Every student in it is made up, and it
+                starts fresh each time you open it, so you can practise freely. A short tour shows
+                you around.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Updates install themselves</h3>
+              <p class="muted">
+                Locker Manager checks for a new version a few seconds after it starts. It never
+                restarts while you are saving, printing or importing. On a Mac, keep the app in
+                Applications so it can replace itself.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>If something goes wrong</h2>
+          <details>
+            <summary>Windows shows no "Run anyway" button</summary>
+            <p>
+              Click the small <strong>More info</strong> link first; the button appears after that.
+              If there is still no button, your school's settings block apps Windows does not
+              recognise. Ask your IT team to install it for you.
+            </p>
+          </details>
+          <details>
+            <summary>The Mac has no "Open Anyway" button</summary>
+            <p>
+              The button only appears for about an hour after you try to open the app. Open Locker
+              Manager from Applications again, click Done, then go straight back to
+              <strong>Privacy &amp; Security</strong>. If it still does not appear, the Mac may be
+              managed by your school; ask your IT team.
+            </p>
+          </details>
+          <details>
+            <summary>The Mac says the app is "damaged" or "can't be opened"</summary>
+            <p>
+              Delete the copy you have, download it again from this page, and follow the Mac steps
+              from the start. Do not copy the app from another computer or a USB stick. If it still
+              happens,
+              <a href="https://github.com/mrdavearms/locker-manager/issues">report it on GitHub</a>.
+            </p>
+          </details>
+          <details>
+            <summary>The app says it cannot update itself</summary>
+            <ul>
+              <li>
+                <strong>Mac, running from the disk image or Downloads:</strong> quit it, drag it
+                into Applications, and open it from there.
+              </li>
+              <li>
+                <strong>Mac, account not allowed to change Applications:</strong> the app tells you
+                when a new version is out and opens the download page. Install the new version over
+                the old one, or ask your IT team.
+              </li>
+              <li>
+                <strong>Mac, version 0.10.0 or older:</strong> these copies cannot update
+                themselves. Install the newest version from this page once; after that it updates
+                itself.
+              </li>
+            </ul>
+          </details>
+          <details>
+            <summary>Is it really safe to click past the warning?</summary>
+            <p>
+              The warning means the app is not registered with Microsoft or Apple, not that anything
+              is wrong with it. Registration (called code signing) is planned; once it is in place,
+              the warnings go away. Locker Manager is open source, so anyone can read exactly what
+              it does. It has no server and no accounts, and the only thing it ever asks the
+              internet is whether a newer version exists.
+            </p>
+          </details>
+          <details>
+            <summary>Will installing a new version touch our school's data?</summary>
+            <p>
+              No. The data file lives in the folder your school chose, and it has its own backups.
+              Installing, updating or uninstalling the app does not change it.
+            </p>
+          </details>
+        </section>
+
+        <section class="it">
+          <h2>For school IT</h2>
+          <ul>
+            <li>
+              Windows silent install for every user:
+              <code>Locker-Manager-Setup-&lt;version&gt;.exe /S /allusers</code> (installs to
+              <code>C:\Program Files\Locker Manager</code>).
+            </li>
+            <li>
+              Managed Macs: an MDM profile that allows the bundle identifier
+              <code>au.com.dandsarmstrong.lockermanager</code> avoids the first-open prompt.
+            </li>
+            <li>
+              Updates come from <code>github.com</code> and
+              <code>release-assets.githubusercontent.com</code>. They can be turned off with managed
+              settings.
+            </li>
+            <li>
+              Everything else, including managed settings and the security model, is in the
+              <a href="https://github.com/mrdavearms/locker-manager/blob/main/docs/it-guide.md"
+                >IT guide</a
+              >.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <p class="muted">
+            Looking for an older version or the release notes? Every version is on the
+            <a href="https://github.com/mrdavearms/locker-manager/releases">releases page</a>.
+          </p>
+        </section>
+      </main>
+
+      <footer>
+        Locker Manager is free and open source (MIT), made for schools.
+        <a href="https://github.com/mrdavearms/locker-manager">Source on GitHub</a>.
+      </footer>
+    </div>
+
+    <script>
+      // Fills in the newest version's direct download links. Without JavaScript, or if
+      // GitHub does not answer, the buttons stay pointed at the releases page.
+      ;(function () {
+        var ua =
+          (navigator.userAgentData && navigator.userAgentData.platform) || navigator.userAgent
+        var yours = /mac/i.test(ua) ? 'mac' : /win/i.test(ua) ? 'win' : null
+        if (yours) {
+          var card = document.getElementById('choice-' + yours)
+          card.classList.add('yours')
+          card.parentNode.insertBefore(card, card.parentNode.firstChild)
+        }
+
+        function versionOf(tag) {
+          return (tag || '').replace(/^v/, '')
+        }
+        function mb(bytes) {
+          return Math.round(bytes / 1048576) + ' MB'
+        }
+
+        fetch('https://api.github.com/repos/mrdavearms/locker-manager/releases?per_page=20', {
+          headers: { Accept: 'application/vnd.github+json' }
+        })
+          .then(function (r) {
+            if (!r.ok) throw new Error('GitHub answered ' + r.status)
+            return r.json()
+          })
+          .then(function (releases) {
+            var published = releases.filter(function (r) {
+              return !r.draft
+            })
+            // A normal release wins once one exists (1.0 onwards); before that, the newest
+            // pre-release is the version to use.
+            var release =
+              published.filter(function (r) {
+                return !r.prerelease
+              })[0] || published[0]
+            if (!release) return
+
+            var assets = release.assets || []
+            var win = assets.filter(function (a) {
+              return /^Locker-Manager-Setup-.*\.exe$/.test(a.name)
+            })[0]
+            var mac = assets.filter(function (a) {
+              return /-universal\.dmg$/.test(a.name)
+            })[0]
+            if (win) {
+              document.getElementById('dl-win').href = win.browser_download_url
+              document.getElementById('file-win').textContent = win.name + ' · ' + mb(win.size)
+            }
+            if (mac) {
+              document.getElementById('dl-mac').href = mac.browser_download_url
+              document.getElementById('file-mac').textContent = mac.name + ' · ' + mb(mac.size)
+            }
+
+            var when = new Date(release.published_at).toLocaleDateString('en-AU', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+            })
+            var line = document.getElementById('version')
+            line.textContent =
+              'Version ' + versionOf(release.tag_name) + ', released ' + when + '. '
+            var notes = document.createElement('a')
+            notes.href = release.html_url
+            notes.textContent = "See what's new"
+            line.appendChild(notes)
+          })
+          .catch(function () {
+            // Leave the buttons on the releases page.
+          })
+      })()
+    </script>
+  </body>
+</html>
