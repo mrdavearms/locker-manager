@@ -202,6 +202,15 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     (`src/main/buildInfo.ts`, `AppInfo.commit` and `builtAt`). The line "Version X · commit ·
     built date" shows on Home, in the bottom bar (wide windows), under Welcome, and in About.
 
+27. **Print audit fixes** (Dave, 15 Oct 2026; docs/audits/2026-10-15-print-output-audit.md).
+    The one-colour logo maker (`src/shared/logo.ts`) never makes see-through pixels solid,
+    keeps a white card white, and adapts its cut-off for pale logos. What the app learns
+    about a logo when it is chosen is kept in setting `logo.facts` (`LOGO_FACTS_VERSION`;
+    bump it when the maker changes, and Home offers a remake). Colour letters choose black
+    or white band words and darken the school colour for headings (`src/shared/colour.ts`);
+    the logo goes on a white tile only when it would vanish (`needsLogoTile`). The logo is
+    written into each page's style sheet once. Print… sends A4 or Letter by name.
+
 ## Known, accepted
 
 - `npm audit` reports sprintf-js (moderate, denial of service) through electron-builder's
