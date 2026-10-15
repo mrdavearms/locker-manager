@@ -313,6 +313,11 @@ All data reads and writes from the window go through ONE channel, `rpc`:
   PDFs are rendered with JavaScript off.
 - Never pipe `curl` into `grep -q` in a workflow: grep stops early, curl reports a write
   failure, and pipefail fails the step even though the text was found.
+- Every download from a GitHub Release counts in its public download total, which
+  repo-stats reports as installs. The update proof takes the previous installer from the
+  Release run's artifacts (kept 90 days, SHA-256 checked against the asset's digest;
+  `scripts/update-proof/fetch-previous.sh`) and falls back to the public release, with a
+  notice, only if they have expired. Don't add CI steps that download release installers.
 
 ## Current milestone
 

@@ -166,7 +166,10 @@ jobs:
           npx electron-builder --win --publish never @extra
 
       # Exactly the files the release carries (scripts/verify-release-assets.mjs
-      # checks the list again after upload).
+      # checks the list again after upload). Kept 90 days because the update proof
+      # for the NEXT release installs this one from here rather than downloading it
+      # from the public release, which would count as a school's download
+      # (scripts/update-proof/fetch-previous.sh).
       - name: Hand the Mac files to the publish job
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -179,7 +182,7 @@ jobs:
             release/*.zip.blockmap
             release/latest-mac.yml
           if-no-files-found: error
-          retention-days: 5
+          retention-days: 90
       - name: Hand the Windows files to the publish job
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -190,7 +193,7 @@ jobs:
             release/*.exe.blockmap
             release/latest.yml
           if-no-files-found: error
-          retention-days: 5
+          retention-days: 90
 
   publish:
     name: Upload, verify and publish

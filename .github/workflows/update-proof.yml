@@ -30,6 +30,11 @@ jobs:
           - os: macos-latest
             name: macOS
     runs-on: ${{ matrix.os }}
+    # actions: read lets fetch-previous.sh take the previous installer from the
+    # Release run's artifacts instead of the public release.
+    permissions:
+      contents: read
+      actions: read
     env:
       NEW_TAG: ${{ github.event.inputs.tag || github.event.workflow_run.head_branch }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -63,6 +68,19 @@ jobs:
             sleep 5
           done
           echo "::error::The release feed never listed $NEW_TAG"; exit 1
+      # From the Release run's artifacts, not the public release, so the proof
+      # does not add to the download counts schools are measured by.
+      - name: Get the previous installer (Windows)
+        if: runner.os == 'Windows' && steps.prev.outputs.previous != ''
+        shell: bash
+        env:
+          PREV_TAG: ${{ steps.prev.outputs.previous }}
+        run: ./scripts/update-proof/fetch-previous.sh "Locker-Manager-Setup-${PREV_TAG#v}.exe" prev installers-windows
+      - name: Get the previous installer (macOS)
+        if: runner.os == 'macOS' && steps.prev.outputs.previous != ''
+        env:
+          PREV_TAG: ${{ steps.prev.outputs.previous }}
+        run: ./scripts/update-proof/fetch-previous.sh "Locker-Manager-${PREV_TAG#v}-universal.dmg" "$RUNNER_TEMP/update-proof" installers-macos
       - name: Prove the update (Windows)
         if: runner.os == 'Windows' && steps.prev.outputs.previous != ''
         shell: pwsh

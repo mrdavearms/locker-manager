@@ -19,7 +19,10 @@ function Wait-For([scriptblock]$cond, [int]$seconds, [string]$what) {
 
 Write-Host "Installing $prev silently (per user)"
 New-Item -ItemType Directory -Force prev | Out-Null
-gh release download $env:PREV_TAG --repo $repo --pattern "Locker-Manager-Setup-$prev.exe" --dir prev --clobber
+# The workflow puts it there first (fetch-previous.sh); download it only when run by hand.
+if (-not (Test-Path "prev\Locker-Manager-Setup-$prev.exe")) {
+  gh release download $env:PREV_TAG --repo $repo --pattern "Locker-Manager-Setup-$prev.exe" --dir prev --clobber
+}
 Start-Process -Wait -FilePath "prev\Locker-Manager-Setup-$prev.exe" -ArgumentList '/S'
 Wait-For { Test-Path $exe } 120 'the installed app'
 $v = Installed-Version
