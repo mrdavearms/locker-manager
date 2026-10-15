@@ -9,6 +9,7 @@ import { whileBusy } from './busy'
 import { fileSession } from './fileService'
 import { codesLocked } from './privacy'
 import { revealCode } from './repos/codes'
+import { getMeta } from './db/context'
 import { recordPrintJob } from './repos/labels'
 import { getSchoolProfile } from './repos/school'
 import { buildReport, type BuiltReport } from './reports/build'
@@ -157,17 +158,20 @@ function recordBlocked(hasCodes: boolean): string | null | undefined {
 
 function readyReport(
   job: z.infer<typeof ReportJob>
-): { ok: true; report: BuiltReport; school: string } | { ok: false; message: string } {
-  const { report, school } = fileSession().read((db) => ({
+):
+  | { ok: true; report: BuiltReport; school: string; demo: boolean }
+  | { ok: false; message: string } {
+  const { report, school, demo } = fileSession().read((db) => ({
     report: buildReport(db, job.request),
-    school: getSchoolProfile(db).name
+    school: getSchoolProfile(db).name,
+    demo: getMeta(db, 'demo') === '1'
   }))
   if (report.revealedLockers.length > 0) {
     if (!canRecord()) return { ok: false, message: NEEDS_EDIT }
     const locked = fileSession().read((db) => codesLocked(db))
     if (locked) return { ok: false, message: locked }
   }
-  return { ok: true, report, school }
+  return { ok: true, report, school, demo }
 }
 
 function recordReport(report: BuiltReport, how: 'printed' | 'exported', to: string): Recorded {
@@ -259,7 +263,7 @@ export function registerDocumentHandlers(): void {
     return await whileBusy('printing', async () => {
       const ready = readyReport(ReportJob.parse(raw))
       if (!ready.ok) return ready
-      const page = { school: ready.school, printedAt: new Date(), preview: false }
+      const page = { school: ready.school, printedAt: new Date(), preview: false, demo: ready.demo }
       const bytes = await reportToPdf(
         buildReportHtml(ready.report, page),
         reportFooter(ready.report, page)
@@ -277,7 +281,7 @@ export function registerDocumentHandlers(): void {
     return await whileBusy('printing', async () => {
       const ready = readyReport(ReportJob.parse(raw))
       if (!ready.ok) return ready
-      const page = { school: ready.school, printedAt: new Date(), preview: false }
+      const page = { school: ready.school, printedAt: new Date(), preview: false, demo: ready.demo }
       const report = ready.report
       return await recordThenPrint({
         record: () => {
@@ -288,7 +292,7 @@ export function registerDocumentHandlers(): void {
           printReport(buildReportHtml(report, page), {
             landscape: report.landscape,
             // CONFIDENTIAL comes first: the printer's footer may shorten a long line.
-            footer: `${report.confidential ? 'CONFIDENTIAL · ' : ''}${ready.school} · ${report.title} · Printed ${reportDate(page.printedAt)}`
+            footer: `${ready.demo ? 'DEMO · ' : ''}${report.confidential ? 'CONFIDENTIAL · ' : ''}${ready.school} · ${report.title} · Printed ${reportDate(page.printedAt)}`
           })
       })
     })

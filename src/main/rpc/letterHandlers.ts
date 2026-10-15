@@ -8,6 +8,7 @@ import {
   saveLetterTemplate,
   setStudentLanguage
 } from '../repos/letters'
+import { getMeta } from '../db/context'
 import { getSchoolProfile } from '../repos/school'
 import { buildReport, maskCodes } from '../reports/build'
 import { buildReportHtml } from '../render/report'
@@ -109,7 +110,8 @@ export const letterHandlers: Pick<Handlers, Keys> = {
         html: buildReportHtml(report, {
           school: getSchoolProfile(db).name,
           printedAt: new Date(),
-          preview: true
+          preview: true,
+          demo: getMeta(db, 'demo') === '1'
         }),
         rows: report.rows,
         confidential: report.confidential

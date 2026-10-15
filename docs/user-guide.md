@@ -123,7 +123,8 @@ Only one person does this, once, for the whole school.
 ## Practise with the demo school
 
 1. On the Welcome screen, click **Try the demo school**.
-2. Everything you see is made up, and every screen shows **DEMO**.
+2. Everything you see is made up. Every screen shows **DEMO**, and every label, letter and
+   report printed from it carries a pale **DEMO** mark, so it is never handed out by mistake.
 3. When you finish, click **Close file** at the bottom right.
 
 The demo starts fresh every time you open it.
