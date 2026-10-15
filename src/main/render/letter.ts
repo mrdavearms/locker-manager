@@ -7,10 +7,11 @@ import {
   type ShowFor
 } from '@shared/letters'
 import type { Terminology } from '@shared/terminology'
-import { codeParts, formatBody, formatLine, type MergeValues } from '../letters/text'
+import { codeParts, formatBody, formatLine, isRightToLeft, type MergeValues } from '../letters/text'
 import { fitText } from './fit'
-import { fontFaceCss } from './fonts'
+import { fontFaceCss, PT_TO_MM, textWidthMm } from './fonts'
 import { esc, mm, safeImageUrl } from './html'
+import { darkenFor, textOn } from '@shared/colour'
 
 // Student letters as HTML pages in millimetres (SPEC.md 5.2 and 5.3). One student
 // per page: each letter is a page-sized box. The printing code measures every box
@@ -20,6 +21,8 @@ import { esc, mm, safeImageUrl } from './html'
 export interface LetterSchool {
   name: string
   logo: string | null
+  /** Put the logo on a white tile in the heading band (it would vanish into the band). */
+  logoTile: boolean
   primary: string
   accent: string
   stripes: string[]
@@ -57,7 +60,36 @@ export interface LetterOutput {
 
 const PAGE_PAD_X = 16
 const PAGE_PAD_Y = 14
-const NAME_BOX = { w: 108, h: 24 }
+const NAME_BOX_HEIGHT = 24
+
+/**
+ * The room the student's name really has: the panel's inside width less the
+ * lock column beside it (code boxes, key number or locker number), so a long
+ * name is fitted to the space it prints in (print audit, Low).
+ */
+function nameBoxWidth(
+  input: LetterBuildInput,
+  item: LetterItem,
+  captions: { locker: string; code: string; key: string }
+): number {
+  const r = item.record
+  const page = PAGE_SIZES[input.template.pageSize]
+  const inside = page.width - 2 * PAGE_PAD_X - 2 * (0.6 + 6)
+  // A caption is 9 pt bold capitals, spaced 0.08 em apart (.slock .w).
+  const caption = (text: string): number => {
+    const upper = text.toLocaleUpperCase(item.lang)
+    return textWidthMm(upper, 9, 700) + [...upper].length * 0.08 * 9 * PT_TO_MM
+  }
+  let lock = Math.max(textWidthMm(r.locker, 28, 700), caption(captions.locker))
+  if ((r.kind === 'settable' || r.kind === 'fixed') && item.code) {
+    const parts = codeParts(item.code)
+    const boxes = parts.reduce((w, p) => w + Math.max(10, textWidthMm(p, 20, 700) + 4.2), 0)
+    lock = Math.max(lock, boxes + 1.6 * (parts.length - 1), caption(captions.code))
+  } else if (r.kind === 'keyed')
+    lock = Math.max(lock, textWidthMm(r.keyNumber ?? '—', 18, 700), caption(captions.key))
+  else if (r.kind === 'no_lock') lock = Math.max(lock, 52)
+  return Math.max(40, inside - 6 - lock)
+}
 
 /** Words in a language, falling back to the template's first language, then any. */
 export function pick(loc: Localised, lang: string, fallback: string): string {
@@ -100,7 +132,14 @@ function pageCss(input: LetterBuildInput): string {
   const mono = input.template.colour === 'mono'
   const primary = mono ? '#000000' : input.school.primary
   const accent = mono ? '#000000' : input.school.accent
+  // A pale school colour (gold, sky blue) gets black band text, and is darkened
+  // wherever it is used for words, so every heading reads on paper (audit H5).
+  const bandText = mono ? '#000' : textOn(primary)
+  const words = mono
+    ? '#000000'
+    : darkenFor(primary, ['#FFFFFF', tint(primary, 0.9), tint(accent, 0.88)])
   // Only plain base64 pictures reach the CSS; anything else could close the style.
+  const logoUrl = safeImageUrl(input.school.logo)
   const imageCss = [...input.images.entries()]
     .flatMap(([id, img]) => {
       const url = safeImageUrl(img.dataUrl)
@@ -115,8 +154,9 @@ body{font-family:LMArimo,Arial,sans-serif;color:#141414;font-size:11pt;line-heig
 .letter{position:relative;width:${mm(page.width)};height:${mm(page.height)};padding:${mm(PAGE_PAD_Y)} ${mm(PAGE_PAD_X)};background:#fff;overflow:${input.preview ? 'visible' : 'hidden'};break-after:page;page-break-after:always}
 .letter:last-child{break-after:auto;page-break-after:auto}
 .pageend{position:absolute;left:0;right:0;top:${mm(page.height)};border-top:0.6mm dashed #c0392b;font-size:8pt;color:#c0392b;padding-top:1mm;text-align:center}
-.hdr{display:flex;align-items:center;gap:6mm;margin:-${mm(PAGE_PAD_Y)} -${mm(PAGE_PAD_X)} 0;padding:9mm ${mm(PAGE_PAD_X)} 8mm;background:${mono ? '#fff' : primary};color:${mono ? '#000' : '#fff'};${mono ? 'border-bottom:0.6mm solid #000;' : ''}}
-.hlogo{width:24mm;height:24mm;flex:none;background-size:contain;background-repeat:no-repeat;background-position:center}
+.hdr{display:flex;align-items:center;gap:6mm;margin:-${mm(PAGE_PAD_Y)} -${mm(PAGE_PAD_X)} 0;padding:9mm ${mm(PAGE_PAD_X)} 8mm;background:${mono ? '#fff' : primary};color:${bandText};${mono ? 'border-bottom:0.6mm solid #000;' : ''}}
+.hlogo{width:24mm;height:24mm;flex:none;background:${logoUrl ? `url("${logoUrl}")` : 'none'} center/contain no-repeat}
+.hlogo.tile{width:28mm;height:28mm;padding:2mm;background-color:#fff;background-origin:content-box;border-radius:3mm}
 .hschool{font-size:12pt;font-weight:700;opacity:.9}
 .htitle{font-size:26pt;font-weight:700;line-height:1.1}
 .hsub{font-size:11pt;margin-top:1mm;opacity:.9}
@@ -126,14 +166,14 @@ body{font-family:LMArimo,Arial,sans-serif;color:#141414;font-size:11pt;line-heig
 .sname{flex:1;min-width:0}
 .sname .n{font-weight:700;line-height:1.15;color:#000}
 .sname .g{margin-top:1.5mm;font-size:11pt;color:#333}
-.slock{flex:none;text-align:right}
-.slock .w{font-size:9pt;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${primary}}
+.slock{flex:none;text-align:end}
+.slock .w{font-size:9pt;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${words}}
 .slock .num{font-size:28pt;font-weight:700;line-height:1.05}
-.code{display:flex;gap:1.6mm;justify-content:flex-end;margin-top:1mm}
+.code{display:flex;direction:ltr;gap:1.6mm;justify-content:flex-end;margin-top:1mm}
 .code span{display:flex;align-items:center;justify-content:center;min-width:10mm;height:12mm;padding:0 1.5mm;border:0.6mm solid ${primary};border-radius:1.6mm;font-size:20pt;font-weight:700}
 .keyno{font-size:18pt;font-weight:700}
 .block{margin-top:6mm;break-inside:avoid}
-.block h2{margin:0 0 1.5mm;font-size:13pt;color:${primary}}
+.block h2{margin:0 0 1.5mm;font-size:13pt;color:${words}}
 .block p{margin:0 0 2mm}
 .block ul,.block ol{margin:0 0 2mm;padding-left:6mm}
 .block li{margin:0 0 1mm}
@@ -204,7 +244,15 @@ function studentPanel(
   const labels = pick(block.body, lang, fallback).split('\n')
   const [lockerWord = input.terms.locker.one, codeLabel = '', keyLabel = '', noLock = ''] = labels
   const name = `${r.firstName} ${r.lastName}`.trim()
-  const fitted = fitText(name, NAME_BOX, { max: 30, min: 14 }, 700)
+  const fitted = fitText(
+    name,
+    {
+      w: nameBoxWidth(input, item, { locker: lockerWord, code: codeLabel, key: keyLabel }),
+      h: NAME_BOX_HEIGHT
+    },
+    { max: 30, min: 14 },
+    700
+  )
   if (fitted.tooLong) tooLong.push(name)
   const groupLine = [
     r.group ? `${input.terms.group.one} ${r.group}` : null,
@@ -245,8 +293,13 @@ function renderBlock(
   const body = pick(block.body, lang, fallback)
   switch (block.type) {
     case 'header': {
+      // The picture itself is in the page's style sheet once, not in every letter.
       const logo = safeImageUrl(input.school.logo)
-      return `<div class="hdr">${logo ? `<div class="hlogo" style="background-image:url(&quot;${esc(logo)}&quot;)"></div>` : ''}<div><div class="hschool">${esc(
+      return `<div class="hdr">${
+        logo
+          ? `<div class="hlogo${input.school.logoTile && input.template.colour !== 'mono' ? ' tile' : ''}"></div>`
+          : ''
+      }<div><div class="hschool">${esc(
         input.school.name
       )}</div><div class="htitle">${formatLine(heading, values)}</div>${
         body.trim() ? `<div class="hsub">${formatLine(body, values)}</div>` : ''
@@ -292,7 +345,13 @@ export function buildLetters(input: LetterBuildInput, items: readonly LetterItem
       .filter((b) => showsFor(b.show, item.record.kind))
       .map((b) => renderBlock(input, b, item, values, tooLong))
       .join('')
-    return `<section class="letter" data-student="${esc(item.record.studentId)}"><div class="content">${blocks}</div>${
+    // The letter's language and direction, so Arabic, Persian or Dari letters are
+    // laid out right to left (print audit M2). A language the template has no words
+    // for prints in the first language.
+    const lang = input.template.languages.some((l) => l.code === item.lang)
+      ? item.lang
+      : (input.template.languages[0]?.code ?? 'en')
+    return `<section class="letter" lang="${esc(lang)}" dir="${isRightToLeft(lang) ? 'rtl' : 'ltr'}" data-student="${esc(item.record.studentId)}"><div class="content">${blocks}</div>${
       input.preview ? '<div class="pageend">The page ends here</div>' : ''
     }</section>`
   })

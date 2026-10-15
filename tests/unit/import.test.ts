@@ -173,6 +173,9 @@ describe('name case (SPEC.md section 15, item 4)', () => {
     expect(sur('O’SULLIVAN').value).toBe('O’Sullivan')
     expect(sur('SMITH-JONES')).toEqual({ value: 'Smith-Jones', flags: [] })
     expect(sur("D'SOUZA").value).toBe("D'Souza")
+    // Turkish dotted capitals keep their dot and gain no stray one.
+    expect(toNameCase('İSMAİL', { particles: 'capital', isSurname: false }).value).toBe('İsmail')
+    expect(sur('YILDIZ').value).toBe('Yildiz')
   })
   it('does not guess Mac, and flags it', () => {
     expect(sur('MACDONALD')).toEqual({ value: 'Macdonald', flags: ['mac'] })

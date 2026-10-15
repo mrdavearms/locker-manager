@@ -520,10 +520,12 @@ that record's own details change; lockers given out, codes and history stay as t
 1. Click **Labels** in the left-hand menu.
 2. Under **Which labels**, choose every locker, one Homeroom, one bank, chosen locker numbers
    (for example `1-10, 15`), lockers changed since the last print, or spare lockers only.
-3. Check the preview on the right. It is the real sheet, exactly as it will print.
+3. Check the preview on the right. It is the real sheet, exactly as it will print, before
+   your printer nudge moves it.
 4. Click **Save as PDF…** (best) or **Print…**.
-5. In the print window choose **Actual size** (or 100%). Never choose **Fit to page**: it
-   shrinks everything and the labels will not line up.
+5. In the print window, check the paper size is **A4** (or **US Letter** for US Letter
+   sheets), and choose **Actual size** (or 100%) if it is offered. Never choose
+   **Fit to page**: it shrinks everything and the labels will not line up.
 
 **Part-used sheet**: set **Start at label** to the first empty label (1 is the top-left).
 Label makers advise against putting a part-used sheet back through a laser printer, because
@@ -555,7 +557,8 @@ Most printers shift everything slightly. You fix this once per printer.
 2. Print it on plain paper at **Actual size**. The bar on the page must measure exactly
    100 mm. If it does not, the printer is shrinking the page.
 3. Lay the printout on a sheet of labels and hold both up to a window.
-4. Read the rulers at the edges. If the printed outlines sit 1 mm to the right of the real
+4. Read the rulers near the top and left edges (they count millimetres from the edge of the
+   paper). If the printed outlines sit 1 mm to the right of the real
    labels, the nudge right is **-1**. If they sit 1 mm low, the nudge down is **-1**.
 5. Type the printer's name (for example "Office laser"), set the nudges, and click **Save**.
 6. To check, click **Change** beside the printer, then **Calibration page…** again. The new
@@ -591,7 +594,8 @@ Each student with a locker gets a one-page letter with their locker number and c
 3. Check the preview. Use **Next** and **Previous** to look through the letters. Codes show
    as dots on screen; the real codes are in the PDF.
 4. Wait for **Every letter fits on one page.**
-5. Click **Save as PDF…** (best) or **Print…**. Print at **Actual size** (100%).
+5. Click **Save as PDF…** (best) or **Print…**. Check the paper size is **A4** (unless you
+   chose US Letter) and print at **Actual size** (100%).
 
 Letters are made 25 at a time. A progress bar shows how far along they are, and **Cancel**
 stops it.

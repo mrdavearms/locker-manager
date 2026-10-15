@@ -175,7 +175,8 @@ export function registerFileHandlers(): void {
     const path = openPath()
     return {
       tourSeen: prefs.get().tourSeenAt !== null,
-      checklistHidden: path !== null && prefs.get().checklistHidden.includes(path)
+      checklistHidden: path !== null && prefs.get().checklistHidden.includes(path),
+      printerNudge: prefs.get().printerNudge
     }
   }
   ipcMain.handle(channels.onboardingGet, onboarding)
@@ -195,7 +196,8 @@ export function registerFileHandlers(): void {
           ? p.checklistHidden
           : patch.checklistHidden
             ? [...new Set([...p.checklistHidden, path])]
-            : p.checklistHidden.filter((x) => x !== path)
+            : p.checklistHidden.filter((x) => x !== path),
+      printerNudge: patch.printerNudge === undefined ? p.printerNudge : patch.printerNudge
     }))
     return onboarding()
   })

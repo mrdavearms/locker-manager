@@ -1,10 +1,11 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, session } from 'electron'
 import { z } from 'zod'
 import { channels } from '@shared/channels'
 import { ComputerSettingsSchema, type ComputerSettings, type ComputerView } from '@shared/computer'
 import { preferences } from './fileService'
 import { managedPath, readManaged } from './managed'
 import { applyUpdatePrefs, type UpdatePrefs } from './update/updater'
+import { RENDER_PARTITION } from './render/pdf'
 
 // This computer's settings (appearance and updates), with school IT's managed
 // settings on top (SPEC.md 7, 9.5). Applied to every window and to the updater.
@@ -41,6 +42,9 @@ export function updatePrefs(): UpdatePrefs {
 }
 
 export function applyToWindow(win: BrowserWindow): void {
+  // The hidden windows that make PDFs keep 100%: printing ignores zoom today, but
+  // the letter measuring step must never depend on that (print audit, Low).
+  if (win.webContents.session === session.fromPartition(RENDER_PARTITION)) return
   const s = computerView().settings
   win.webContents.setZoomFactor(s.textSize / 100)
 }

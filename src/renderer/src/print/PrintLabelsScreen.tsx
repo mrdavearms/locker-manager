@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, FileDown, Printer, Ruler } from 'lucide-react'
 import type { LabelPreview, LabelSelection } from '@shared/labels'
-import { labelsPerSheet } from '@shared/labelGeometry'
+import { labelsPerSheet, namedPaper, nearPaperEdge, PRINTER_EDGE_MM } from '@shared/labelGeometry'
 import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, Select, TextInput } from '@renderer/components/Field'
@@ -26,7 +26,15 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
   const [bankId, setBankId] = useState('')
   const [numbers, setNumbers] = useState('')
   const [startAt, setStartAt] = useState(1)
-  const [printer, setPrinter] = useState<string>('')
+  const [chosen, setChosen] = useState<string | null>(null)
+  // The nudge last chosen on this computer is chosen again, while that printer
+  // still has a nudge in this file (print audit M8).
+  const [remembered, setRemembered] = useState<string | null>(null)
+  useEffect(() => {
+    void window.api.getOnboarding().then((o) => setRemembered(o.printerNudge))
+  }, [])
+  const rememberedOk = remembered !== null && printers?.some((p) => p.name === remembered)
+  const printer = chosen ?? (rememberedOk ? remembered : '')
   const [preview, setPreview] = useState<LabelPreview | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
@@ -48,6 +56,8 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
           : { mode }
   const key = JSON.stringify([selection, startAt])
   const stock = stocks?.find((s) => s.id === template?.stockId)
+  const nudge = printers?.find((p) => p.name === printer) ?? { right: 0, down: 0 }
+  const edges = stock && template ? nearPaperEdge(stock, nudge, template.safeMargin) : []
   const perSheet = stock ? labelsPerSheet(stock) : 14
 
   useEffect(() => {
@@ -70,6 +80,10 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
 
   const job = selection ? { selection, startAt, printer: printer || null } : null
   const shown = selection ? preview : null
+  const longNames = shown?.tooLong.filter((t) => !t.what) ?? []
+  const longWords = new Map<string, NonNullable<typeof shown>['tooLong']>()
+  for (const t of shown?.tooLong ?? [])
+    if (t.what) longWords.set(t.what, [...(longWords.get(t.what) ?? []), t])
 
   return (
     <div className="w-full space-y-6 px-6 py-8">
@@ -198,7 +212,10 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
                 <Select
                   id="labels-printer"
                   value={printer}
-                  onChange={(e) => setPrinter(e.target.value)}
+                  onChange={(e) => {
+                    setChosen(e.target.value)
+                    void window.api.setOnboarding({ printerNudge: e.target.value || null })
+                  }}
                 >
                   <option value="">None</option>
                   {printers?.map((p) => (
@@ -211,6 +228,16 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
                 </Select>
               </Field>
             </div>
+            {edges.length > 0 && (
+              <div className="mt-4">
+                <Banner tone="warn" title="Words near the edge of the paper" testId="labels-edge">
+                  With {printer ? 'this nudge' : 'this label sheet'}, words on the labels come
+                  within {PRINTER_EDGE_MM} mm of the {edges.join(' and ')} edge of the paper. Most
+                  printers cannot print there, so those words may be cut off. Check the nudge, or
+                  the label sheet&apos;s measurements in Settings, Labels.
+                </Banner>
+              </div>
+            )}
           </SectionCard>
 
           <div className="card space-y-3 p-5">
@@ -250,7 +277,9 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
               <Printer size={18} aria-hidden /> Print…
             </Button>
             <p className="text-xs text-ink-muted">
-              In the print window choose <strong>Actual size</strong> (or 100%). Never choose{' '}
+              In the print window, check the paper size is{' '}
+              <strong>{paperName(shown?.stock ?? null)}</strong>, and choose{' '}
+              <strong>Actual size</strong> (or 100%) if it is offered. Never choose{' '}
               <strong>Fit to page</strong>: it shrinks everything and the labels will not line up.
             </p>
           </div>
@@ -277,15 +306,30 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
               <p className="text-sm text-ink-muted" data-testid="labels-count">
                 {plural(shown.labels, 'label')} on {plural(shown.sheets, 'sheet')}.
               </p>
-              {shown.tooLong.length > 0 && (
+              {longNames.length > 0 && (
                 <Banner
                   tone="warn"
-                  title={`${plural(shown.tooLong.length, 'name')} too long to fit`}
+                  title={`${plural(longNames.length, 'name')} too long to fit`}
                   testId="labels-too-long"
                 >
                   Printed at the smallest size and may be cut off:{' '}
-                  {shown.tooLong.map((t) => `${t.name} (${t.number})`).join(', ')}. Use a shorter
+                  {longNames.map((t) => `${t.name} (${t.number})`).join(', ')}. Use a shorter
                   preferred name, or a smaller minimum size in the layout.
+                </Banner>
+              )}
+              {longWords.size > 0 && (
+                <Banner tone="warn" title="Some words are cut off" testId="labels-words-too-long">
+                  {[...longWords].map(([what, list]) => (
+                    <p key={what}>
+                      {what}: {plural(list.length, 'label')}, such as “{list[0]!.name}” on{' '}
+                      {list[0]!.number}.
+                    </p>
+                  ))}
+                  <p className="mt-1">
+                    The end of these words does not fit, even at the smallest size. Make the box
+                    wider in Settings, Labels, use a shorter word in Settings, Words we use, or
+                    lower the smallest size.
+                  </p>
                 </Banner>
               )}
               {shown.labels > 0 ? (
@@ -307,4 +351,11 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
       </div>
     </div>
   )
+}
+
+/** The paper to choose in the print window for this label sheet. */
+function paperName(stock: { pageWidth: number; pageHeight: number } | null): string {
+  if (!stock) return 'A4'
+  const named = namedPaper(stock.pageWidth, stock.pageHeight)
+  return named === 'Letter' ? 'US Letter' : (named ?? `${stock.pageWidth} × ${stock.pageHeight} mm`)
 }

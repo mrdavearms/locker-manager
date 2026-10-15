@@ -4,18 +4,22 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BrowserWindow, session, type Session } from 'electron'
 import { PDFDocument } from 'pdf-lib'
+import { namedPaper } from '@shared/labelGeometry'
 import { guardRenderContents, renderRequestAllowed } from './guard'
 
 // Renders our own HTML to PDF in a hidden window (SPEC.md 5.3): no scripts, no
 // network, page size from CSS, zero margins. The page is written to a private
 // temporary file (data URLs that big are refused) and removed afterwards.
 
+/** The hidden windows' own session; this computer's text size never applies to them. */
+export const RENDER_PARTITION = 'locker-manager-render'
+
 let render: Session | null = null
 
 /** A session of their own for the hidden windows, where nothing but file and data loads. */
 function renderSession(): Session {
   if (!render) {
-    render = session.fromPartition('locker-manager-render')
+    render = session.fromPartition(RENDER_PARTITION)
     render.webRequest.onBeforeRequest((details, callback) =>
       callback({ cancel: !renderRequestAllowed(details.url) })
     )
@@ -86,7 +90,7 @@ export async function printHtml(
             printBackground: true,
             margins: { marginType: 'none' },
             scaleFactor: 100,
-            pageSize: {
+            pageSize: namedPaper(page.widthMm, page.heightMm) ?? {
               width: Math.round(page.widthMm * 1000),
               height: Math.round(page.heightMm * 1000)
             }
@@ -105,13 +109,16 @@ export async function overflowingLetters(html: string): Promise<string[]> {
   return withPage(
     html,
     async (win) =>
+      // Measured once the fonts are ready, so a slow font never makes a letter look shorter.
       (await win.webContents.executeJavaScript(
-        `Array.from(document.querySelectorAll('section.letter')).filter(function (s) {
-           var c = s.querySelector('.content');
-           var style = getComputedStyle(s);
-           var room = s.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
-           return c && c.scrollHeight > room + 1;
-         }).map(function (s) { return s.getAttribute('data-student'); })`
+        `document.fonts.ready.then(function () {
+           return Array.from(document.querySelectorAll('section.letter')).filter(function (s) {
+             var c = s.querySelector('.content');
+             var style = getComputedStyle(s);
+             var room = s.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+             return c && c.scrollHeight > room + 1;
+           }).map(function (s) { return s.getAttribute('data-student'); });
+         })`
       )) as string[],
     true
   )

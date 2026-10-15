@@ -3,10 +3,15 @@ import type { LabelRecord, Stock } from '../../src/shared/labels'
 import { DEFAULT_TERMS } from '../../src/shared/terminology'
 import { buildCalibrationPage } from '../../src/main/render/calibration'
 import { fitText } from '../../src/main/render/fit'
-import { textWidthMm } from '../../src/main/render/fonts'
+import { fontFaceCss, textWidthMm } from '../../src/main/render/fonts'
 import { buildLabelSheets } from '../../src/main/render/labelSheet'
 import { defaultTemplate, outsideSafeArea, rescaleTemplate } from '../../src/main/render/layout'
 import { BUILT_IN_STOCKS, labelPosition, stockProblems } from '../../src/main/render/stocks'
+import { namedPaper, nearPaperEdge } from '../../src/shared/labelGeometry'
+import { lockerIdFromLink } from '../../src/shared/lockerLink'
+import { lockerQrText, qrSvg } from '../../src/main/render/qr'
+import { quickSearch } from '../../src/main/repos/history'
+import { allocatedDemo } from './fixtures'
 
 const L7163 = BUILT_IN_STOCKS.find((s) => s.id === 'avery-l7163')!
 // WHS measured its L7163EV box: 38.0 mm high, first row 14.0 mm from the top (SPEC.md 5.1).
@@ -51,6 +56,25 @@ function build(
   })
 }
 
+describe('font coverage (print audit M4)', () => {
+  it('embeds Arimo for Vietnamese, Greek, Cyrillic and Hebrew', () => {
+    const css = fontFaceCss()
+    for (const range of ['U+1EA0-1EF9', 'U+0370-0377', 'U+0400-045F', 'U+0590-05FF'])
+      expect(css).toContain(range)
+  })
+  it('measures those letters with real glyphs, close to their Latin look-alikes', () => {
+    // Cyrillic "А" and Greek "Α" are drawn like Latin "A" in Arimo.
+    const a = textWidthMm('A', 12, 400)
+    expect(textWidthMm('А', 12, 400)).toBeCloseTo(a, 3)
+    expect(textWidthMm('Α', 12, 400)).toBeCloseTo(a, 3)
+    expect(textWidthMm('ạ', 12, 400)).toBeCloseTo(textWidthMm('a', 12, 400), 3)
+  })
+  it('gives a full em to characters the app has no font for, so they are never under-measured', () => {
+    const em = (12 * 25.4) / 72
+    expect(textWidthMm('张伟', 12, 400)).toBeCloseTo(2 * em, 3)
+  })
+})
+
 describe('stock geometry (SPEC.md 5.1)', () => {
   it('every built-in stock fits its page without overlaps', () => {
     for (const s of BUILT_IN_STOCKS) expect(stockProblems(s), s.id).toEqual([])
@@ -70,6 +94,25 @@ describe('stock geometry (SPEC.md 5.1)', () => {
 })
 
 describe('label sheets', () => {
+  it('report words other than the name that are cut off, and keep their start (audit M1)', () => {
+    const terms = {
+      ...DEFAULT_TERMS,
+      locker: { one: 'Learning Community Locker', many: 'Learning Community Lockers' }
+    }
+    const out = build(L7163, [rec(1000)], { terms })
+    const long = out.tooLong.find((t) => t.what === 'Locker number')
+    expect(long).toMatchObject({ number: '1000', name: 'LEARNING COMMUNITY LOCKER 1000' })
+    // Right-aligned text that does not fit starts at the left, so its start shows.
+    const el = out.html.match(/<div class="el"[^>]*><span>LEARNING COMMUNITY LOCKER 1000/)![0]
+    expect(el).toContain('align-items:flex-start')
+  })
+  it('carry the logo once per page, however many labels there are', () => {
+    const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=='
+    const records = Array.from({ length: 40 }, (_, i) => rec(i + 1))
+    const out = build(L7163, records, { logo: { colour: null, mono: logo } })
+    expect(out.html.split(logo).length - 1).toBe(1)
+    expect(out.html.match(/class="el logo"/g)).toHaveLength(40)
+  })
   it('put each label at exact millimetres, with printer offsets', () => {
     const out = build(MEASURED, [rec(1), rec(2), rec(3)], { offset: { right: 0.5, down: -0.3 } })
     expect(out.placed.map((p) => [p.number, p.x, p.y])).toEqual([
@@ -169,5 +212,60 @@ describe('calibration page', () => {
     expect(html).toContain('width:100mm')
     expect(html).toContain('dashed')
     expect(html).toContain('Actual size')
+  })
+  it('keeps every ruler mark at least 6 mm from the paper edge, where lasers print (audit M9)', () => {
+    const html = buildCalibrationPage(MEASURED, { right: 0, down: 0 }, 5, 'L7163EV measured')
+    const marks = [
+      ...html.matchAll(/(left|top):([\d.]+)mm;(top|left):([\d.]+)mm;(width|height):0\.2mm/g)
+    ]
+    expect(marks.length).toBeGreaterThan(400)
+    for (const m of marks) {
+      expect(Number(m[2])).toBeGreaterThanOrEqual(6)
+      expect(Number(m[4])).toBeGreaterThanOrEqual(6)
+    }
+  })
+})
+
+describe('paper by name (print audit M7)', () => {
+  it('names A4 and US Letter pages, and leaves other sizes custom', () => {
+    expect(namedPaper(210, 297)).toBe('A4')
+    expect(namedPaper(215.9, 279.4)).toBe('Letter')
+    expect(namedPaper(100, 150)).toBeNull()
+    for (const s of BUILT_IN_STOCKS)
+      expect(namedPaper(s.pageWidth, s.pageHeight), s.id).not.toBeNull()
+  })
+})
+
+describe('QR codes (print audit M10)', () => {
+  it('carry a clear border four squares wide, on white', () => {
+    const svg = qrSvg(lockerQrText('AbC123xy'))
+    const size = Number(/viewBox="0 0 (\d+) /.exec(svg)![1])
+    expect(size).toBe(29 + 8)
+    expect(svg).toContain('<rect width="37" height="37" fill="#fff"/>')
+    // The first dark square starts four squares in.
+    expect(svg).toMatch(/<path d="M4 4h1v1h-1z/)
+  })
+  it('are found by quick find from the link a scanner types', async () => {
+    const { db } = await allocatedDemo()
+    const row = db.get<{ id: string; qr_id: string; number: string }>(
+      'SELECT id, qr_id, number FROM locker WHERE qr_id IS NOT NULL LIMIT 1'
+    )!
+    const found = quickSearch(db, `lockermanager://locker/${row.qr_id}`)
+    expect(found[0]).toMatchObject({ kind: 'locker', id: row.id, title: `Locker ${row.number}` })
+    expect(lockerIdFromLink('LOCKERMANAGER://locker/AbC123xy/')).toBe('AbC123xy')
+    expect(lockerIdFromLink('https://example.com/locker/AbC123xy')).toBeNull()
+  })
+})
+
+describe('words near the paper edge (print audit, Low)', () => {
+  it('finds no problem on the built-in sheets with the standard layout', () => {
+    for (const s of BUILT_IN_STOCKS)
+      expect(nearPaperEdge(s, { right: 0, down: 0 }, defaultTemplate(s).safeMargin), s.id).toEqual(
+        []
+      )
+  })
+  it('warns when a nudge pushes words into the edge printers cannot reach', () => {
+    expect(nearPaperEdge(L7163, { right: -6, down: 0 }, 5)).toEqual(['left'])
+    expect(nearPaperEdge(L7163, { right: 0, down: 20 }, 5)).toEqual(['bottom'])
   })
 })

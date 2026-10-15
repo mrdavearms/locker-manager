@@ -5,6 +5,8 @@ import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, TextInput } from '@renderer/components/Field'
 import { useAction, useCanEdit } from '@renderer/lib/appContext'
 import { prepareLogo } from '@renderer/lib/logoImage'
+import { needsLogoTile, textOn } from '@shared/colour'
+import { dataUrlToFile, LOGO_FACTS_VERSION, logoWarnings } from '@shared/logo'
 import { call, useRpc } from '@renderer/lib/rpc'
 
 function ColourPicker({
@@ -44,7 +46,6 @@ export function SchoolForm(): React.JSX.Element {
   const act = useAction()
   const fileInput = useRef<HTMLInputElement>(null)
   const monoInput = useRef<HTMLInputElement>(null)
-  const [warning, setWarning] = useState<string | null>(null)
   const [draft, setDraft] = useState<{ name: string; shortName: string; address: string } | null>(
     null
   )
@@ -70,13 +71,13 @@ export function SchoolForm(): React.JSX.Element {
     if (!file) return
     await act(async () => {
       const p = await prepareLogo(file)
-      await call('school.setLogo', { which: 'colour', bytes: p.bytes, type: p.type })
-      await call('school.setLogo', { which: 'mono', bytes: p.mono, type: 'image/png' })
-      setWarning(
-        p.analysis.vanishesOnWhite
-          ? 'This logo has light lettering on a see-through background, so it would vanish on white labels. A dark version has been made for labels; check it below.'
-          : null
-      )
+      await call('school.setLogo', {
+        which: 'both',
+        bytes: p.bytes,
+        type: p.type,
+        mono: p.mono,
+        facts: p.facts
+      })
     })
   }
 
@@ -84,9 +85,55 @@ export function SchoolForm(): React.JSX.Element {
     if (!file) return
     await act(async () => {
       const p = await prepareLogo(file)
-      await call('school.setLogo', { which: 'mono', bytes: p.bytes, type: p.type })
+      // An older file has no facts about its logo: work them out from the colour
+      // logo now, so the school's own one-colour file is remembered as theirs.
+      const colour = school.logoDataUrl
+      const known = school.logoFacts?.version === LOGO_FACTS_VERSION
+      const facts = !known && colour ? (await prepareLogo(dataUrlToFile(colour))).facts : undefined
+      await call('school.setLogo', {
+        which: 'mono',
+        bytes: p.bytes,
+        type: p.type,
+        ...(facts ? { facts: { ...facts, mono: 'own' as const, monoResult: 'ok' as const } } : {})
+      })
     })
   }
+
+  // A logo chosen before v0.11.2 has a one-colour version made by the older rules
+  // (often a solid black shape), and no facts. Offer to make it again from the
+  // colour logo kept in the file, or to keep the one there.
+  const facts = school.logoFacts
+  const oldMono =
+    school.hasLogo &&
+    school.logoDataUrl !== null &&
+    facts?.mono !== 'own' &&
+    (facts === null || facts.version < LOGO_FACTS_VERSION)
+  const remake = async (keep: boolean): Promise<void> => {
+    const url = school.logoDataUrl
+    if (!url) return
+    await act(async () => {
+      const p = await prepareLogo(dataUrlToFile(url))
+      if (keep)
+        await call('school.setLogo', {
+          which: 'colour',
+          bytes: p.bytes,
+          type: p.type,
+          facts: { ...p.facts, mono: 'own', monoResult: 'ok' }
+        })
+      else
+        await call('school.setLogo', {
+          which: 'mono',
+          bytes: p.mono,
+          type: 'image/png',
+          facts: p.facts
+        })
+    })
+  }
+  const warnings = logoWarnings(facts)
+  // The letter heading band, as colour letters print it (print audit H5, H6).
+  const band = school.colourPrimary ?? '#1F3A5F'
+  const pale = textOn(band) !== '#FFFFFF'
+  const tile = needsLogoTile(school, band)
 
   return (
     <div className="space-y-6">
@@ -185,15 +232,36 @@ export function SchoolForm(): React.JSX.Element {
             </div>
           </Field>
         </div>
-        {(school.colourPrimary || school.colourStripes.length > 0) && (
+        {pale && (
+          <p className="mt-4 text-sm text-ink-muted" data-testid="pale-colour-note">
+            This main colour is pale, so white words would be hard to read on it. Colour letters
+            print the heading words in black, and print headings in a darker shade of this colour.
+          </p>
+        )}
+        {(school.colourPrimary || school.colourStripes.length > 0 || school.hasLogo) && (
           <div
             className="mt-5 overflow-hidden rounded-xl border border-line"
             aria-label="Preview of the letter header"
           >
             <div
-              className="flex h-14 items-center px-5 font-display text-lg font-semibold text-white"
-              style={{ background: school.colourPrimary ?? '#0e4a57' }}
+              className="flex min-h-14 items-center gap-4 px-5 py-2 font-display text-lg font-semibold"
+              style={{ background: band, color: textOn(band) }}
             >
+              {school.logoDataUrl && (
+                <span
+                  className={`flex h-12 w-12 flex-none items-center justify-center ${tile ? 'rounded-lg bg-white p-1' : ''}`}
+                >
+                  <img
+                    src={
+                      tile && school.logoFacts?.lightOnWhite
+                        ? (school.monoLogoDataUrl ?? school.logoDataUrl)
+                        : school.logoDataUrl
+                    }
+                    alt=""
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </span>
+              )}
               {school.name}
             </div>
             <div className="flex h-2">
@@ -209,10 +277,38 @@ export function SchoolForm(): React.JSX.Element {
         title="Logo"
         description="PNG, JPEG or SVG, up to 2 MB. A one-colour version is made for black-and-white labels."
       >
-        {warning && (
+        {oldMono && (
           <div className="mb-4">
-            <Banner tone="warn" title="Check the label version of your logo">
-              {warning}
+            <Banner tone="warn" title="Remake your one-colour logo">
+              <p>
+                Your one-colour logo was made by an older version of Locker Manager. It may print as
+                a solid black shape, without the detail inside your crest. Remake it from your
+                colour logo, then check it below.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" disabled={!canEdit} onClick={() => void remake(false)}>
+                  Remake the one-colour logo
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!canEdit}
+                  onClick={() => void remake(true)}
+                >
+                  Keep the one I have
+                </Button>
+              </div>
+            </Banner>
+          </div>
+        )}
+        {warnings.length > 0 && (
+          <div className="mb-4">
+            <Banner tone="warn" title="Check your logo">
+              {warnings.map((w) => (
+                <p key={w} className="mt-1 first:mt-0">
+                  {w}
+                </p>
+              ))}
             </Banner>
           </div>
         )}
@@ -278,11 +374,9 @@ export function SchoolForm(): React.JSX.Element {
               variant="ghost"
               disabled={!canEdit}
               onClick={() =>
-                void act(async () => {
-                  await call('school.setLogo', { which: 'colour', bytes: null, type: null })
-                  await call('school.setLogo', { which: 'mono', bytes: null, type: null })
-                  setWarning(null)
-                })
+                void act(() =>
+                  call('school.setLogo', { which: 'both', bytes: null, type: null, mono: null })
+                )
               }
             >
               <Trash2 size={16} aria-hidden /> Remove logo

@@ -1,4 +1,11 @@
-import { analyseLogo, makeMonoLogo, type LogoAnalysis } from '@shared/logo'
+import {
+  analyseLogo,
+  inkColour,
+  LOGO_FACTS_VERSION,
+  makeMonoLogo,
+  type LogoAnalysis,
+  type LogoFacts
+} from '@shared/logo'
 
 export type LogoType = 'image/png' | 'image/svg+xml' | 'image/jpeg'
 
@@ -7,7 +14,9 @@ export interface PreparedLogo {
   type: LogoType
   mono: Uint8Array<ArrayBuffer>
   analysis: LogoAnalysis
-  monoMethod: 'threshold' | 'darkened'
+  monoMethod: ReturnType<typeof makeMonoLogo>['method']
+  /** What to remember about the logo (stored with it as setting `logo.facts`). */
+  facts: LogoFacts
 }
 
 function loadImage(blob: Blob): Promise<HTMLImageElement> {
@@ -62,6 +71,17 @@ export async function prepareLogo(file: File): Promise<PreparedLogo> {
     type,
     mono: new Uint8Array(await monoBlob.arrayBuffer()),
     analysis,
-    monoMethod: mono.method
+    monoMethod: mono.method,
+    facts: {
+      version: LOGO_FACTS_VERSION,
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+      svg: type === 'image/svg+xml',
+      lightOnWhite: mono.lightLettering,
+      opaque: analysis.hasBackground,
+      ink: inkColour(data.data),
+      mono: 'auto',
+      monoResult: mono.result
+    }
   }
 }

@@ -91,7 +91,12 @@ export function registerRenderHandlers(): void {
             message: `The PDF came out with ${pages} pages instead of ${prepared.sheets}. Nothing was saved.`
           }
         }
-        const path = await savePdf(`Locker labels ${stampDate()}.pdf`, bytes)
+        // The nudge is built into the PDF, so its name goes in the file name: printing
+        // the file on another printer would put the labels in the wrong place (audit M8).
+        const nudge = job.printer
+          ? ` (nudged for ${job.printer.replace(/[\\/:*?"<>|]/g, '-')})`
+          : ''
+        const path = await savePdf(`Locker labels ${stampDate()}${nudge}.pdf`, bytes)
         if (!path) return { ok: false, cancelled: true, message: '' }
         if (s.state.status === 'open' && s.state.mode === 'edit') {
           s.write(

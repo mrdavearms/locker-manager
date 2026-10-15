@@ -102,16 +102,19 @@ export const OperatorInfoSchema = z.object({
 })
 export type OperatorInfo = z.infer<typeof OperatorInfoSchema>
 
-/** First-time help remembered on this computer (not in the school's file). */
+/** First-time help and small choices remembered on this computer (not in the school's file). */
 export interface OnboardingInfo {
   tourSeen: boolean
   /** True when the getting-started list was hidden for the open file. */
   checklistHidden: boolean
+  /** The printer nudge last chosen for labels on this computer. */
+  printerNudge: string | null
 }
 
 export const OnboardingSetSchema = z.object({
   tourSeen: z.boolean().optional(),
-  checklistHidden: z.boolean().optional()
+  checklistHidden: z.boolean().optional(),
+  printerNudge: z.string().max(80).nullable().optional()
 })
 export type OnboardingSet = z.infer<typeof OnboardingSetSchema>
 

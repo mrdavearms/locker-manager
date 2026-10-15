@@ -37,11 +37,12 @@ function previewWith(
   db: LockerDb,
   template: LabelTemplate | undefined,
   selection: Parameters<typeof prepareLabels>[1]['selection'],
-  startAt: number
+  startAt: number,
+  limit?: number
 ) {
   if (!template) return prepareLabels(db, { selection, startAt, printer: null, outlines: true })
   const stock = getStock(db, template.stockId)
-  const records = labelRecords(db, selection, template.usePreferredName)
+  const records = labelRecords(db, selection, template.usePreferredName).slice(0, limit)
   const qr = new Map<string, string>()
   if (template.elements.some((e) => e.type === 'qr'))
     for (const r of records) qr.set(r.lockerId, qrSvg(lockerQrText(r.qrId)))
@@ -113,7 +114,7 @@ export const labelHandlers: Pick<Handlers, Keys> = {
   'labels.preview': {
     kind: 'read',
     run: (db, p) => {
-      const out = previewWith(db, p.template, p.selection, p.startAt)
+      const out = previewWith(db, p.template, p.selection, p.startAt, p.limit)
       return {
         html: out.html,
         sheets: out.sheets,

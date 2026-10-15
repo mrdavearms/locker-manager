@@ -26,7 +26,9 @@ export const PrefsSchema = z.object({
   /** When this computer's person finished or skipped the welcome tour. */
   tourSeenAt: z.string().nullable().default(null),
   /** Data files whose getting-started list was hidden on this computer. */
-  checklistHidden: z.array(z.string()).default([])
+  checklistHidden: z.array(z.string()).default([]),
+  /** The printer nudge last chosen for labels on this computer. */
+  printerNudge: z.string().nullable().default(null)
 })
 export type Prefs = z.infer<typeof PrefsSchema>
 

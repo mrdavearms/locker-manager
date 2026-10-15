@@ -3,6 +3,7 @@ import type { LetterRecord, LetterTemplate } from '../../src/shared/letters'
 import { DEFAULT_TERMS } from '../../src/shared/terminology'
 import { defaultLetterTemplate } from '../../src/main/letters/defaultTemplate'
 import { formatBody, formatLine } from '../../src/main/letters/text'
+import { textWidthMm } from '../../src/main/render/fonts'
 import { buildLetters, pick, showsFor, type LetterItem } from '../../src/main/render/letter'
 import { PDFDocument } from 'pdf-lib'
 import { runLetterJob } from '../../src/main/render/letterJob'
@@ -27,6 +28,7 @@ import { allocatedDemo } from './fixtures'
 const school = {
   name: 'SYNTHETIC High School',
   logo: null,
+  logoTile: false,
   primary: '#1F3A5F',
   accent: '#E8A33D',
   stripes: []
@@ -65,6 +67,124 @@ function build(items: LetterItem[], template: LetterTemplate = defaultLetterTemp
   )
 }
 
+describe('letter pages', () => {
+  it('carry the logo once, however many letters there are', () => {
+    const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=='
+    const items = Array.from({ length: 30 }, (_, i) => ({
+      record: rec('settable', { studentId: `s${i}` }),
+      code: '1234',
+      masked: false,
+      lang: 'en'
+    }))
+    const out = buildLetters(
+      {
+        template: defaultLetterTemplate(),
+        terms: DEFAULT_TERMS,
+        school: { ...school, logo },
+        images: new Map(),
+        today: new Date('2026-10-06'),
+        preview: false
+      },
+      items
+    )
+    expect(out.html.split(logo).length - 1).toBe(1)
+    expect(out.html.match(/class="hlogo"/g)).toHaveLength(30)
+  })
+})
+
+describe('the name on a letter', () => {
+  it('is fitted to the room beside the lock code, not a fixed width', () => {
+    const html = build([
+      {
+        record: rec('settable', { firstName: 'Thiruchelvanathan', lastName: 'Ng' }),
+        code: '12345678',
+        masked: false,
+        lang: 'en'
+      }
+    ]).html
+    const m = /<div class="n" style="font-size:([\d.]+)pt">(.*?)<\/div>/.exec(html)!
+    const size = Number(m[1])
+    // Eight code boxes take about 67 mm of the 165 mm panel.
+    for (const line of m[2]!.split('<br>')) expect(textWidthMm(line, size, 700)).toBeLessThan(92)
+  })
+})
+
+describe('the name beside a short key number', () => {
+  it('leaves room for the "Your key number" caption, not just the digit', () => {
+    const html = build([
+      {
+        record: rec('keyed', {
+          locker: '1',
+          keyNumber: '1',
+          firstName: 'Bartholomew-Maximilian',
+          lastName: 'Featherstonehaugh-Wolstenholme'
+        }),
+        code: null,
+        masked: false,
+        lang: 'en'
+      }
+    ]).html
+    const m = /<div class="n" style="font-size:([\d.]+)pt">(.*?)<\/div>/.exec(html)!
+    const size = Number(m[1])
+    const caption = textWidthMm('YOUR KEY NUMBER', 9, 700)
+    // 165 mm panel, less the 6 mm gap and the caption's width.
+    for (const line of m[2]!.split('<br>'))
+      expect(textWidthMm(line, size, 700)).toBeLessThanOrEqual(165 - 6 - caption)
+  })
+})
+
+describe('right-to-left letters (print audit M2)', () => {
+  it('lays out an Arabic letter right to left, with the code boxes still left to right', () => {
+    const template = {
+      ...defaultLetterTemplate(),
+      languages: [
+        { code: 'en', name: 'English' },
+        { code: 'ar', name: 'Arabic' }
+      ]
+    }
+    const html = build(
+      [
+        { record: rec('settable'), code: '1234', masked: false, lang: 'ar' },
+        { record: rec('fixed'), code: '5678', masked: false, lang: 'vi' }
+      ],
+      template
+    ).html
+    expect(html).toContain('lang="ar" dir="rtl"')
+    // A language the template has no words for prints in the first language.
+    expect(html).toContain('lang="en" dir="ltr"')
+    expect(html).toContain('.code{display:flex;direction:ltr')
+  })
+})
+
+describe('letter colours (print audit H5, H6)', () => {
+  const page = (primary: string, logoTile = false) =>
+    buildLetters(
+      {
+        template: defaultLetterTemplate(),
+        terms: DEFAULT_TERMS,
+        school: { ...school, primary, logo: 'data:image/png;base64,AAAA', logoTile },
+        images: new Map(),
+        today: new Date('2026-10-06'),
+        preview: false
+      },
+      [{ record: rec('settable'), code: '1234', masked: false, lang: 'en' }]
+    ).html
+  it('prints black band text and darkened headings for a gold school', () => {
+    const html = page('#FFD700')
+    expect(html).toContain('background:#FFD700;color:#141414')
+    expect(html).not.toMatch(/h2\{[^}]*color:#FFD700/)
+  })
+  it('keeps white band text and the school colour for a navy school', () => {
+    const html = page('#1F3A5F')
+    expect(html).toContain('background:#1F3A5F;color:#FFFFFF')
+    expect(html).toMatch(/h2\{[^}]*color:#1F3A5F/)
+  })
+  it('puts the logo on a white tile when asked', () => {
+    expect(page('#1F3A5F', true)).toContain('class="hlogo tile"')
+    expect(page('#1F3A5F', false)).not.toContain('hlogo tile')
+  })
+})
+
 describe('letter words (SPEC.md 5.2)', () => {
   it('turns lines into paragraphs, bullet points, numbered steps and bold', () => {
     expect(formatBody('One\ntwo\n\n- a\n- b\n\n1. first\n2. **second**', {})).toBe(
@@ -77,10 +197,18 @@ describe('letter words (SPEC.md 5.2)', () => {
         locker: '7',
         first_name: '<b>Al</b>'
       })
-    ).toBe('Locker 7 for &lt;b&gt;Al&lt;/b&gt; {nope}')
+    ).toBe('Locker <bdi>7</bdi> for <bdi>&lt;b&gt;Al&lt;/b&gt;</bdi> {nope}')
   })
   it('never turns a merged value into bold or a list', () => {
-    expect(formatBody('{first_name}', { first_name: '**Zed**' })).toBe('<p>**Zed**</p>')
+    expect(formatBody('{first_name}', { first_name: '**Zed**' })).toBe('<p><bdi>**Zed**</bdi></p>')
+  })
+  it('keeps the typed step numbers when steps are split by blank lines (audit M3)', () => {
+    expect(formatBody('1. Open\n\n2. Turn\n\n3. Close', {})).toBe(
+      '<ol><li>Open</li></ol><ol start="2"><li>Turn</li></ol><ol start="3"><li>Close</li></ol>'
+    )
+  })
+  it('keeps the lock code left to right inside right-to-left words (audit M2)', () => {
+    expect(formatLine('{code}', { code: '1 2 3 4' })).toBe('<bdi dir="ltr">1 2 3 4</bdi>')
   })
 })
 

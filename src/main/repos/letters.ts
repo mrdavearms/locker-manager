@@ -11,6 +11,7 @@ import {
 } from '@shared/letters'
 import { LOCK_TYPE_INFO, type LockType } from '@shared/locks'
 import type { CodeStatus } from '@shared/codes'
+import { needsLogoTile } from '@shared/colour'
 import type { LockerDb } from '../db/db'
 import { newId, stamp, type OperatorContext } from '../db/context'
 import { decryptCode, readCodeKey } from '../codes/cipher'
@@ -341,10 +342,15 @@ export function letterSet(
 
 export function letterSchool(db: LockerDb, template: LetterTemplate): LetterSchool {
   const p = getSchoolProfile(db)
+  const primary = p.colourPrimary ?? '#1F3A5F'
+  const tile = template.colour === 'colour' && needsLogoTile(p, primary)
+  // On a white tile, a logo with light lettering uses its one-colour version.
+  const useMono = template.colour === 'mono' || (tile && p.logoFacts?.lightOnWhite === true)
   return {
     name: p.name,
-    logo: template.colour === 'mono' ? (p.monoLogoDataUrl ?? p.logoDataUrl) : p.logoDataUrl,
-    primary: p.colourPrimary ?? '#1F3A5F',
+    logo: useMono ? (p.monoLogoDataUrl ?? p.logoDataUrl) : p.logoDataUrl,
+    logoTile: tile,
+    primary,
     accent: p.colourAccent ?? '#E8A33D',
     stripes: p.colourStripes
   }

@@ -29,3 +29,40 @@ export function stockProblems(s: Stock): string[] {
     out.push('The bottom labels run off the page.')
   return out
 }
+
+/**
+ * A4 and US Letter pages go to the printer by name. A printer driver set to
+ * another paper is less likely to override a named size than a custom one, which
+ * could cut off or shrink the bottom row of labels (print audit M7).
+ */
+export function namedPaper(widthMm: number, heightMm: number): 'A4' | 'Letter' | null {
+  const near = (a: number, b: number): boolean => Math.abs(a - b) < 0.5
+  if (near(widthMm, 210) && near(heightMm, 297)) return 'A4'
+  if (near(widthMm, 215.9) && near(heightMm, 279.4)) return 'Letter'
+  return null
+}
+
+/** Most printers cannot print this close to the paper's edge (mm). */
+export const PRINTER_EDGE_MM = 4
+
+/**
+ * The sides of the paper where label words, after the printer nudge, come
+ * closer to the edge than printers can print, so they would be cut off
+ * (print audit, Low). Words sit inside each label by the safe margin.
+ */
+export function nearPaperEdge(
+  s: Stock,
+  offset: { right: number; down: number },
+  safeMargin: number
+): ('left' | 'top' | 'right' | 'bottom')[] {
+  const left = s.left + offset.right + safeMargin
+  const top = s.top + offset.down + safeMargin
+  const right = s.left + (s.columns - 1) * s.pitchX + s.labelWidth + offset.right - safeMargin
+  const bottom = s.top + (s.rows - 1) * s.pitchY + s.labelHeight + offset.down - safeMargin
+  const out: ('left' | 'top' | 'right' | 'bottom')[] = []
+  if (left < PRINTER_EDGE_MM) out.push('left')
+  if (top < PRINTER_EDGE_MM) out.push('top')
+  if (right > s.pageWidth - PRINTER_EDGE_MM) out.push('right')
+  if (bottom > s.pageHeight - PRINTER_EDGE_MM) out.push('bottom')
+  return out
+}

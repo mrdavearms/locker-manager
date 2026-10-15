@@ -77,8 +77,8 @@ h2{font-size:12pt;margin:0 0 2mm}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
 thead{display:table-header-group}
 tr{break-inside:avoid;page-break-inside:avoid}
-th{text-align:left;font-size:8.5pt;text-transform:uppercase;letter-spacing:.04em;border-bottom:0.4mm solid #111;padding:1.6mm 1.5mm}
-td{border-bottom:0.2mm solid #bbb;padding:1.7mm 1.5mm;vertical-align:top;overflow-wrap:anywhere}
+th{text-align:left;font-size:8.5pt;text-transform:uppercase;letter-spacing:.04em;border-bottom:0.4mm solid #111;padding:1.6mm 1.5mm;overflow-wrap:anywhere}
+td{border-bottom:0.25mm solid #888;padding:1.7mm 1.5mm;vertical-align:top;overflow-wrap:anywhere}
 td.code{font-weight:700;letter-spacing:.12em}
 td.blank{height:9mm}
 td.tick .box{display:inline-block;width:4mm;height:4mm;border:0.35mm solid #111;border-radius:0.6mm}

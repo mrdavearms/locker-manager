@@ -3,6 +3,7 @@ import { FileDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import {
   ELEMENT_LABELS,
   ELEMENT_TYPES,
+  QR_MIN_MM,
   type ElementType,
   type LabelElement,
   type LabelTemplate,
@@ -352,7 +353,7 @@ function DesignerCard({
     const tpl = JSON.parse(key) as LabelTemplate
     const timer = setTimeout(() => {
       void window.api
-        .rpc('labels.preview', { selection: { mode: 'all' }, startAt: 1, template: tpl })
+        .rpc('labels.preview', { selection: { mode: 'all' }, startAt: 1, template: tpl, limit: 1 })
         .then((r) => {
           if (!cancelled && r.ok) setHtml(r.value.html)
         })
@@ -490,6 +491,15 @@ function DesignerCard({
         )}
       </div>
 
+      {t.elements.some((e) => e.type === 'qr' && Math.min(e.w, e.h) < QR_MIN_MM) && (
+        <div className="mt-4">
+          <Banner tone="warn" title="The QR code is too small to scan" testId="qr-too-small">
+            Make it at least {QR_MIN_MM} mm square. Smaller codes print, but most phones and
+            scanners cannot read them.
+          </Banner>
+        </div>
+      )}
+
       <div className="mt-5 grid gap-5 lg:grid-cols-[16rem_1fr]">
         <div>
           <ul className="space-y-1">
@@ -526,8 +536,8 @@ function DesignerCard({
                       type,
                       x: t.safeMargin,
                       y: t.safeMargin,
-                      w: 20,
-                      h: type === 'rule' ? 0.4 : 6,
+                      w: type === 'qr' ? 14 : 20,
+                      h: type === 'rule' ? 0.4 : type === 'qr' ? 14 : 6,
                       fontMax: 12,
                       fontMin: 7,
                       bold: true,
@@ -693,7 +703,11 @@ function DesignerCard({
             }
           />
         </Field>
-        <Field label="Logo" htmlFor="tpl-colour">
+        <Field
+          label="Logo"
+          hint="A logo with white lettering always prints its one-colour version, because white lettering would vanish on white labels."
+          htmlFor="tpl-colour"
+        >
           <Select
             id="tpl-colour"
             disabled={!canEdit}

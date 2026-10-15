@@ -1,4 +1,5 @@
 import type { HistoryEntryView, QuickResult } from '@shared/history'
+import { lockerIdFromLink } from '@shared/lockerLink'
 import type { LockerDb } from '../db/db'
 
 // The history screen and quick search (SPEC.md 4.11 and 4.12). History lines
@@ -110,9 +111,11 @@ export function quickSearch(db: LockerDb, q: string): QuickResult[] {
               (SELECT COALESCE(s.preferred_name, s.first_name) || ' ' || s.last_name FROM assignment a JOIN student s ON s.id = a.student_id WHERE a.locker_id = l.id AND a.status = 'current' LIMIT 1) AS holder,
               (SELECT a.student_id FROM assignment a WHERE a.locker_id = l.id AND a.status = 'current' LIMIT 1) AS student_id
          FROM locker l LEFT JOIN lock k ON k.locker_id = l.id AND k.status IN ('in_use','spare')
-        WHERE l.archived_at IS NULL AND (lower(l.number) = $exact OR lower(COALESCE(k.serial_number,'')) = $exact OR lower(COALESCE(k.key_number,'')) = $exact)
+        WHERE l.archived_at IS NULL AND (lower(l.number) = $exact OR lower(COALESCE(k.serial_number,'')) = $exact OR lower(COALESCE(k.key_number,'')) = $exact
+               OR l.qr_id = $qr)
         LIMIT 5`,
-      { $exact: t }
+      // A label's QR link, typed by a USB scanner or pasted, finds its locker (audit M10).
+      { $exact: t, $qr: lockerIdFromLink(q) }
     )
     .map((l): QuickResult => ({
       kind: 'locker',

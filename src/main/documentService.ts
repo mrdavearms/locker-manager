@@ -287,7 +287,8 @@ export function registerDocumentHandlers(): void {
         print: () =>
           printReport(buildReportHtml(report, page), {
             landscape: report.landscape,
-            footer: `${ready.school} · ${report.title}${report.confidential ? ' · CONFIDENTIAL' : ''} · Printed ${reportDate(page.printedAt)}`
+            // CONFIDENTIAL comes first: the printer's footer may shorten a long line.
+            footer: `${report.confidential ? 'CONFIDENTIAL · ' : ''}${ready.school} · ${report.title} · Printed ${reportDate(page.printedAt)}`
           })
       })
     })

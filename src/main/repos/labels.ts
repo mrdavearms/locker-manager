@@ -280,7 +280,10 @@ export function labelRecords(
 
 export function schoolLogos(db: LockerDb): { colour: string | null; mono: string | null } {
   const p = getSchoolProfile(db)
-  return { colour: p.logoDataUrl, mono: p.monoLogoDataUrl }
+  // Labels are white: a logo with light lettering on a see-through background
+  // would vanish there, so colour labels use the one-colour version (audit M5).
+  const colour = p.logoFacts?.lightOnWhite ? (p.monoLogoDataUrl ?? p.logoDataUrl) : p.logoDataUrl
+  return { colour, mono: p.monoLogoDataUrl }
 }
 
 export function recordPrintJob(

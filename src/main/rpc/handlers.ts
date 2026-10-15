@@ -21,7 +21,13 @@ import {
   updateBank,
   updateLocker
 } from '../repos/locations'
-import { getSchoolProfile, getTerms, setLogo, setTerms, updateSchoolProfile } from '../repos/school'
+import {
+  getSchoolProfile,
+  getTerms,
+  setLogos,
+  setTerms,
+  updateSchoolProfile
+} from '../repos/school'
 import { getSetting, setSetting } from '../repos/settings'
 import type { Handlers } from './registry'
 import { labelHandlers } from './labelHandlers'
@@ -80,7 +86,7 @@ export const handlers: Handlers = {
       after: { which: p.which, type: p.type, bytes: p.bytes?.byteLength ?? 0 }
     }),
     run: (db, ctx, p) => {
-      setLogo(db, ctx, p.which, p.bytes, p.type)
+      setLogos(db, ctx, p)
       return getSchoolProfile(db)
     }
   },

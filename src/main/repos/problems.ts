@@ -3,6 +3,8 @@ import type { LockerDb } from '../db/db'
 import { decryptCode, readCodeKey } from '../codes/cipher'
 import { codeRules } from './codes'
 import { letterSet } from './letters'
+import { logoFacts } from './school'
+import { LOGO_FACTS_VERSION } from '@shared/logo'
 import { studentCounts } from './students'
 
 // Everything that needs attention (SPEC.md 10), worked out from the file each time.
@@ -128,5 +130,21 @@ export function listProblems(db: LockerDb): Problem[] {
         fix: { label: 'Print letters', screen: 'letters' }
       })
   }
+
+  // A one-colour logo made by the rules before v0.11.2 (often a solid black shape).
+  const facts = logoFacts(db)
+  if (
+    count(db, 'SELECT COUNT(*) AS n FROM school WHERE logo IS NOT NULL') > 0 &&
+    facts?.mono !== 'own' &&
+    (facts === null || facts.version < LOGO_FACTS_VERSION)
+  )
+    out.push({
+      id: 'old-logo',
+      tone: 'warn',
+      title: 'Remake your one-colour logo',
+      detail:
+        'It was made by an older version and may print as a solid black shape on black-and-white labels and letters.',
+      fix: { label: 'School settings', screen: 'settings' }
+    })
   return out
 }

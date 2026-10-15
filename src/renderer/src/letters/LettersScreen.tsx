@@ -320,7 +320,9 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
               Letters print only while the file is open for editing, because every code printed is
               recorded in the history with your name. The codes are recorded before the print window
               opens, and stay recorded if you cancel.{' '}
-              {canEdit ? 'Print at Actual size (100%).' : lockedReason}
+              {canEdit
+                ? 'In the print window, check the paper size matches the letter (A4 unless you chose US Letter) and print at Actual size (100%).'
+                : lockedReason}
             </p>
           </div>
           {saved && (
