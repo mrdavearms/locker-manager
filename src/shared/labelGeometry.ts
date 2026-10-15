@@ -29,3 +29,15 @@ export function stockProblems(s: Stock): string[] {
     out.push('The bottom labels run off the page.')
   return out
 }
+
+/**
+ * A4 and US Letter pages go to the printer by name. A printer driver set to
+ * another paper is less likely to override a named size than a custom one, which
+ * could cut off or shrink the bottom row of labels (print audit M7).
+ */
+export function namedPaper(widthMm: number, heightMm: number): 'A4' | 'Letter' | null {
+  const near = (a: number, b: number): boolean => Math.abs(a - b) < 0.5
+  if (near(widthMm, 210) && near(heightMm, 297)) return 'A4'
+  if (near(widthMm, 215.9) && near(heightMm, 279.4)) return 'Letter'
+  return null
+}

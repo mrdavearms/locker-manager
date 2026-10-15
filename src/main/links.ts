@@ -1,16 +1,11 @@
 import { BrowserWindow } from 'electron'
 import log from 'electron-log/main'
-import { brand } from '@shared/brand'
+import { lockerIdFromLink } from '@shared/lockerLink'
 import { channels } from '@shared/channels'
 import { fileSession } from './fileService'
 
 // Label QR codes (SPEC.md 5.6) carry lockermanager://locker/<short id>, never a
 // name or code. Scanning one on a computer with the app opens that locker.
-
-export function lockerIdFromLink(url: string): string | null {
-  const m = new RegExp(`^${brand.protocol}://locker/([A-Za-z0-9_-]{4,64})/?$`).exec(url.trim())
-  return m ? m[1]! : null
-}
 
 export function openLockerLink(url: string): void {
   const win = BrowserWindow.getAllWindows()[0]

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, FileDown, Printer, Ruler } from 'lucide-react'
 import type { LabelPreview, LabelSelection } from '@shared/labels'
-import { labelsPerSheet } from '@shared/labelGeometry'
+import { labelsPerSheet, namedPaper } from '@shared/labelGeometry'
 import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, Select, TextInput } from '@renderer/components/Field'
@@ -26,7 +26,15 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
   const [bankId, setBankId] = useState('')
   const [numbers, setNumbers] = useState('')
   const [startAt, setStartAt] = useState(1)
-  const [printer, setPrinter] = useState<string>('')
+  const [chosen, setChosen] = useState<string | null>(null)
+  // The nudge last chosen on this computer is chosen again, while that printer
+  // still has a nudge in this file (print audit M8).
+  const [remembered, setRemembered] = useState<string | null>(null)
+  useEffect(() => {
+    void window.api.getOnboarding().then((o) => setRemembered(o.printerNudge))
+  }, [])
+  const rememberedOk = remembered !== null && printers?.some((p) => p.name === remembered)
+  const printer = chosen ?? (rememberedOk ? remembered : '')
   const [preview, setPreview] = useState<LabelPreview | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
@@ -202,7 +210,10 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
                 <Select
                   id="labels-printer"
                   value={printer}
-                  onChange={(e) => setPrinter(e.target.value)}
+                  onChange={(e) => {
+                    setChosen(e.target.value)
+                    void window.api.setOnboarding({ printerNudge: e.target.value || null })
+                  }}
                 >
                   <option value="">None</option>
                   {printers?.map((p) => (
@@ -254,7 +265,9 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
               <Printer size={18} aria-hidden /> Print…
             </Button>
             <p className="text-xs text-ink-muted">
-              In the print window choose <strong>Actual size</strong> (or 100%). Never choose{' '}
+              In the print window, check the paper size is{' '}
+              <strong>{paperName(shown?.stock ?? null)}</strong>, and choose{' '}
+              <strong>Actual size</strong> (or 100%) if it is offered. Never choose{' '}
               <strong>Fit to page</strong>: it shrinks everything and the labels will not line up.
             </p>
           </div>
@@ -326,4 +339,11 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
       </div>
     </div>
   )
+}
+
+/** The paper to choose in the print window for this label sheet. */
+function paperName(stock: { pageWidth: number; pageHeight: number } | null): string {
+  if (!stock) return 'A4'
+  const named = namedPaper(stock.pageWidth, stock.pageHeight)
+  return named === 'Letter' ? 'US Letter' : (named ?? `${stock.pageWidth} × ${stock.pageHeight} mm`)
 }

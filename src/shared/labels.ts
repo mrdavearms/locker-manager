@@ -48,6 +48,12 @@ export const ELEMENT_LABELS: Record<ElementType, string> = {
   text: 'Your own text'
 }
 
+/**
+ * Below this size (mm, the clear border included) the squares of a label's QR
+ * code are too small for most phones and scanners to read (print audit M10).
+ */
+export const QR_MIN_MM = 12
+
 export const LabelElementSchema = z.object({
   id: z.string().min(1).max(64),
   type: z.enum(ELEMENT_TYPES),

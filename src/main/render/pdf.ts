@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BrowserWindow, session, type Session } from 'electron'
 import { PDFDocument } from 'pdf-lib'
+import { namedPaper } from '@shared/labelGeometry'
 import { guardRenderContents, renderRequestAllowed } from './guard'
 
 // Renders our own HTML to PDF in a hidden window (SPEC.md 5.3): no scripts, no
@@ -86,7 +87,7 @@ export async function printHtml(
             printBackground: true,
             margins: { marginType: 'none' },
             scaleFactor: 100,
-            pageSize: {
+            pageSize: namedPaper(page.widthMm, page.heightMm) ?? {
               width: Math.round(page.widthMm * 1000),
               height: Math.round(page.heightMm * 1000)
             }

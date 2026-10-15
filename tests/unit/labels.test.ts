@@ -7,6 +7,11 @@ import { fontFaceCss, textWidthMm } from '../../src/main/render/fonts'
 import { buildLabelSheets } from '../../src/main/render/labelSheet'
 import { defaultTemplate, outsideSafeArea, rescaleTemplate } from '../../src/main/render/layout'
 import { BUILT_IN_STOCKS, labelPosition, stockProblems } from '../../src/main/render/stocks'
+import { namedPaper } from '../../src/shared/labelGeometry'
+import { lockerIdFromLink } from '../../src/shared/lockerLink'
+import { lockerQrText, qrSvg } from '../../src/main/render/qr'
+import { quickSearch } from '../../src/main/repos/history'
+import { allocatedDemo } from './fixtures'
 
 const L7163 = BUILT_IN_STOCKS.find((s) => s.id === 'avery-l7163')!
 // WHS measured its L7163EV box: 38.0 mm high, first row 14.0 mm from the top (SPEC.md 5.1).
@@ -207,5 +212,47 @@ describe('calibration page', () => {
     expect(html).toContain('width:100mm')
     expect(html).toContain('dashed')
     expect(html).toContain('Actual size')
+  })
+  it('keeps every ruler mark at least 6 mm from the paper edge, where lasers print (audit M9)', () => {
+    const html = buildCalibrationPage(MEASURED, { right: 0, down: 0 }, 5, 'L7163EV measured')
+    const marks = [
+      ...html.matchAll(/(left|top):([\d.]+)mm;(top|left):([\d.]+)mm;(width|height):0\.2mm/g)
+    ]
+    expect(marks.length).toBeGreaterThan(400)
+    for (const m of marks) {
+      expect(Number(m[2])).toBeGreaterThanOrEqual(6)
+      expect(Number(m[4])).toBeGreaterThanOrEqual(6)
+    }
+  })
+})
+
+describe('paper by name (print audit M7)', () => {
+  it('names A4 and US Letter pages, and leaves other sizes custom', () => {
+    expect(namedPaper(210, 297)).toBe('A4')
+    expect(namedPaper(215.9, 279.4)).toBe('Letter')
+    expect(namedPaper(100, 150)).toBeNull()
+    for (const s of BUILT_IN_STOCKS)
+      expect(namedPaper(s.pageWidth, s.pageHeight), s.id).not.toBeNull()
+  })
+})
+
+describe('QR codes (print audit M10)', () => {
+  it('carry a clear border four squares wide, on white', () => {
+    const svg = qrSvg(lockerQrText('AbC123xy'))
+    const size = Number(/viewBox="0 0 (\d+) /.exec(svg)![1])
+    expect(size).toBe(29 + 8)
+    expect(svg).toContain('<rect width="37" height="37" fill="#fff"/>')
+    // The first dark square starts four squares in.
+    expect(svg).toMatch(/<path d="M4 4h1v1h-1z/)
+  })
+  it('are found by quick find from the link a scanner types', async () => {
+    const { db } = await allocatedDemo()
+    const row = db.get<{ id: string; qr_id: string; number: string }>(
+      'SELECT id, qr_id, number FROM locker WHERE qr_id IS NOT NULL LIMIT 1'
+    )!
+    const found = quickSearch(db, `lockermanager://locker/${row.qr_id}`)
+    expect(found[0]).toMatchObject({ kind: 'locker', id: row.id, title: `Locker ${row.number}` })
+    expect(lockerIdFromLink('LOCKERMANAGER://locker/AbC123xy/')).toBe('AbC123xy')
+    expect(lockerIdFromLink('https://example.com/locker/AbC123xy')).toBeNull()
   })
 })
