@@ -1,5 +1,5 @@
 import {
-  rulesSummary,
+  rulesPreview,
   codeRules,
   setCodeRules,
   generateYearSet,
@@ -80,7 +80,7 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
       return codeRules(db)
     }
   },
-  'codes.rules.preview': { kind: 'pure', run: (p) => rulesSummary(p.rules) },
+  'codes.rules.preview': { kind: 'read', run: (db, p) => rulesPreview(db, p.rules) },
   'codes.sets.list': { kind: 'read', run: (db) => listCodeSets(db) },
   'codes.sets.generate': {
     kind: 'write',

@@ -38,7 +38,6 @@ export function CodesForm({
 
   if (!r) return <SectionCard title="Lock codes">Loading…</SectionCard>
   const set = (patch: Partial<CodeRules>): void => setDraft({ ...r, ...patch })
-  const lockers = sets?.find((s) => s.purpose === 'year')?.total ?? 0
 
   return (
     <div className="space-y-6">
@@ -197,7 +196,7 @@ export function CodesForm({
           title="Code sets"
           description={`Make next year's codes in advance: one for every ${terms.locker.one.toLowerCase()}, never the same as its code before, plus spares for changes during the year. A set made while ${terms.locker.many.toLowerCase()} are given out is kept for next year and used when you start next year.`}
         >
-          {summary && lockers + r.sparePoolSize > summary.validCount / 2 && (
+          {summary?.overHalf && (
             <div className="mb-4">
               <Banner tone="warn" title="This would use more than half the codes the rules allow">
                 Codes become easier to guess. Allow longer codes or fewer spares.

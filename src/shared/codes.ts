@@ -80,6 +80,10 @@ export interface CodeRulesSummary {
   /** True when the count is an estimate (very large code spaces). */
   estimated: boolean
   samples: string[]
+  /** Lockers a year code set would give a code to. */
+  lockers: number
+  /** A year set plus its spares would use more than half the codes the rules allow. */
+  overHalf: boolean
 }
 
 export interface CodeSetView {
