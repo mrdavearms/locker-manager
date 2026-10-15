@@ -693,7 +693,11 @@ function DesignerCard({
             }
           />
         </Field>
-        <Field label="Logo" htmlFor="tpl-colour">
+        <Field
+          label="Logo"
+          hint="A logo with white lettering always prints its one-colour version, because white lettering would vanish on white labels."
+          htmlFor="tpl-colour"
+        >
           <Select
             id="tpl-colour"
             disabled={!canEdit}
