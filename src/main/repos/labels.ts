@@ -187,9 +187,11 @@ export function labelRecords(
     group_code: string | null
     year_level: string | null
     assigned_at: string | null
+    holder_updated_at: string | null
   }>(
     `SELECT l.id, l.number, l.status, l.qr_id, a.name AS area, b.name AS bank, b.id AS bank_id,
-            s.first_name, s.preferred_name, s.last_name, s.group_code, s.year_level, x.created_at AS assigned_at
+            s.first_name, s.preferred_name, s.last_name, s.group_code, s.year_level, x.created_at AS assigned_at,
+            s.updated_at AS holder_updated_at
        FROM locker l JOIN bank b ON b.id = l.bank_id JOIN area a ON a.id = b.area_id
        LEFT JOIN assignment x ON x.locker_id = l.id AND x.status = 'current'
        LEFT JOIN student s ON s.id = x.student_id
@@ -245,9 +247,11 @@ export function labelRecords(
     }))
     .sort((a, b) => compareLockerNumbers(a.number, b.number))
   if (selection.mode !== 'changed') return records
-  // Per locker: a label is due when its words differ from the last label printed for
-  // that locker. Lockers printed before labels were remembered this way fall back to
-  // what has happened to them since their own last label print (spec audit, gap 5).
+  // Per locker: a locker's labels are due when their words differ from the labels last
+  // printed for that locker (a shared locker has one label per holder, compared as a
+  // set). Lockers printed before labels were remembered this way fall back to what has
+  // happened to them, or to a holder's record, since their own last label print (gap 5).
+  const now = lockerFingerprints(records)
   const printed = getSetting(db, PRINTED_KEY, Printed, {})
   const lastPrint = new Map(
     db
@@ -258,9 +262,11 @@ export function labelRecords(
       )
       .map((r) => [r.locker_id, r.at])
   )
-  const assignedAt = new Map(rows.map((r) => [r.id, r.assigned_at]))
   const touchedSince = (lockerId: string, since: string): boolean =>
-    (assignedAt.get(lockerId) ?? '') > since ||
+    rows.some(
+      (r) =>
+        r.id === lockerId && ((r.assigned_at ?? '') > since || (r.holder_updated_at ?? '') > since)
+    ) ||
     db.get(
       "SELECT 1 AS x FROM assignment WHERE locker_id = $l AND status = 'ended' AND updated_at > $s",
       { $l: lockerId, $s: since }
@@ -271,7 +277,7 @@ export function labelRecords(
     }) !== undefined
   return records.filter((r) => {
     const was = printed[r.lockerId]
-    if (was !== undefined) return was !== labelFingerprint(r)
+    if (was !== undefined) return was !== now.get(r.lockerId)
     const last = lastPrint.get(r.lockerId)
     return !last || touchedSince(r.lockerId, last)
   })
@@ -280,23 +286,31 @@ export function labelRecords(
 const PRINTED_KEY = 'labels.printed'
 const Printed = z.record(z.string(), z.string())
 
-/** A short fingerprint of everything a label shows, so a later change can be seen. */
-export function labelFingerprint(r: LabelRecord): string {
-  return createHash('sha256')
-    .update(
-      JSON.stringify([
-        r.number,
-        r.status,
-        r.firstName,
-        r.lastName,
-        r.group,
-        r.yearLevel,
-        r.area,
-        r.bank
-      ])
-    )
-    .digest('base64')
-    .slice(0, 16)
+/**
+ * A short fingerprint of everything each locker's labels show, so a later change can be
+ * seen. A shared locker's labels (one per holder) make one fingerprint, in a fixed order.
+ */
+export function lockerFingerprints(records: readonly LabelRecord[]): Map<string, string> {
+  const words = new Map<string, string[]>()
+  for (const r of records) {
+    const w = JSON.stringify([
+      r.number,
+      r.status,
+      r.firstName,
+      r.lastName,
+      r.group,
+      r.yearLevel,
+      r.area,
+      r.bank
+    ])
+    words.set(r.lockerId, [...(words.get(r.lockerId) ?? []), w])
+  }
+  return new Map(
+    [...words].map(([id, w]) => [
+      id,
+      createHash('sha256').update(w.sort().join('\n')).digest('base64').slice(0, 16)
+    ])
+  )
 }
 
 /** Records a label print, and remembers what each printed label said. */
@@ -306,7 +320,7 @@ export function recordLabelPrint(
   records: readonly LabelRecord[]
 ): string {
   const printed = { ...getSetting(db, PRINTED_KEY, Printed, {}) }
-  for (const r of records) printed[r.lockerId] = labelFingerprint(r)
+  for (const [id, f] of lockerFingerprints(records)) printed[id] = f
   setSetting(db, ctx, PRINTED_KEY, printed)
   return recordPrintJob(
     db,

@@ -16,6 +16,7 @@ import {
   labelRecords,
   listStocks,
   recordLabelPrint,
+  recordPrintJob,
   resetStock,
   saveStock
 } from '../../src/main/repos/labels'
@@ -337,5 +338,51 @@ describe("a school's measured label sizes (spec audit gap 9)", () => {
 
     resetStock(db, ctx, MEASURED.id)
     expect(getStock(db, MEASURED.id).top).toBe(L7163.top)
+  })
+})
+
+describe('labels changed since printed: shared lockers and older prints (PR #7 review)', () => {
+  const due = (db: Parameters<typeof labelRecords>[0]): string[] =>
+    labelRecords(db, { mode: 'changed' }, true).map((r) => `${r.number} ${r.lastName ?? ''}`)
+
+  it('treats both holders of a shared locker as one set of labels', async () => {
+    const { db, ctx } = await allocatedDemo()
+    const held = db.get<{ locker_id: string }>(
+      "SELECT locker_id FROM assignment WHERE status = 'current' LIMIT 1"
+    )!.locker_id
+    const spare = db.get<{ id: string }>(
+      `SELECT s.id FROM student s WHERE s.active = 1 AND NOT EXISTS
+         (SELECT 1 FROM assignment a WHERE a.student_id = s.id AND a.status = 'current') LIMIT 1`
+    )!.id
+    db.run('UPDATE locker SET capacity = 2 WHERE id = $id', { $id: held })
+    db.run(
+      `INSERT INTO assignment (id, student_id, locker_id, school_year_id, start_date, status, created_at, updated_at, updated_by)
+       SELECT 'syn-second', $s, $l, school_year_id, start_date, 'current', created_at, updated_at, updated_by
+         FROM assignment WHERE locker_id = $l AND status = 'current' LIMIT 1`,
+      { $s: spare, $l: held }
+    )
+    recordLabelPrint(db, ctx, labelRecords(db, { mode: 'all' }, true))
+    expect(due(db)).toEqual([])
+  })
+
+  it('counts a holder’s name change on a locker printed before labels were remembered', async () => {
+    const { db, ctx } = await allocatedDemo()
+    const all = labelRecords(db, { mode: 'all' }, true)
+    // An older print: recorded as a print job, with no remembered words.
+    recordPrintJob(
+      db,
+      ctx,
+      'labels',
+      all.map((r) => r.lockerId)
+    )
+    expect(due(db)).toEqual([])
+    const r = all.find((x) => x.status === 'assigned')!
+    const student = db.get<{ student_id: string }>(
+      "SELECT student_id FROM assignment WHERE locker_id = $l AND status = 'current'",
+      { $l: r.lockerId }
+    )!.student_id
+    ctx.advance(60_000)
+    updateStudent(db, ctx, student, { lastName: 'Synthetic' })
+    expect(due(db)).toEqual([`${r.number} Synthetic`])
   })
 })
