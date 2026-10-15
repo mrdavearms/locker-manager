@@ -42,6 +42,9 @@ test('Undo after changing a year level and group puts the panel back too', async
   await l.page.locator('tbody tr').first().click()
   const year = l.page.locator('#st-year')
   const group = l.page.locator('#st-group')
+  // The year list fills in after the panel opens; until then the box shows its
+  // "other" placeholder. Read the starting value only once the real one is there.
+  await expect(year).not.toHaveValue('__other')
   const wasYear = await year.inputValue()
   const wasGroup = await group.inputValue()
   expect(wasYear).not.toBe('8')
