@@ -27,6 +27,7 @@ import { allocatedDemo } from './fixtures'
 const school = {
   name: 'SYNTHETIC High School',
   logo: null,
+  logoTile: false,
   primary: '#1F3A5F',
   accent: '#E8A33D',
   stripes: []
@@ -87,6 +88,35 @@ describe('letter pages', () => {
     )
     expect(out.html.split(logo).length - 1).toBe(1)
     expect(out.html.match(/class="hlogo"/g)).toHaveLength(30)
+  })
+})
+
+describe('letter colours (print audit H5, H6)', () => {
+  const page = (primary: string, logoTile = false) =>
+    buildLetters(
+      {
+        template: defaultLetterTemplate(),
+        terms: DEFAULT_TERMS,
+        school: { ...school, primary, logo: 'data:image/png;base64,AAAA', logoTile },
+        images: new Map(),
+        today: new Date('2026-10-06'),
+        preview: false
+      },
+      [{ record: rec('settable'), code: '1234', masked: false, lang: 'en' }]
+    ).html
+  it('prints black band text and darkened headings for a gold school', () => {
+    const html = page('#FFD700')
+    expect(html).toContain('background:#FFD700;color:#141414')
+    expect(html).not.toMatch(/h2\{[^}]*color:#FFD700/)
+  })
+  it('keeps white band text and the school colour for a navy school', () => {
+    const html = page('#1F3A5F')
+    expect(html).toContain('background:#1F3A5F;color:#FFFFFF')
+    expect(html).toMatch(/h2\{[^}]*color:#1F3A5F/)
+  })
+  it('puts the logo on a white tile when asked', () => {
+    expect(page('#1F3A5F', true)).toContain('class="hlogo tile"')
+    expect(page('#1F3A5F', false)).not.toContain('hlogo tile')
   })
 })
 

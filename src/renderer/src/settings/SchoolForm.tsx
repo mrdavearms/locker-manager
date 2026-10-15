@@ -5,6 +5,7 @@ import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, TextInput } from '@renderer/components/Field'
 import { useAction, useCanEdit } from '@renderer/lib/appContext'
 import { prepareLogo } from '@renderer/lib/logoImage'
+import { needsLogoTile, textOn } from '@shared/colour'
 import { LOGO_FACTS_VERSION, logoWarnings } from '@shared/logo'
 import { call, useRpc } from '@renderer/lib/rpc'
 
@@ -120,6 +121,10 @@ export function SchoolForm(): React.JSX.Element {
     })
   }
   const warnings = logoWarnings(facts)
+  // The letter heading band, as colour letters print it (print audit H5, H6).
+  const band = school.colourPrimary ?? '#1F3A5F'
+  const pale = textOn(band) !== '#FFFFFF'
+  const tile = needsLogoTile(school, band)
 
   return (
     <div className="space-y-6">
@@ -218,15 +223,36 @@ export function SchoolForm(): React.JSX.Element {
             </div>
           </Field>
         </div>
-        {(school.colourPrimary || school.colourStripes.length > 0) && (
+        {pale && (
+          <p className="mt-4 text-sm text-ink-muted" data-testid="pale-colour-note">
+            This main colour is pale, so white words would be hard to read on it. Colour letters
+            print the heading words in black, and print headings in a darker shade of this colour.
+          </p>
+        )}
+        {(school.colourPrimary || school.colourStripes.length > 0 || school.hasLogo) && (
           <div
             className="mt-5 overflow-hidden rounded-xl border border-line"
             aria-label="Preview of the letter header"
           >
             <div
-              className="flex h-14 items-center px-5 font-display text-lg font-semibold text-white"
-              style={{ background: school.colourPrimary ?? '#0e4a57' }}
+              className="flex min-h-14 items-center gap-4 px-5 py-2 font-display text-lg font-semibold"
+              style={{ background: band, color: textOn(band) }}
             >
+              {school.logoDataUrl && (
+                <span
+                  className={`flex h-12 w-12 flex-none items-center justify-center ${tile ? 'rounded-lg bg-white p-1' : ''}`}
+                >
+                  <img
+                    src={
+                      tile && school.logoFacts?.lightOnWhite
+                        ? (school.monoLogoDataUrl ?? school.logoDataUrl)
+                        : school.logoDataUrl
+                    }
+                    alt=""
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </span>
+              )}
               {school.name}
             </div>
             <div className="flex h-2">

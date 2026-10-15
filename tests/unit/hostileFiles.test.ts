@@ -101,6 +101,7 @@ describe('picture types are allow-listed', () => {
         school: {
           name: 'SYNTHETIC High School',
           logo: `data:${EVIL}`,
+          logoTile: false,
           primary: '#1F3A5F',
           accent: '#E8A33D',
           stripes: []

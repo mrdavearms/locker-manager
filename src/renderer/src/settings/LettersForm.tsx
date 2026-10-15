@@ -563,7 +563,11 @@ function Designer({
             <option value="Letter">US Letter</option>
           </Select>
         </Field>
-        <Field label="Colour" htmlFor="tpl-colour">
+        <Field
+          label="Colour"
+          hint="Choose Black and white if your printer has no colour: colour headings and the coloured band print faint grey on a black-and-white printer."
+          htmlFor="tpl-colour"
+        >
           <Select
             id="tpl-colour"
             value={t.colour}

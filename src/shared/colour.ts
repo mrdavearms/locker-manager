@@ -1,3 +1,5 @@
+import type { SchoolProfile } from './locations'
+
 // Colour contrast for printed letters, worked out the WCAG way (the web
 // accessibility guidelines): 4.5 to 1 for ordinary text, 3 to 1 for large text.
 // Used so a pale school colour never prints white-on-gold or gold-on-white.
@@ -56,3 +58,23 @@ export function darkenFor(
   }
   return '#000000'
 }
+
+/**
+ * A colour letter puts the logo straight on the heading band of the main colour.
+ * It goes on a white tile instead when it has its own solid background (a JPEG
+ * would show as a white box anyway) or its artwork is close to the band colour
+ * (a navy crest on a navy band would vanish), or it has white lettering and the
+ * band is pale. Audit H6.
+ */
+export function needsLogoTile(p: SchoolProfile, band: string): boolean {
+  if (!p.logoDataUrl) return false
+  const f = p.logoFacts
+  if (!f) return p.logoDataUrl.startsWith('data:image/jpeg')
+  if (f.opaque) return true
+  // Light lettering in the logo would vanish into a pale band.
+  if (f.lightOnWhite && contrast('#FFFFFF', band) < LOGO_ON_BAND_CONTRAST) return true
+  return f.ink !== null && contrast(f.ink, band) < LOGO_ON_BAND_CONTRAST
+}
+
+/** Below this contrast with the band, the logo's artwork is hard to see on it. */
+export const LOGO_ON_BAND_CONTRAST = 2
