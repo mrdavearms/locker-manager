@@ -9,7 +9,7 @@ import {
 import type { Terminology } from '@shared/terminology'
 import { codeParts, formatBody, formatLine, isRightToLeft, type MergeValues } from '../letters/text'
 import { fitText } from './fit'
-import { fontFaceCss, textWidthMm } from './fonts'
+import { fontFaceCss, PT_TO_MM, textWidthMm } from './fonts'
 import { esc, mm, safeImageUrl } from './html'
 import { darkenFor, textOn } from '@shared/colour'
 
@@ -67,16 +67,26 @@ const NAME_BOX_HEIGHT = 24
  * lock column beside it (code boxes, key number or locker number), so a long
  * name is fitted to the space it prints in (print audit, Low).
  */
-function nameBoxWidth(input: LetterBuildInput, item: LetterItem): number {
+function nameBoxWidth(
+  input: LetterBuildInput,
+  item: LetterItem,
+  captions: { locker: string; code: string; key: string }
+): number {
   const r = item.record
   const page = PAGE_SIZES[input.template.pageSize]
   const inside = page.width - 2 * PAGE_PAD_X - 2 * (0.6 + 6)
-  let lock = textWidthMm(r.locker, 28, 700)
+  // A caption is 9 pt bold capitals, spaced 0.08 em apart (.slock .w).
+  const caption = (text: string): number => {
+    const upper = text.toLocaleUpperCase(item.lang)
+    return textWidthMm(upper, 9, 700) + [...upper].length * 0.08 * 9 * PT_TO_MM
+  }
+  let lock = Math.max(textWidthMm(r.locker, 28, 700), caption(captions.locker))
   if ((r.kind === 'settable' || r.kind === 'fixed') && item.code) {
     const parts = codeParts(item.code)
     const boxes = parts.reduce((w, p) => w + Math.max(10, textWidthMm(p, 20, 700) + 4.2), 0)
-    lock = Math.max(lock, boxes + 1.6 * (parts.length - 1))
-  } else if (r.kind === 'keyed') lock = Math.max(lock, textWidthMm(r.keyNumber ?? '—', 18, 700))
+    lock = Math.max(lock, boxes + 1.6 * (parts.length - 1), caption(captions.code))
+  } else if (r.kind === 'keyed')
+    lock = Math.max(lock, textWidthMm(r.keyNumber ?? '—', 18, 700), caption(captions.key))
   else if (r.kind === 'no_lock') lock = Math.max(lock, 52)
   return Math.max(40, inside - 6 - lock)
 }
@@ -236,7 +246,10 @@ function studentPanel(
   const name = `${r.firstName} ${r.lastName}`.trim()
   const fitted = fitText(
     name,
-    { w: nameBoxWidth(input, item), h: NAME_BOX_HEIGHT },
+    {
+      w: nameBoxWidth(input, item, { locker: lockerWord, code: codeLabel, key: keyLabel }),
+      h: NAME_BOX_HEIGHT
+    },
     { max: 30, min: 14 },
     700
   )

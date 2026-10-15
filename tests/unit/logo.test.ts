@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { analyseLogo, inkColour, logoWarnings, makeMonoLogo } from '../../src/shared/logo'
+import {
+  analyseLogo,
+  dataUrlToFile,
+  inkColour,
+  logoWarnings,
+  makeMonoLogo
+} from '../../src/shared/logo'
 
 function image(pixels: [number, number, number, number][]): Uint8ClampedArray {
   return new Uint8ClampedArray(pixels.flat())
@@ -139,6 +145,13 @@ describe('makeMonoLogo: logo shapes from the print audit', () => {
     expect(m.at(30, 30)).toEqual(BLACK_OUT)
     expect(m.result).toBe('ok')
   })
+  it('a white card with a small crest stays white (sparse artwork)', () => {
+    // 100 x 100 canvas, 80 x 80 white card, 16 x 16 navy crest: the crest is 4% of the card.
+    const m = new Pic(100, 100).rect(10, 10, 80, 80, WHITE).rect(42, 42, 16, 16, NAVY).mono()
+    expect(m.at(15, 15)).toEqual(WHITE_OUT)
+    expect(m.at(50, 50)).toEqual(BLACK_OUT)
+    expect(m.result).toBe('ok')
+  })
   it('gold lettering beside a navy crest turns black so it shows on white', () => {
     const m = new Pic(80, 30).rect(2, 2, 24, 26, NAVY).rect(34, 10, 30, 8, GOLD).mono()
     expect(m.at(10, 10)).toEqual(BLACK_OUT)
@@ -216,5 +229,14 @@ describe('inkColour and logoWarnings', () => {
 describe('makeMonoLogo: the result', () => {
   it('is fine for a plain dark crest, which has no detail to lose', () => {
     expect(new Pic(30, 30).rect(5, 5, 20, 20, NAVY).mono().result).toBe('ok')
+  })
+})
+
+describe('dataUrlToFile', () => {
+  it('decodes the stored logo without fetching it (the window may not fetch data addresses)', async () => {
+    const f = dataUrlToFile('data:image/png;base64,iVBORw==')
+    expect(f.type).toBe('image/png')
+    expect([...new Uint8Array(await f.arrayBuffer())]).toEqual([137, 80, 78, 71])
+    expect(() => dataUrlToFile('https://example.com/logo.png')).toThrow(/could not be read/)
   })
 })

@@ -59,7 +59,8 @@ export type MonoResult = 'ok' | 'blank' | 'solid'
  *   beside a crest) would vanish on white labels, so they turn black. Light parts
  *   enclosed by darker ones stay white.
  * - A large light area that touches the see-through background and surrounds the
- *   dark artwork is the logo's own card or tile, so it stays white.
+ *   dark artwork, however small that artwork is, is the logo's own card or tile, so
+ *   it stays white.
  *
  * Pass the picture's width and height so "touching" is worked out in two
  * dimensions; without them the pixels are read as one row.
@@ -155,7 +156,7 @@ export function makeMonoLogo(
     const darkInside = boxCount(sat, w, ax0, ay0, ax1, ay1)
     const isCard =
       area.length >= visible * 0.25 &&
-      darkInside >= visible * 0.05 &&
+      darkInside > 0 &&
       ax1 - ax0 + 1 >= visW * 0.5 &&
       ay1 - ay0 + 1 >= visH * 0.5
     if (isCard) continue
@@ -347,4 +348,18 @@ export function logoWarnings(f: LogoFacts | null): string[] {
       )
   }
   return out
+}
+
+/**
+ * The logo stored in the file, as a File, decoded here: the window's security
+ * policy lets it fetch only its own pages, so fetching a data address fails in
+ * the installed app.
+ */
+export function dataUrlToFile(url: string, name = 'logo'): File {
+  const m = /^data:([^;,]+);base64,(.*)$/.exec(url)
+  if (!m) throw new Error('The logo in this file could not be read.')
+  const text = atob(m[2]!)
+  const bytes = new Uint8Array(text.length)
+  for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i)
+  return new File([bytes], name, { type: m[1]! })
 }

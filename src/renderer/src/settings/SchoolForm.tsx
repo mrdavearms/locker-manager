@@ -6,7 +6,7 @@ import { Field, SectionCard, TextInput } from '@renderer/components/Field'
 import { useAction, useCanEdit } from '@renderer/lib/appContext'
 import { prepareLogo } from '@renderer/lib/logoImage'
 import { needsLogoTile, textOn } from '@shared/colour'
-import { LOGO_FACTS_VERSION, logoWarnings } from '@shared/logo'
+import { dataUrlToFile, LOGO_FACTS_VERSION, logoWarnings } from '@shared/logo'
 import { call, useRpc } from '@renderer/lib/rpc'
 
 function ColourPicker({
@@ -85,7 +85,17 @@ export function SchoolForm(): React.JSX.Element {
     if (!file) return
     await act(async () => {
       const p = await prepareLogo(file)
-      await call('school.setLogo', { which: 'mono', bytes: p.bytes, type: p.type })
+      // An older file has no facts about its logo: work them out from the colour
+      // logo now, so the school's own one-colour file is remembered as theirs.
+      const colour = school.logoDataUrl
+      const known = school.logoFacts?.version === LOGO_FACTS_VERSION
+      const facts = !known && colour ? (await prepareLogo(dataUrlToFile(colour))).facts : undefined
+      await call('school.setLogo', {
+        which: 'mono',
+        bytes: p.bytes,
+        type: p.type,
+        ...(facts ? { facts: { ...facts, mono: 'own' as const, monoResult: 'ok' as const } } : {})
+      })
     })
   }
 
@@ -102,8 +112,7 @@ export function SchoolForm(): React.JSX.Element {
     const url = school.logoDataUrl
     if (!url) return
     await act(async () => {
-      const blob = await (await fetch(url)).blob()
-      const p = await prepareLogo(new File([blob], 'logo', { type: blob.type }))
+      const p = await prepareLogo(dataUrlToFile(url))
       if (keep)
         await call('school.setLogo', {
           which: 'colour',

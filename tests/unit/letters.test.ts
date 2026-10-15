@@ -109,6 +109,30 @@ describe('the name on a letter', () => {
   })
 })
 
+describe('the name beside a short key number', () => {
+  it('leaves room for the "Your key number" caption, not just the digit', () => {
+    const html = build([
+      {
+        record: rec('keyed', {
+          locker: '1',
+          keyNumber: '1',
+          firstName: 'Bartholomew-Maximilian',
+          lastName: 'Featherstonehaugh-Wolstenholme'
+        }),
+        code: null,
+        masked: false,
+        lang: 'en'
+      }
+    ]).html
+    const m = /<div class="n" style="font-size:([\d.]+)pt">(.*?)<\/div>/.exec(html)!
+    const size = Number(m[1])
+    const caption = textWidthMm('YOUR KEY NUMBER', 9, 700)
+    // 165 mm panel, less the 6 mm gap and the caption's width.
+    for (const line of m[2]!.split('<br>'))
+      expect(textWidthMm(line, size, 700)).toBeLessThanOrEqual(165 - 6 - caption)
+  })
+})
+
 describe('right-to-left letters (print audit M2)', () => {
   it('lays out an Arabic letter right to left, with the code boxes still left to right', () => {
     const template = {
