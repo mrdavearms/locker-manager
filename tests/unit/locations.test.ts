@@ -24,10 +24,12 @@ import {
   getSchoolProfile,
   getTerms,
   setLogo,
+  setLogos,
   setTerms,
   updateSchoolProfile
 } from '../../src/main/repos/school'
 import { TERMINOLOGY_PRESETS } from '../../src/shared/terminology'
+import { listProblems } from '../../src/main/repos/problems'
 import { testContext } from './helpers'
 
 describe('locker numbers', () => {
@@ -319,6 +321,41 @@ describe('the school profile', () => {
     expect(() =>
       setLogo(d, testContext(), 'mono', new Uint8Array(3 * 1024 * 1024), 'image/png')
     ).toThrow(/2 MB/)
+  })
+  it('stores both logos and the facts in one step, and offers a remake for older logos', async () => {
+    const d = await db()
+    const png = new Uint8Array([137, 80, 78, 71])
+    const facts = {
+      version: 2,
+      width: 600,
+      height: 300,
+      svg: false,
+      lightOnWhite: true,
+      opaque: false,
+      ink: '#1F3A5F',
+      mono: 'auto' as const,
+      monoResult: 'ok' as const
+    }
+    // A logo set by an older version: no facts, so Home asks for a remake.
+    setLogo(d, testContext(), 'colour', png, 'image/png')
+    expect(listProblems(d).map((p) => p.id)).toContain('old-logo')
+    setLogos(d, testContext(), { which: 'both', bytes: png, type: 'image/png', mono: png, facts })
+    expect(getSchoolProfile(d)).toMatchObject({
+      hasLogo: true,
+      hasMonoLogo: true,
+      logoFacts: facts
+    })
+    expect(listProblems(d).map((p) => p.id)).not.toContain('old-logo')
+    // The school's own one-colour file is marked as theirs.
+    setLogos(d, testContext(), { which: 'mono', bytes: png, type: 'image/png' })
+    expect(getSchoolProfile(d).logoFacts?.mono).toBe('own')
+    // Removing the logo removes both versions and the facts.
+    setLogos(d, testContext(), { which: 'both', bytes: null, type: null, mono: null })
+    expect(getSchoolProfile(d)).toMatchObject({
+      hasLogo: false,
+      hasMonoLogo: false,
+      logoFacts: null
+    })
   })
   it('keeps terminology, falling back to defaults', async () => {
     const d = await db()

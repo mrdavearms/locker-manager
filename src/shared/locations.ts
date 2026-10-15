@@ -1,3 +1,4 @@
+import type { LogoFacts } from './logo'
 import type { LockType } from './locks'
 
 export interface AreaView {
@@ -50,4 +51,6 @@ export interface SchoolProfile {
   hasMonoLogo: boolean
   logoDataUrl: string | null
   monoLogoDataUrl: string | null
+  /** What the app learnt about the logo when it was chosen; null for older files. */
+  logoFacts: LogoFacts | null
 }

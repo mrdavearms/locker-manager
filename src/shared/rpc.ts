@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { LogoFactsSchema } from './logo'
 import type { FilePreview, ImportAnalysis, ImportOptions, ImportResult } from './importTypes'
 import { IMPORT_FIELDS } from './importTypes'
 import type { AreaView, LockerView, SchoolProfile } from './locations'
@@ -91,9 +92,12 @@ export const rpcParams = {
     address: z.string().max(300).nullable().optional()
   }),
   'school.setLogo': z.object({
-    which: z.enum(['colour', 'mono']),
+    /** both: the colour logo in bytes and the one-colour version made from it in mono. */
+    which: z.enum(['colour', 'mono', 'both']),
     bytes: z.instanceof(Uint8Array).nullable(),
-    type: z.enum(['image/png', 'image/svg+xml', 'image/jpeg']).nullable()
+    type: z.enum(['image/png', 'image/svg+xml', 'image/jpeg']).nullable(),
+    mono: z.instanceof(Uint8Array).nullable().optional(),
+    facts: LogoFactsSchema.nullable().optional()
   }),
   'terms.get': z.object({}),
   'terms.set': z.object({ terms: TerminologySchema }),

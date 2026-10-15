@@ -3,7 +3,8 @@ import { resolveTerms, type Terminology } from '@shared/terminology'
 import type { LockerDb } from '../db/db'
 import type { OperatorContext } from '../db/context'
 import { imageDataUrl } from '../render/html'
-import { setSetting } from './settings'
+import { LogoFactsSchema, type LogoFacts } from '@shared/logo'
+import { getSetting, setSetting } from './settings'
 
 type SchoolRow = {
   id: string
@@ -47,9 +48,16 @@ export function getSchoolProfile(db: LockerDb): SchoolProfile {
     hasLogo: r.logo !== null,
     hasMonoLogo: r.logo_mono !== null,
     logoDataUrl: dataUrl(r.logo, r.logo_type),
-    monoLogoDataUrl: dataUrl(r.logo_mono, r.logo_mono_type)
+    monoLogoDataUrl: dataUrl(r.logo_mono, r.logo_mono_type),
+    logoFacts: r.logo ? logoFacts(db) : null
   }
 }
+
+export function logoFacts(db: LockerDb): LogoFacts | null {
+  return getSetting(db, LOGO_FACTS_KEY, LogoFactsSchema.nullable(), null)
+}
+
+const LOGO_FACTS_KEY = 'logo.facts'
 
 export interface SchoolPatch {
   name?: string
@@ -132,6 +140,34 @@ export function setLogo(
       $id: r.id
     }
   )
+}
+
+/**
+ * Sets the colour logo, the one-colour logo, or both at once (a new logo and the
+ * version made from it), with what was learnt about it. Removing the colour logo
+ * removes the facts; the school's own one-colour file marks the facts "own".
+ */
+export function setLogos(
+  db: LockerDb,
+  ctx: OperatorContext,
+  p: {
+    which: 'colour' | 'mono' | 'both'
+    bytes: Uint8Array | null
+    type: (typeof LOGO_TYPES)[number] | null
+    mono?: Uint8Array | null | undefined
+    facts?: LogoFacts | null | undefined
+  }
+): void {
+  if (p.which === 'both') {
+    setLogo(db, ctx, 'colour', p.bytes, p.type)
+    setLogo(db, ctx, 'mono', p.mono ?? null, p.mono ? 'image/png' : null)
+  } else setLogo(db, ctx, p.which, p.bytes, p.type)
+  if (p.which !== 'mono' && !p.bytes) setSetting(db, ctx, LOGO_FACTS_KEY, null)
+  else if (p.facts !== undefined) setSetting(db, ctx, LOGO_FACTS_KEY, p.facts)
+  else if (p.which === 'mono' && p.bytes) {
+    const f = logoFacts(db)
+    if (f) setSetting(db, ctx, LOGO_FACTS_KEY, { ...f, mono: 'own', monoResult: 'ok' })
+  }
 }
 
 export function getTerms(db: LockerDb): Terminology {

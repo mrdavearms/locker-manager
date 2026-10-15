@@ -5,6 +5,7 @@ import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, TextInput } from '@renderer/components/Field'
 import { useAction, useCanEdit } from '@renderer/lib/appContext'
 import { prepareLogo } from '@renderer/lib/logoImage'
+import { LOGO_FACTS_VERSION, logoWarnings } from '@shared/logo'
 import { call, useRpc } from '@renderer/lib/rpc'
 
 function ColourPicker({
@@ -44,7 +45,6 @@ export function SchoolForm(): React.JSX.Element {
   const act = useAction()
   const fileInput = useRef<HTMLInputElement>(null)
   const monoInput = useRef<HTMLInputElement>(null)
-  const [warning, setWarning] = useState<string | null>(null)
   const [draft, setDraft] = useState<{ name: string; shortName: string; address: string } | null>(
     null
   )
@@ -70,13 +70,13 @@ export function SchoolForm(): React.JSX.Element {
     if (!file) return
     await act(async () => {
       const p = await prepareLogo(file)
-      await call('school.setLogo', { which: 'colour', bytes: p.bytes, type: p.type })
-      await call('school.setLogo', { which: 'mono', bytes: p.mono, type: 'image/png' })
-      setWarning(
-        p.analysis.vanishesOnWhite
-          ? 'This logo has light lettering on a see-through background, so it would vanish on white labels. A dark version has been made for labels; check it below.'
-          : null
-      )
+      await call('school.setLogo', {
+        which: 'both',
+        bytes: p.bytes,
+        type: p.type,
+        mono: p.mono,
+        facts: p.facts
+      })
     })
   }
 
@@ -87,6 +87,39 @@ export function SchoolForm(): React.JSX.Element {
       await call('school.setLogo', { which: 'mono', bytes: p.bytes, type: p.type })
     })
   }
+
+  // A logo chosen before v0.11.2 has a one-colour version made by the older rules
+  // (often a solid black shape), and no facts. Offer to make it again from the
+  // colour logo kept in the file, or to keep the one there.
+  const facts = school.logoFacts
+  const oldMono =
+    school.hasLogo &&
+    school.logoDataUrl !== null &&
+    facts?.mono !== 'own' &&
+    (facts === null || facts.version < LOGO_FACTS_VERSION)
+  const remake = async (keep: boolean): Promise<void> => {
+    const url = school.logoDataUrl
+    if (!url) return
+    await act(async () => {
+      const blob = await (await fetch(url)).blob()
+      const p = await prepareLogo(new File([blob], 'logo', { type: blob.type }))
+      if (keep)
+        await call('school.setLogo', {
+          which: 'colour',
+          bytes: p.bytes,
+          type: p.type,
+          facts: { ...p.facts, mono: 'own', monoResult: 'ok' }
+        })
+      else
+        await call('school.setLogo', {
+          which: 'mono',
+          bytes: p.mono,
+          type: 'image/png',
+          facts: p.facts
+        })
+    })
+  }
+  const warnings = logoWarnings(facts)
 
   return (
     <div className="space-y-6">
@@ -209,10 +242,38 @@ export function SchoolForm(): React.JSX.Element {
         title="Logo"
         description="PNG, JPEG or SVG, up to 2 MB. A one-colour version is made for black-and-white labels."
       >
-        {warning && (
+        {oldMono && (
           <div className="mb-4">
-            <Banner tone="warn" title="Check the label version of your logo">
-              {warning}
+            <Banner tone="warn" title="Remake your one-colour logo">
+              <p>
+                Your one-colour logo was made by an older version of Locker Manager. It may print as
+                a solid black shape, without the detail inside your crest. Remake it from your
+                colour logo, then check it below.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" disabled={!canEdit} onClick={() => void remake(false)}>
+                  Remake the one-colour logo
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!canEdit}
+                  onClick={() => void remake(true)}
+                >
+                  Keep the one I have
+                </Button>
+              </div>
+            </Banner>
+          </div>
+        )}
+        {warnings.length > 0 && (
+          <div className="mb-4">
+            <Banner tone="warn" title="Check your logo">
+              {warnings.map((w) => (
+                <p key={w} className="mt-1 first:mt-0">
+                  {w}
+                </p>
+              ))}
             </Banner>
           </div>
         )}
@@ -278,11 +339,9 @@ export function SchoolForm(): React.JSX.Element {
               variant="ghost"
               disabled={!canEdit}
               onClick={() =>
-                void act(async () => {
-                  await call('school.setLogo', { which: 'colour', bytes: null, type: null })
-                  await call('school.setLogo', { which: 'mono', bytes: null, type: null })
-                  setWarning(null)
-                })
+                void act(() =>
+                  call('school.setLogo', { which: 'both', bytes: null, type: null, mono: null })
+                )
               }
             >
               <Trash2 size={16} aria-hidden /> Remove logo
