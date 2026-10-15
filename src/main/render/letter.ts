@@ -101,6 +101,7 @@ function pageCss(input: LetterBuildInput): string {
   const primary = mono ? '#000000' : input.school.primary
   const accent = mono ? '#000000' : input.school.accent
   // Only plain base64 pictures reach the CSS; anything else could close the style.
+  const logoUrl = safeImageUrl(input.school.logo)
   const imageCss = [...input.images.entries()]
     .flatMap(([id, img]) => {
       const url = safeImageUrl(img.dataUrl)
@@ -116,7 +117,7 @@ body{font-family:LMArimo,Arial,sans-serif;color:#141414;font-size:11pt;line-heig
 .letter:last-child{break-after:auto;page-break-after:auto}
 .pageend{position:absolute;left:0;right:0;top:${mm(page.height)};border-top:0.6mm dashed #c0392b;font-size:8pt;color:#c0392b;padding-top:1mm;text-align:center}
 .hdr{display:flex;align-items:center;gap:6mm;margin:-${mm(PAGE_PAD_Y)} -${mm(PAGE_PAD_X)} 0;padding:9mm ${mm(PAGE_PAD_X)} 8mm;background:${mono ? '#fff' : primary};color:${mono ? '#000' : '#fff'};${mono ? 'border-bottom:0.6mm solid #000;' : ''}}
-.hlogo{width:24mm;height:24mm;flex:none;background-size:contain;background-repeat:no-repeat;background-position:center}
+.hlogo{width:24mm;height:24mm;flex:none;background:${logoUrl ? `url("${logoUrl}")` : 'none'} center/contain no-repeat}
 .hschool{font-size:12pt;font-weight:700;opacity:.9}
 .htitle{font-size:26pt;font-weight:700;line-height:1.1}
 .hsub{font-size:11pt;margin-top:1mm;opacity:.9}
@@ -245,8 +246,9 @@ function renderBlock(
   const body = pick(block.body, lang, fallback)
   switch (block.type) {
     case 'header': {
+      // The picture itself is in the page's style sheet once, not in every letter.
       const logo = safeImageUrl(input.school.logo)
-      return `<div class="hdr">${logo ? `<div class="hlogo" style="background-image:url(&quot;${esc(logo)}&quot;)"></div>` : ''}<div><div class="hschool">${esc(
+      return `<div class="hdr">${logo ? '<div class="hlogo"></div>' : ''}<div><div class="hschool">${esc(
         input.school.name
       )}</div><div class="htitle">${formatLine(heading, values)}</div>${
         body.trim() ? `<div class="hsub">${formatLine(body, values)}</div>` : ''

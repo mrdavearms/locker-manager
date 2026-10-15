@@ -282,7 +282,9 @@ export const rpcParams = {
   'labels.preview': z.object({
     selection: LabelSelectionSchema,
     startAt: z.number().int().min(1).max(100),
-    template: LabelTemplateSchema.optional()
+    template: LabelTemplateSchema.optional(),
+    /** Only the first few labels (the designer shows one, so it asks for one). */
+    limit: z.number().int().min(1).max(1000).optional()
   }),
   'labels.calibrationPreview': z.object({
     stockId: z.string().max(64).nullable(),

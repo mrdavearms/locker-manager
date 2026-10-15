@@ -70,6 +70,13 @@ describe('stock geometry (SPEC.md 5.1)', () => {
 })
 
 describe('label sheets', () => {
+  it('carry the logo once per page, however many labels there are', () => {
+    const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=='
+    const records = Array.from({ length: 40 }, (_, i) => rec(i + 1))
+    const out = build(L7163, records, { logo: { colour: null, mono: logo } })
+    expect(out.html.split(logo).length - 1).toBe(1)
+    expect(out.html.match(/class="el logo"/g)).toHaveLength(40)
+  })
   it('put each label at exact millimetres, with printer offsets', () => {
     const out = build(MEASURED, [rec(1), rec(2), rec(3)], { offset: { right: 0.5, down: -0.3 } })
     expect(out.placed.map((p) => [p.number, p.x, p.y])).toEqual([

@@ -64,16 +64,11 @@ function renderElement(
   const fit = (text: string, box = { w: e.w, h: e.h }, twoLines = true) =>
     fitText(text, box, { max: e.fontMax, min: e.fontMin }, weight, twoLines)
   switch (e.type) {
-    case 'logo': {
-      const src = safeImageUrl(
-        input.template.colour === 'mono'
-          ? (input.logo.mono ?? input.logo.colour)
-          : (input.logo.colour ?? input.logo.mono)
-      )
-      return src
-        ? `<img class="el logo" src="${esc(src)}" style="left:${mm(e.x)};top:${mm(e.y)};width:${mm(e.w)};height:${mm(e.h)}" alt="">`
+    case 'logo':
+      // The picture itself is in the page's style sheet once (labelLogo), not per label.
+      return labelLogo(input)
+        ? `<div class="el logo" style="left:${mm(e.x)};top:${mm(e.y)};width:${mm(e.w)};height:${mm(e.h)}"></div>`
         : ''
-    }
     case 'name': {
       if (r.status !== 'assigned') {
         const text =
@@ -135,7 +130,17 @@ function renderElement(
   }
 }
 
-export function pageCss(stock: Stock): string {
+/** The logo this sheet prints: the one-colour version on mono labels. */
+function labelLogo(input: SheetInput): string | null {
+  return safeImageUrl(
+    input.template.colour === 'mono'
+      ? (input.logo.mono ?? input.logo.colour)
+      : (input.logo.colour ?? input.logo.mono)
+  )
+}
+
+/** Page styles; the logo, when given, is written here once for every label to share. */
+export function pageCss(stock: Stock, logo: string | null = null): string {
   return `${fontFaceCss()}
 @page { size: ${mm(stock.pageWidth)} ${mm(stock.pageHeight)}; margin: 0 }
 * { box-sizing: border-box }
@@ -146,7 +151,7 @@ body { font-family: LMArimo, Arial, sans-serif; -webkit-print-color-adjust: exac
 .label { position: absolute; width: ${mm(stock.labelWidth)}; height: ${mm(stock.labelHeight)}; overflow: hidden }
 .label.outline { outline: 0.2mm solid #b9c4cc; border-radius: ${mm(stock.cornerRadius)} }
 .el { position: absolute; display: flex; flex-direction: column; white-space: nowrap; overflow: hidden; line-height: ${LINE_HEIGHT} }
-.logo { object-fit: contain; object-position: left center }
+.logo { background: ${logo ? `url("${logo}")` : 'none'} left center / contain no-repeat }
 .rule { position: absolute; background: #000 }
 .qr svg { width: 100%; height: 100% }`
 }
@@ -180,7 +185,7 @@ export function buildLabelSheets(input: SheetInput): SheetOutput {
       )
     }
   }
-  const html = `<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><title>Labels</title><style>${pageCss(stock)}</style></head><body>${pages
+  const html = `<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><title>Labels</title><style>${pageCss(stock, labelLogo(input))}</style></head><body>${pages
     .map((p) => `<div class="page">${p.join('')}</div>`)
     .join('')}</body></html>`
   return { html, sheets: pages.length, placed, tooLong }

@@ -352,7 +352,7 @@ function DesignerCard({
     const tpl = JSON.parse(key) as LabelTemplate
     const timer = setTimeout(() => {
       void window.api
-        .rpc('labels.preview', { selection: { mode: 'all' }, startAt: 1, template: tpl })
+        .rpc('labels.preview', { selection: { mode: 'all' }, startAt: 1, template: tpl, limit: 1 })
         .then((r) => {
           if (!cancelled && r.ok) setHtml(r.value.html)
         })

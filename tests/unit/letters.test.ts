@@ -65,6 +65,31 @@ function build(items: LetterItem[], template: LetterTemplate = defaultLetterTemp
   )
 }
 
+describe('letter pages', () => {
+  it('carry the logo once, however many letters there are', () => {
+    const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=='
+    const items = Array.from({ length: 30 }, (_, i) => ({
+      record: rec('settable', { studentId: `s${i}` }),
+      code: '1234',
+      masked: false,
+      lang: 'en'
+    }))
+    const out = buildLetters(
+      {
+        template: defaultLetterTemplate(),
+        terms: DEFAULT_TERMS,
+        school: { ...school, logo },
+        images: new Map(),
+        today: new Date('2026-10-06'),
+        preview: false
+      },
+      items
+    )
+    expect(out.html.split(logo).length - 1).toBe(1)
+    expect(out.html.match(/class="hlogo"/g)).toHaveLength(30)
+  })
+})
+
 describe('letter words (SPEC.md 5.2)', () => {
   it('turns lines into paragraphs, bullet points, numbered steps and bold', () => {
     expect(formatBody('One\ntwo\n\n- a\n- b\n\n1. first\n2. **second**', {})).toBe(
