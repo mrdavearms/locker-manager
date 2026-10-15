@@ -381,6 +381,35 @@ describe('comparing with the data file and applying (SPEC.md 4.2 steps 6 and 7)'
     expect(a3.changed).toEqual([])
   })
 
+  it('does not flag a name when the student system now agrees with the hand correction', async () => {
+    const db = await createNewDatabase(testContext(), {
+      schoolName: 'SYNTHETIC',
+      appVersion: '0.11.2'
+    })
+    const ctx = testContext()
+    const first = await compassFile('Year 7.csv', ['SYN0001,I,NGUYEN,Ava,F,M,07A,R'])
+    const a1 = analyseImport(db, buildStudents([first], [settingsFor(first)], OPTS), OPTS)
+    applyImport(
+      db,
+      ctx,
+      a1,
+      { add: ['SYN0001'], update: [], markMissing: [] },
+      { files: ['Year 7.csv'], profile: 'compass' }
+    )
+    const id = db.get<{ id: string }>("SELECT id FROM student WHERE external_id = 'SYN0001'")!.id
+    updateStudent(db, ctx, id, { firstName: 'Ava-Rose' })
+    const again = await compassFile('Year 7.csv', ['SYN0001,I,NGUYEN,Ava-Rose,F,M,07A,R'])
+    const a2 = analyseImport(db, buildStudents([again], [settingsFor(again)], OPTS), OPTS)
+    applyImport(
+      db,
+      ctx,
+      a2,
+      { add: [], update: [id], markMissing: [] },
+      { files: ['Year 7.csv'], profile: 'compass' }
+    )
+    expect(getStudent(db, id)!.nameCheck).not.toContain('import_differs')
+  })
+
   it('treats the whole school as covered when told to', async () => {
     const db = await createNewDatabase(testContext(), {
       schoolName: 'SYNTHETIC',

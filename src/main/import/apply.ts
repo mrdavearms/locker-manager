@@ -74,7 +74,15 @@ export function applyImport(
       const nameChange = ch.changes.some((c) => c.field === 'name')
       // A name corrected by hand is kept, but stays flagged while the student system
       // spells it another way (SPEC.md section 15 item 2; spec audit gap 6).
-      const check = ch.overrideKept ? [...st.nameCheck, 'import_differs'] : st.nameCheck
+      const kept = ch.overrideKept
+        ? db.get<{ first_name: string; last_name: string }>(
+            'SELECT first_name, last_name FROM student WHERE id = $id',
+            { $id: ch.studentId }
+          )
+        : undefined
+      const differs =
+        kept !== undefined && (kept.first_name !== st.firstName || kept.last_name !== st.lastName)
+      const check = differs ? [...st.nameCheck, 'import_differs'] : st.nameCheck
       db.run(
         `UPDATE student SET
            first_name_raw = $fr, last_name_raw = $lr, preferred_name_raw = $pr,
@@ -93,7 +101,7 @@ export function applyImport(
           $f: st.firstName,
           $l: st.lastName,
           $p: st.preferredName,
-          $nameChange: nameChange || ch.overrideKept ? 1 : 0,
+          $nameChange: nameChange || differs ? 1 : 0,
           $check: JSON.stringify(check),
           $y: st.yearLevel,
           $g: st.groupCode,
