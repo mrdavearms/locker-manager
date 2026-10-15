@@ -69,7 +69,7 @@ test('the getting-started list hides, comes back, and the Guide reopens set-up',
   await l.page.getByTestId('new-file').click()
   await l.page.getByLabel('School name').fill('SYNTHETIC Onboarding College')
   await l.page.getByRole('button', { name: 'Choose where to save…' }).click()
-  await expect(l.page.getByText('Set up your school')).toBeVisible()
+  await expect(l.page.getByText('Set up your school')).toBeVisible({ timeout: 20_000 })
   await l.page.getByTestId('nav-home').click()
 
   const list = l.page.getByTestId('getting-started')
@@ -99,7 +99,7 @@ test('labels and letters can be set aside as not used, and brought back', async 
   await l.page.getByTestId('new-file').click()
   await l.page.getByLabel('School name').fill('SYNTHETIC Not Used College')
   await l.page.getByRole('button', { name: 'Choose where to save…' }).click()
-  await expect(l.page.getByText('Set up your school')).toBeVisible()
+  await expect(l.page.getByText('Set up your school')).toBeVisible({ timeout: 20_000 })
   await l.page.getByTestId('nav-home').click()
 
   const list = l.page.getByTestId('getting-started')

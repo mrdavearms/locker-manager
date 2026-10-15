@@ -13,7 +13,8 @@ test('set up a school: an area, a bank, 114 lockers in 3 tiers', async () => {
   await l.page.getByLabel('School name').fill('SYNTHETIC Setup College')
   await l.page.getByRole('button', { name: 'Choose where to save…' }).click()
 
-  await expect(l.page.getByText('Set up your school')).toBeVisible()
+  // Making the file can take several seconds on a slow Windows test machine.
+  await expect(l.page.getByText('Set up your school')).toBeVisible({ timeout: 20_000 })
   await l.page
     .getByRole('list', { name: 'Steps' })
     .getByRole('button', { name: /Lockers/ })
@@ -64,7 +65,7 @@ test('quick start: 40 lockers with no lock in one step', async () => {
   await l.page.getByLabel('School name').fill('SYNTHETIC Quick Start School')
   await l.page.getByRole('button', { name: 'Choose where to save…' }).click()
 
-  await expect(l.page.getByText('Set up your school')).toBeVisible()
+  await expect(l.page.getByText('Set up your school')).toBeVisible({ timeout: 20_000 })
   await l.page
     .getByRole('list', { name: 'Steps' })
     .getByRole('button', { name: /Lockers/ })

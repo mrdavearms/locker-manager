@@ -14,7 +14,7 @@ test('a small school with no locks, no import and no labels', async () => {
   await p.getByTestId('new-file').click()
   await p.getByLabel('School name').fill('SYNTHETIC Small Primary')
   await p.getByRole('button', { name: 'Choose where to save…' }).click()
-  await expect(p.getByText('Set up your school')).toBeVisible()
+  await expect(p.getByText('Set up your school')).toBeVisible({ timeout: 20_000 })
 
   // Lockers: the quick start makes one area, one bank and 40 lockers with no lock.
   await p
