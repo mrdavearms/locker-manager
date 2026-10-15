@@ -3,7 +3,7 @@ import type { LabelRecord, Stock } from '../../src/shared/labels'
 import { DEFAULT_TERMS } from '../../src/shared/terminology'
 import { buildCalibrationPage } from '../../src/main/render/calibration'
 import { fitText } from '../../src/main/render/fit'
-import { textWidthMm } from '../../src/main/render/fonts'
+import { fontFaceCss, textWidthMm } from '../../src/main/render/fonts'
 import { buildLabelSheets } from '../../src/main/render/labelSheet'
 import { defaultTemplate, outsideSafeArea, rescaleTemplate } from '../../src/main/render/layout'
 import { BUILT_IN_STOCKS, labelPosition, stockProblems } from '../../src/main/render/stocks'
@@ -50,6 +50,25 @@ function build(
     ...extra
   })
 }
+
+describe('font coverage (print audit M4)', () => {
+  it('embeds Arimo for Vietnamese, Greek, Cyrillic and Hebrew', () => {
+    const css = fontFaceCss()
+    for (const range of ['U+1EA0-1EF9', 'U+0370-0377', 'U+0400-045F', 'U+0590-05FF'])
+      expect(css).toContain(range)
+  })
+  it('measures those letters with real glyphs, close to their Latin look-alikes', () => {
+    // Cyrillic "А" and Greek "Α" are drawn like Latin "A" in Arimo.
+    const a = textWidthMm('A', 12, 400)
+    expect(textWidthMm('А', 12, 400)).toBeCloseTo(a, 3)
+    expect(textWidthMm('Α', 12, 400)).toBeCloseTo(a, 3)
+    expect(textWidthMm('ạ', 12, 400)).toBeCloseTo(textWidthMm('a', 12, 400), 3)
+  })
+  it('gives a full em to characters the app has no font for, so they are never under-measured', () => {
+    const em = (12 * 25.4) / 72
+    expect(textWidthMm('张伟', 12, 400)).toBeCloseTo(2 * em, 3)
+  })
+})
 
 describe('stock geometry (SPEC.md 5.1)', () => {
   it('every built-in stock fits its page without overlaps', () => {
