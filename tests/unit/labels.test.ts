@@ -11,7 +11,15 @@ import { namedPaper, nearPaperEdge } from '../../src/shared/labelGeometry'
 import { lockerIdFromLink } from '../../src/shared/lockerLink'
 import { lockerQrText, qrSvg } from '../../src/main/render/qr'
 import { quickSearch } from '../../src/main/repos/history'
-import { labelRecords, recordLabelPrint } from '../../src/main/repos/labels'
+import {
+  getStock,
+  labelRecords,
+  listStocks,
+  recordLabelPrint,
+  resetStock,
+  saveStock
+} from '../../src/main/repos/labels'
+import { prepareLabels } from '../../src/main/render/prepare'
 import { updateStudent } from '../../src/main/repos/students'
 import { allocatedDemo } from './fixtures'
 
@@ -306,5 +314,28 @@ describe('labels changed since they were last printed (spec audit gap 5)', () =>
     ctx.advance(60_000)
     recordLabelPrint(db, ctx, labelRecords(db, { mode: 'lockers', numbers: a!.number }, true))
     expect(due(db)).toEqual([b!.number, c!.number])
+  })
+})
+
+describe("a school's measured label sizes (spec audit gap 9)", () => {
+  it('are saved, read back and used for printing, and can be put back to the published sizes', async () => {
+    const { db, ctx } = await allocatedDemo()
+    saveStock(db, ctx, MEASURED)
+    const got = getStock(db, MEASURED.id)
+    expect(got).toMatchObject({ top: 14.0, labelHeight: 38.0, pitchY: 38.0 })
+    expect(listStocks(db).find((s) => s.id === MEASURED.id)).toMatchObject({ top: 14.0 })
+
+    // Labels print from the measured top: the first label sits 14.0 mm down.
+    const out = prepareLabels(db, {
+      selection: { mode: 'lockers', numbers: '1' },
+      startAt: 1,
+      printer: null,
+      outlines: false
+    })
+    expect(out.placed[0]!.y).toBeCloseTo(14.0, 3)
+    expect(out.html).toContain('top:14mm')
+
+    resetStock(db, ctx, MEASURED.id)
+    expect(getStock(db, MEASURED.id).top).toBe(L7163.top)
   })
 })
