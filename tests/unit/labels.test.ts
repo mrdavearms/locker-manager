@@ -7,7 +7,7 @@ import { fontFaceCss, textWidthMm } from '../../src/main/render/fonts'
 import { buildLabelSheets } from '../../src/main/render/labelSheet'
 import { defaultTemplate, outsideSafeArea, rescaleTemplate } from '../../src/main/render/layout'
 import { BUILT_IN_STOCKS, labelPosition, stockProblems } from '../../src/main/render/stocks'
-import { namedPaper } from '../../src/shared/labelGeometry'
+import { namedPaper, nearPaperEdge } from '../../src/shared/labelGeometry'
 import { lockerIdFromLink } from '../../src/shared/lockerLink'
 import { lockerQrText, qrSvg } from '../../src/main/render/qr'
 import { quickSearch } from '../../src/main/repos/history'
@@ -254,5 +254,18 @@ describe('QR codes (print audit M10)', () => {
     expect(found[0]).toMatchObject({ kind: 'locker', id: row.id, title: `Locker ${row.number}` })
     expect(lockerIdFromLink('LOCKERMANAGER://locker/AbC123xy/')).toBe('AbC123xy')
     expect(lockerIdFromLink('https://example.com/locker/AbC123xy')).toBeNull()
+  })
+})
+
+describe('words near the paper edge (print audit, Low)', () => {
+  it('finds no problem on the built-in sheets with the standard layout', () => {
+    for (const s of BUILT_IN_STOCKS)
+      expect(nearPaperEdge(s, { right: 0, down: 0 }, defaultTemplate(s).safeMargin), s.id).toEqual(
+        []
+      )
+  })
+  it('warns when a nudge pushes words into the edge printers cannot reach', () => {
+    expect(nearPaperEdge(L7163, { right: -6, down: 0 }, 5)).toEqual(['left'])
+    expect(nearPaperEdge(L7163, { right: 0, down: 20 }, 5)).toEqual(['bottom'])
   })
 })

@@ -43,14 +43,23 @@ export function needsCaseFix(s: string): boolean {
   return l === l.toLocaleUpperCase('en-AU') || l === l.toLocaleLowerCase('en-AU')
 }
 
+/**
+ * Lower case without the stray dot: a Turkish capital İ lower-cases to "i" plus a
+ * combining dot in English rules, which prints as "İsmai̇l" (print audit, Low).
+ */
+function lowerCase(s: string): string {
+  return s.toLocaleLowerCase('en-AU').replace(/i\u0307/g, 'i')
+}
+
 function cap(part: string): string {
   if (part.length === 0) return part
-  const lower = part.toLocaleLowerCase('en-AU')
-  return lower.charAt(0).toLocaleUpperCase('en-AU') + lower.slice(1)
+  const lower = lowerCase(part)
+  const first = part.charAt(0) === 'İ' ? 'İ' : lower.charAt(0).toLocaleUpperCase('en-AU')
+  return first + lower.slice(1)
 }
 
 function fixPart(part: string, flags: Set<NameFlag>): string {
-  const lower = part.toLocaleLowerCase('en-AU')
+  const lower = lowerCase(part)
   // O'Brien, D'Souza: a single letter, an apostrophe, then the name.
   const apos = /^(\p{L})(['’])(\p{L}.*)$/u.exec(part)
   if (apos) return `${apos[1]!.toLocaleUpperCase('en-AU')}${apos[2]}${cap(apos[3]!)}`

@@ -520,7 +520,8 @@ that record's own details change; lockers given out, codes and history stay as t
 1. Click **Labels** in the left-hand menu.
 2. Under **Which labels**, choose every locker, one Homeroom, one bank, chosen locker numbers
    (for example `1-10, 15`), lockers changed since the last print, or spare lockers only.
-3. Check the preview on the right. It is the real sheet, exactly as it will print.
+3. Check the preview on the right. It is the real sheet, exactly as it will print, before
+   your printer nudge moves it.
 4. Click **Save as PDF…** (best) or **Print…**.
 5. In the print window, check the paper size is **A4** (or **US Letter** for US Letter
    sheets), and choose **Actual size** (or 100%) if it is offered. Never choose

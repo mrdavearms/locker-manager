@@ -9,7 +9,7 @@ import {
 import type { Terminology } from '@shared/terminology'
 import { codeParts, formatBody, formatLine, isRightToLeft, type MergeValues } from '../letters/text'
 import { fitText } from './fit'
-import { fontFaceCss } from './fonts'
+import { fontFaceCss, textWidthMm } from './fonts'
 import { esc, mm, safeImageUrl } from './html'
 import { darkenFor, textOn } from '@shared/colour'
 
@@ -60,7 +60,26 @@ export interface LetterOutput {
 
 const PAGE_PAD_X = 16
 const PAGE_PAD_Y = 14
-const NAME_BOX = { w: 108, h: 24 }
+const NAME_BOX_HEIGHT = 24
+
+/**
+ * The room the student's name really has: the panel's inside width less the
+ * lock column beside it (code boxes, key number or locker number), so a long
+ * name is fitted to the space it prints in (print audit, Low).
+ */
+function nameBoxWidth(input: LetterBuildInput, item: LetterItem): number {
+  const r = item.record
+  const page = PAGE_SIZES[input.template.pageSize]
+  const inside = page.width - 2 * PAGE_PAD_X - 2 * (0.6 + 6)
+  let lock = textWidthMm(r.locker, 28, 700)
+  if ((r.kind === 'settable' || r.kind === 'fixed') && item.code) {
+    const parts = codeParts(item.code)
+    const boxes = parts.reduce((w, p) => w + Math.max(10, textWidthMm(p, 20, 700) + 4.2), 0)
+    lock = Math.max(lock, boxes + 1.6 * (parts.length - 1))
+  } else if (r.kind === 'keyed') lock = Math.max(lock, textWidthMm(r.keyNumber ?? '—', 18, 700))
+  else if (r.kind === 'no_lock') lock = Math.max(lock, 52)
+  return Math.max(40, inside - 6 - lock)
+}
 
 /** Words in a language, falling back to the template's first language, then any. */
 export function pick(loc: Localised, lang: string, fallback: string): string {
@@ -215,7 +234,12 @@ function studentPanel(
   const labels = pick(block.body, lang, fallback).split('\n')
   const [lockerWord = input.terms.locker.one, codeLabel = '', keyLabel = '', noLock = ''] = labels
   const name = `${r.firstName} ${r.lastName}`.trim()
-  const fitted = fitText(name, NAME_BOX, { max: 30, min: 14 }, 700)
+  const fitted = fitText(
+    name,
+    { w: nameBoxWidth(input, item), h: NAME_BOX_HEIGHT },
+    { max: 30, min: 14 },
+    700
+  )
   if (fitted.tooLong) tooLong.push(name)
   const groupLine = [
     r.group ? `${input.terms.group.one} ${r.group}` : null,

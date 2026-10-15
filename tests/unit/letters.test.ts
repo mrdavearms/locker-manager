@@ -3,6 +3,7 @@ import type { LetterRecord, LetterTemplate } from '../../src/shared/letters'
 import { DEFAULT_TERMS } from '../../src/shared/terminology'
 import { defaultLetterTemplate } from '../../src/main/letters/defaultTemplate'
 import { formatBody, formatLine } from '../../src/main/letters/text'
+import { textWidthMm } from '../../src/main/render/fonts'
 import { buildLetters, pick, showsFor, type LetterItem } from '../../src/main/render/letter'
 import { PDFDocument } from 'pdf-lib'
 import { runLetterJob } from '../../src/main/render/letterJob'
@@ -88,6 +89,23 @@ describe('letter pages', () => {
     )
     expect(out.html.split(logo).length - 1).toBe(1)
     expect(out.html.match(/class="hlogo"/g)).toHaveLength(30)
+  })
+})
+
+describe('the name on a letter', () => {
+  it('is fitted to the room beside the lock code, not a fixed width', () => {
+    const html = build([
+      {
+        record: rec('settable', { firstName: 'Thiruchelvanathan', lastName: 'Ng' }),
+        code: '12345678',
+        masked: false,
+        lang: 'en'
+      }
+    ]).html
+    const m = /<div class="n" style="font-size:([\d.]+)pt">(.*?)<\/div>/.exec(html)!
+    const size = Number(m[1])
+    // Eight code boxes take about 67 mm of the 165 mm panel.
+    for (const line of m[2]!.split('<br>')) expect(textWidthMm(line, size, 700)).toBeLessThan(92)
   })
 })
 

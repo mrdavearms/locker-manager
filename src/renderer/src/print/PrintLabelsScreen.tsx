@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, FileDown, Printer, Ruler } from 'lucide-react'
 import type { LabelPreview, LabelSelection } from '@shared/labels'
-import { labelsPerSheet, namedPaper } from '@shared/labelGeometry'
+import { labelsPerSheet, namedPaper, nearPaperEdge, PRINTER_EDGE_MM } from '@shared/labelGeometry'
 import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Field, SectionCard, Select, TextInput } from '@renderer/components/Field'
@@ -56,6 +56,8 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
           : { mode }
   const key = JSON.stringify([selection, startAt])
   const stock = stocks?.find((s) => s.id === template?.stockId)
+  const nudge = printers?.find((p) => p.name === printer) ?? { right: 0, down: 0 }
+  const edges = stock && template ? nearPaperEdge(stock, nudge, template.safeMargin) : []
   const perSheet = stock ? labelsPerSheet(stock) : 14
 
   useEffect(() => {
@@ -226,6 +228,16 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
                 </Select>
               </Field>
             </div>
+            {edges.length > 0 && (
+              <div className="mt-4">
+                <Banner tone="warn" title="Words near the edge of the paper" testId="labels-edge">
+                  With {printer ? 'this nudge' : 'this label sheet'}, words on the labels come
+                  within {PRINTER_EDGE_MM} mm of the {edges.join(' and ')} edge of the paper. Most
+                  printers cannot print there, so those words may be cut off. Check the nudge, or
+                  the label sheet&apos;s measurements in Settings, Labels.
+                </Banner>
+              </div>
+            )}
           </SectionCard>
 
           <div className="card space-y-3 p-5">
