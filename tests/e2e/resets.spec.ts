@@ -35,3 +35,32 @@ test('tick two locks to reset and mark them both at once', async () => {
   await expect(list).toHaveCount(0)
   await l.close()
 })
+
+test('a locker given out without a code is on Locks to reset, and Issue a code shows the code', async () => {
+  const share = sharedFolder()
+  const l = await launchApp()
+  await answerNextDialog(l.app, 'open', placeFixture(share))
+  await l.page.getByTestId('open-file').click()
+
+  await l.page.getByTestId('nav-lockers').click()
+  await l.page.getByTestId('open-allocate').click()
+  await l.page.getByTestId('make-draft').click()
+  await expect(l.page.getByText(/students placed/)).toBeVisible()
+  await l.page.getByLabel(/Issue a code to each/).uncheck()
+  await l.page.getByTestId('commit-allocation').click()
+  await expect(l.page.getByTestId('allocation-done')).toContainText('given out')
+
+  await l.page.getByTestId('nav-home').click()
+  const list = l.page.getByTestId('reset-list')
+  await expect(list).toContainText('On 0 0 0 0 with no code yet')
+  const before = await list.getByTestId('issue-code').count()
+  expect(before).toBeGreaterThan(0)
+  // These need a code, not a reset, so they have no tick box.
+  await expect(list.getByRole('checkbox')).toHaveCount(0)
+  await list.getByTestId('issue-code').first().click()
+  await expect(l.page.getByTestId('issued-dialog')).toBeVisible()
+  await expect(l.page.getByTestId('issued-dialog')).toContainText('Code issued')
+  await l.page.getByTestId('issued-dialog').getByRole('button', { name: 'Done' }).click()
+  await expect(list.getByTestId('issue-code')).toHaveCount(before - 1)
+  await l.close()
+})

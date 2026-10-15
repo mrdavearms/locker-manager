@@ -498,7 +498,17 @@ export function ResetList({
   const [ticked, setTicked] = useState<Set<string>>(new Set())
   const [shown, setShown] = useState(false)
   const [issued, setIssued] = useState<{ code: string | null; number: string } | null>(null)
-  if (!tasks || tasks.length === 0) return null
+  // The code just issued stays on screen until dismissed, even when issuing it
+  // emptied the list.
+  const issuedDialog = issued && (
+    <IssuedDialog
+      title="Code issued"
+      code={issued.code}
+      lockerNumber={issued.number}
+      onClose={() => setIssued(null)}
+    />
+  )
+  if (!tasks || tasks.length === 0) return issuedDialog
   // A held lock on 0 0 0 0 needs a code, not a reset, so it has no tick box.
   const resettable = tasks.filter((t) => t.status !== 'reset_no_code')
   // A lock that was reset elsewhere is no longer on the list, so it cannot stay ticked.
@@ -627,14 +637,7 @@ export function ResetList({
           </li>
         ))}
       </ul>
-      {issued && (
-        <IssuedDialog
-          title="Code issued"
-          code={issued.code}
-          lockerNumber={issued.number}
-          onClose={() => setIssued(null)}
-        />
-      )}
+      {issuedDialog}
     </section>
   )
 }
