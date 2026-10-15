@@ -520,6 +520,9 @@ that record's own details change; lockers given out, codes and history stay as t
 1. Click **Labels** in the left-hand menu.
 2. Under **Which labels**, choose every locker, one Homeroom, one bank, chosen locker numbers
    (for example `1-10, 15`), lockers changed since the last print, or spare lockers only.
+   "Changed since the last print" is worked out locker by locker: it lists every locker whose
+   label would now read differently from the last label printed for that locker, such as a
+   new holder, a corrected name, a new preferred name or a new Homeroom.
 3. Check the preview on the right. It is the real sheet, exactly as it will print, before
    your printer nudge moves it.
 4. Click **Save as PDF…** (best) or **Print…**.

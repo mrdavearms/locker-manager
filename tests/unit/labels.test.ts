@@ -11,6 +11,8 @@ import { namedPaper, nearPaperEdge } from '../../src/shared/labelGeometry'
 import { lockerIdFromLink } from '../../src/shared/lockerLink'
 import { lockerQrText, qrSvg } from '../../src/main/render/qr'
 import { quickSearch } from '../../src/main/repos/history'
+import { labelRecords, recordLabelPrint } from '../../src/main/repos/labels'
+import { updateStudent } from '../../src/main/repos/students'
 import { allocatedDemo } from './fixtures'
 
 const L7163 = BUILT_IN_STOCKS.find((s) => s.id === 'avery-l7163')!
@@ -267,5 +269,42 @@ describe('words near the paper edge (print audit, Low)', () => {
   it('warns when a nudge pushes words into the edge printers cannot reach', () => {
     expect(nearPaperEdge(L7163, { right: -6, down: 0 }, 5)).toEqual(['left'])
     expect(nearPaperEdge(L7163, { right: 0, down: 20 }, 5)).toEqual(['bottom'])
+  })
+})
+
+describe('labels changed since they were last printed (spec audit gap 5)', () => {
+  const due = (db: Parameters<typeof labelRecords>[0]): string[] =>
+    labelRecords(db, { mode: 'changed' }, true).map((r) => r.number)
+
+  it('is per locker, and sees a name, preferred name or group change', async () => {
+    const { db, ctx } = await allocatedDemo()
+    const all = labelRecords(db, { mode: 'all' }, true)
+    expect(due(db)).toHaveLength(all.length)
+    recordLabelPrint(db, ctx, all)
+    expect(due(db)).toEqual([])
+
+    const held = all.filter((r) => r.status === 'assigned')
+    const [a, b, c, d] = held.map((r) => ({
+      number: r.number,
+      student: db.get<{ student_id: string }>(
+        "SELECT student_id FROM assignment WHERE locker_id = $l AND status = 'current'",
+        { $l: r.lockerId }
+      )!.student_id
+    }))
+    ctx.advance(60_000)
+    updateStudent(db, ctx, a!.student, { firstName: 'Synthetica' })
+    updateStudent(db, ctx, b!.student, { preferredName: 'Syn' })
+    updateStudent(db, ctx, c!.student, { groupCode: '09Z' })
+    expect(due(db)).toEqual([a!.number, b!.number, c!.number])
+
+    // Printing one other locker does not hide the others still waiting.
+    ctx.advance(60_000)
+    recordLabelPrint(db, ctx, labelRecords(db, { mode: 'lockers', numbers: d!.number }, true))
+    expect(due(db)).toEqual([a!.number, b!.number, c!.number])
+
+    // Printing one of them takes only that one off the list.
+    ctx.advance(60_000)
+    recordLabelPrint(db, ctx, labelRecords(db, { mode: 'lockers', numbers: a!.number }, true))
+    expect(due(db)).toEqual([b!.number, c!.number])
   })
 })

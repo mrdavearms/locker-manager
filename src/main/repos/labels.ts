@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import {
   LabelTemplateSchema,
@@ -165,14 +166,6 @@ export function parseLockerList(text: string, numbers: readonly string[]): Set<s
   return wanted
 }
 
-export function lastPrintAt(db: LockerDb, kind: 'labels' | 'letters'): string | null {
-  return (
-    db.get<{ at: string }>('SELECT MAX(printed_at) AS at FROM print_job WHERE kind = $k', {
-      $k: kind
-    })?.at ?? null
-  )
-}
-
 /** The labels to print, in locker order (SPEC.md 4.7). */
 export function labelRecords(
   db: LockerDb,
@@ -224,36 +217,11 @@ export function labelRecords(
     case 'spare':
       filtered = rows.filter((r) => r.first_name === null && r.status === 'in_service')
       break
-    case 'changed': {
-      const since = lastPrintAt(db, 'labels')
-      if (since) {
-        const endedSince = new Set(
-          db
-            .all<{ locker_id: string }>(
-              "SELECT DISTINCT locker_id FROM assignment WHERE status = 'ended' AND updated_at > $s",
-              { $s: since }
-            )
-            .map((r) => r.locker_id)
-        )
-        const renamed = new Set(
-          db
-            .all<{ id: string }>(
-              "SELECT DISTINCT entity_id AS id FROM audit_log WHERE entity = 'locker' AND at > $s",
-              { $s: since }
-            )
-            .map((r) => r.id)
-        )
-        filtered = rows.filter(
-          (r) =>
-            (r.assigned_at !== null && r.assigned_at > since) ||
-            endedSince.has(r.id) ||
-            renamed.has(r.id)
-        )
-      }
+    case 'changed':
+      // Handled below, once each label's words are known.
       break
-    }
   }
-  return filtered
+  const records = filtered
     .map((r) => ({
       lockerId: r.id,
       number: r.number,
@@ -276,6 +244,76 @@ export function labelRecords(
       yearLevel: r.year_level
     }))
     .sort((a, b) => compareLockerNumbers(a.number, b.number))
+  if (selection.mode !== 'changed') return records
+  // Per locker: a label is due when its words differ from the last label printed for
+  // that locker. Lockers printed before labels were remembered this way fall back to
+  // what has happened to them since their own last label print (spec audit, gap 5).
+  const printed = getSetting(db, PRINTED_KEY, Printed, {})
+  const lastPrint = new Map(
+    db
+      .all<{ locker_id: string; at: string }>(
+        `SELECT j.value AS locker_id, MAX(p.printed_at) AS at
+           FROM print_job p, json_each(p.records) j
+          WHERE p.kind = 'labels' GROUP BY j.value`
+      )
+      .map((r) => [r.locker_id, r.at])
+  )
+  const assignedAt = new Map(rows.map((r) => [r.id, r.assigned_at]))
+  const touchedSince = (lockerId: string, since: string): boolean =>
+    (assignedAt.get(lockerId) ?? '') > since ||
+    db.get(
+      "SELECT 1 AS x FROM assignment WHERE locker_id = $l AND status = 'ended' AND updated_at > $s",
+      { $l: lockerId, $s: since }
+    ) !== undefined ||
+    db.get("SELECT 1 AS x FROM audit_log WHERE entity = 'locker' AND entity_id = $l AND at > $s", {
+      $l: lockerId,
+      $s: since
+    }) !== undefined
+  return records.filter((r) => {
+    const was = printed[r.lockerId]
+    if (was !== undefined) return was !== labelFingerprint(r)
+    const last = lastPrint.get(r.lockerId)
+    return !last || touchedSince(r.lockerId, last)
+  })
+}
+
+const PRINTED_KEY = 'labels.printed'
+const Printed = z.record(z.string(), z.string())
+
+/** A short fingerprint of everything a label shows, so a later change can be seen. */
+export function labelFingerprint(r: LabelRecord): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        r.number,
+        r.status,
+        r.firstName,
+        r.lastName,
+        r.group,
+        r.yearLevel,
+        r.area,
+        r.bank
+      ])
+    )
+    .digest('base64')
+    .slice(0, 16)
+}
+
+/** Records a label print, and remembers what each printed label said. */
+export function recordLabelPrint(
+  db: LockerDb,
+  ctx: OperatorContext,
+  records: readonly LabelRecord[]
+): string {
+  const printed = { ...getSetting(db, PRINTED_KEY, Printed, {}) }
+  for (const r of records) printed[r.lockerId] = labelFingerprint(r)
+  setSetting(db, ctx, PRINTED_KEY, printed)
+  return recordPrintJob(
+    db,
+    ctx,
+    'labels',
+    records.map((r) => r.lockerId)
+  )
 }
 
 export function schoolLogos(db: LockerDb): { colour: string | null; mono: string | null } {
