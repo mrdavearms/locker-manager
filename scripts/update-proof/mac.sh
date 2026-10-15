@@ -9,7 +9,9 @@ LOG="$HOME/Library/Logs/Locker Manager/main.log"
 WORK="$RUNNER_TEMP/update-proof"
 mkdir -p "$WORK"
 
-gh release download "$PREV_TAG" --repo "$GITHUB_REPOSITORY" --pattern "Locker-Manager-$PREV-universal.dmg" --dir "$WORK" --clobber
+# The workflow puts it there first (fetch-previous.sh); download it only when run by hand.
+[ -f "$WORK/Locker-Manager-$PREV-universal.dmg" ] ||
+  gh release download "$PREV_TAG" --repo "$GITHUB_REPOSITORY" --pattern "Locker-Manager-$PREV-universal.dmg" --dir "$WORK" --clobber
 MNT=$(hdiutil attach "$WORK/Locker-Manager-$PREV-universal.dmg" -nobrowse -readonly | grep -o '/Volumes/.*' | head -1)
 ditto "$MNT/Locker Manager.app" "$WORK/Locker Manager.app"
 hdiutil detach "$MNT" -quiet
