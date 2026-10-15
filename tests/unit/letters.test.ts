@@ -91,6 +91,29 @@ describe('letter pages', () => {
   })
 })
 
+describe('right-to-left letters (print audit M2)', () => {
+  it('lays out an Arabic letter right to left, with the code boxes still left to right', () => {
+    const template = {
+      ...defaultLetterTemplate(),
+      languages: [
+        { code: 'en', name: 'English' },
+        { code: 'ar', name: 'Arabic' }
+      ]
+    }
+    const html = build(
+      [
+        { record: rec('settable'), code: '1234', masked: false, lang: 'ar' },
+        { record: rec('fixed'), code: '5678', masked: false, lang: 'vi' }
+      ],
+      template
+    ).html
+    expect(html).toContain('lang="ar" dir="rtl"')
+    // A language the template has no words for prints in the first language.
+    expect(html).toContain('lang="en" dir="ltr"')
+    expect(html).toContain('.code{display:flex;direction:ltr')
+  })
+})
+
 describe('letter colours (print audit H5, H6)', () => {
   const page = (primary: string, logoTile = false) =>
     buildLetters(
@@ -132,10 +155,18 @@ describe('letter words (SPEC.md 5.2)', () => {
         locker: '7',
         first_name: '<b>Al</b>'
       })
-    ).toBe('Locker 7 for &lt;b&gt;Al&lt;/b&gt; {nope}')
+    ).toBe('Locker <bdi>7</bdi> for <bdi>&lt;b&gt;Al&lt;/b&gt;</bdi> {nope}')
   })
   it('never turns a merged value into bold or a list', () => {
-    expect(formatBody('{first_name}', { first_name: '**Zed**' })).toBe('<p>**Zed**</p>')
+    expect(formatBody('{first_name}', { first_name: '**Zed**' })).toBe('<p><bdi>**Zed**</bdi></p>')
+  })
+  it('keeps the typed step numbers when steps are split by blank lines (audit M3)', () => {
+    expect(formatBody('1. Open\n\n2. Turn\n\n3. Close', {})).toBe(
+      '<ol><li>Open</li></ol><ol start="2"><li>Turn</li></ol><ol start="3"><li>Close</li></ol>'
+    )
+  })
+  it('keeps the lock code left to right inside right-to-left words (audit M2)', () => {
+    expect(formatLine('{code}', { code: '1 2 3 4' })).toBe('<bdi dir="ltr">1 2 3 4</bdi>')
   })
 })
 

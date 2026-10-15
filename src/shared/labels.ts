@@ -120,6 +120,7 @@ export interface LabelPreview {
   html: string
   sheets: number
   labels: number
-  tooLong: { number: string; name: string }[]
+  /** Names, and other words (what says which), still too long at the smallest size. */
+  tooLong: { number: string; name: string; what?: string }[]
   stock: Stock
 }

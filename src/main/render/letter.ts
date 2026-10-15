@@ -7,7 +7,7 @@ import {
   type ShowFor
 } from '@shared/letters'
 import type { Terminology } from '@shared/terminology'
-import { codeParts, formatBody, formatLine, type MergeValues } from '../letters/text'
+import { codeParts, formatBody, formatLine, isRightToLeft, type MergeValues } from '../letters/text'
 import { fitText } from './fit'
 import { fontFaceCss } from './fonts'
 import { esc, mm, safeImageUrl } from './html'
@@ -137,10 +137,10 @@ body{font-family:LMArimo,Arial,sans-serif;color:#141414;font-size:11pt;line-heig
 .sname{flex:1;min-width:0}
 .sname .n{font-weight:700;line-height:1.15;color:#000}
 .sname .g{margin-top:1.5mm;font-size:11pt;color:#333}
-.slock{flex:none;text-align:right}
+.slock{flex:none;text-align:end}
 .slock .w{font-size:9pt;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${words}}
 .slock .num{font-size:28pt;font-weight:700;line-height:1.05}
-.code{display:flex;gap:1.6mm;justify-content:flex-end;margin-top:1mm}
+.code{display:flex;direction:ltr;gap:1.6mm;justify-content:flex-end;margin-top:1mm}
 .code span{display:flex;align-items:center;justify-content:center;min-width:10mm;height:12mm;padding:0 1.5mm;border:0.6mm solid ${primary};border-radius:1.6mm;font-size:20pt;font-weight:700}
 .keyno{font-size:18pt;font-weight:700}
 .block{margin-top:6mm;break-inside:avoid}
@@ -308,7 +308,13 @@ export function buildLetters(input: LetterBuildInput, items: readonly LetterItem
       .filter((b) => showsFor(b.show, item.record.kind))
       .map((b) => renderBlock(input, b, item, values, tooLong))
       .join('')
-    return `<section class="letter" data-student="${esc(item.record.studentId)}"><div class="content">${blocks}</div>${
+    // The letter's language and direction, so Arabic, Persian or Dari letters are
+    // laid out right to left (print audit M2). A language the template has no words
+    // for prints in the first language.
+    const lang = input.template.languages.some((l) => l.code === item.lang)
+      ? item.lang
+      : (input.template.languages[0]?.code ?? 'en')
+    return `<section class="letter" lang="${esc(lang)}" dir="${isRightToLeft(lang) ? 'rtl' : 'ltr'}" data-student="${esc(item.record.studentId)}"><div class="content">${blocks}</div>${
       input.preview ? '<div class="pageend">The page ends here</div>' : ''
     }</section>`
   })

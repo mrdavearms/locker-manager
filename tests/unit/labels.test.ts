@@ -70,6 +70,18 @@ describe('stock geometry (SPEC.md 5.1)', () => {
 })
 
 describe('label sheets', () => {
+  it('report words other than the name that are cut off, and keep their start (audit M1)', () => {
+    const terms = {
+      ...DEFAULT_TERMS,
+      locker: { one: 'Learning Community Locker', many: 'Learning Community Lockers' }
+    }
+    const out = build(L7163, [rec(1000)], { terms })
+    const long = out.tooLong.find((t) => t.what === 'Locker number')
+    expect(long).toMatchObject({ number: '1000', name: 'LEARNING COMMUNITY LOCKER 1000' })
+    // Right-aligned text that does not fit starts at the left, so its start shows.
+    const el = out.html.match(/<div class="el"[^>]*><span>LEARNING COMMUNITY LOCKER 1000/)![0]
+    expect(el).toContain('align-items:flex-start')
+  })
   it('carry the logo once per page, however many labels there are', () => {
     const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=='
     const records = Array.from({ length: 40 }, (_, i) => rec(i + 1))

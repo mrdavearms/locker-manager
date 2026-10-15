@@ -70,6 +70,10 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
 
   const job = selection ? { selection, startAt, printer: printer || null } : null
   const shown = selection ? preview : null
+  const longNames = shown?.tooLong.filter((t) => !t.what) ?? []
+  const longWords = new Map<string, NonNullable<typeof shown>['tooLong']>()
+  for (const t of shown?.tooLong ?? [])
+    if (t.what) longWords.set(t.what, [...(longWords.get(t.what) ?? []), t])
 
   return (
     <div className="w-full space-y-6 px-6 py-8">
@@ -277,15 +281,30 @@ export function PrintLabelsScreen({ onSettings }: { onSettings: () => void }): R
               <p className="text-sm text-ink-muted" data-testid="labels-count">
                 {plural(shown.labels, 'label')} on {plural(shown.sheets, 'sheet')}.
               </p>
-              {shown.tooLong.length > 0 && (
+              {longNames.length > 0 && (
                 <Banner
                   tone="warn"
-                  title={`${plural(shown.tooLong.length, 'name')} too long to fit`}
+                  title={`${plural(longNames.length, 'name')} too long to fit`}
                   testId="labels-too-long"
                 >
                   Printed at the smallest size and may be cut off:{' '}
-                  {shown.tooLong.map((t) => `${t.name} (${t.number})`).join(', ')}. Use a shorter
+                  {longNames.map((t) => `${t.name} (${t.number})`).join(', ')}. Use a shorter
                   preferred name, or a smaller minimum size in the layout.
+                </Banner>
+              )}
+              {longWords.size > 0 && (
+                <Banner tone="warn" title="Some words are cut off" testId="labels-words-too-long">
+                  {[...longWords].map(([what, list]) => (
+                    <p key={what}>
+                      {what}: {plural(list.length, 'label')}, such as “{list[0]!.name}” on{' '}
+                      {list[0]!.number}.
+                    </p>
+                  ))}
+                  <p className="mt-1">
+                    The end of these words does not fit, even at the smallest size. Make the box
+                    wider in Settings, Labels, use a shorter word in Settings, Words we use, or
+                    lower the smallest size.
+                  </p>
                 </Banner>
               )}
               {shown.labels > 0 ? (

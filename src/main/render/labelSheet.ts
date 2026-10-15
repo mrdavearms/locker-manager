@@ -1,4 +1,10 @@
-import type { LabelElement, LabelRecord, LabelTemplate, Stock } from '@shared/labels'
+import {
+  ELEMENT_LABELS,
+  type LabelElement,
+  type LabelRecord,
+  type LabelTemplate,
+  type Stock
+} from '@shared/labels'
 import type { Terminology } from '@shared/terminology'
 import { fitText } from './fit'
 import { fontFaceCss, LINE_HEIGHT } from './fonts'
@@ -35,7 +41,8 @@ export interface SheetOutput {
   html: string
   sheets: number
   placed: PlacedLabel[]
-  tooLong: { number: string; name: string }[]
+  /** Names, and other words (what says which), printed at the smallest size and still too long. */
+  tooLong: { number: string; name: string; what?: string }[]
 }
 
 function clampToSafe(e: LabelElement, stock: Stock, margin: number): LabelElement {
@@ -46,9 +53,17 @@ function clampToSafe(e: LabelElement, stock: Stock, margin: number): LabelElemen
   return { ...e, x, y, w, h }
 }
 
-function textBlock(e: LabelElement, lines: string[], sizePt: number, extraStyle = ''): string {
-  const justify = e.align === 'right' ? 'flex-end' : e.align === 'center' ? 'center' : 'flex-start'
-  return `<div class="el" style="left:${mm(e.x)};top:${mm(e.y)};width:${mm(e.w)};height:${mm(e.h)};font-size:${sizePt}pt;font-weight:${e.bold ? 700 : 400};text-align:${e.align};justify-content:center;align-items:${justify};${extraStyle}">${lines
+function textBlock(e: LabelElement, lines: string[], sizePt: number, tooLong = false): string {
+  // Text that is still too long keeps its start and loses its end, whatever the
+  // alignment: "LEARNING COMMUNITY LOC…" not "…MMUNITY LOCKER 1000" (audit M1).
+  const justify = tooLong
+    ? 'flex-start'
+    : e.align === 'right'
+      ? 'flex-end'
+      : e.align === 'center'
+        ? 'center'
+        : 'flex-start'
+  return `<div class="el" style="left:${mm(e.x)};top:${mm(e.y)};width:${mm(e.w)};height:${mm(e.h)};font-size:${sizePt}pt;font-weight:${e.bold ? 700 : 400};text-align:${e.align};justify-content:center;align-items:${justify}">${lines
     .map((l) => `<span>${esc(l)}</span>`)
     .join('')}</div>`
 }
@@ -63,6 +78,12 @@ function renderElement(
   const terms = input.terms
   const fit = (text: string, box = { w: e.w, h: e.h }, twoLines = true) =>
     fitText(text, box, { max: e.fontMax, min: e.fontMin }, weight, twoLines)
+  // Words other than the name: fitted, reported when too long, start kept.
+  const words = (text: string, twoLines = false): string => {
+    const f = fit(text, undefined, twoLines)
+    if (f.tooLong) tooLong.push({ number: r.number, name: text, what: ELEMENT_LABELS[e.type] })
+    return textBlock(e, f.lines, f.sizePt, f.tooLong)
+  }
   switch (e.type) {
     case 'logo':
       // The picture itself is in the page's style sheet once (labelLogo), not per label.
@@ -73,15 +94,14 @@ function renderElement(
       if (r.status !== 'assigned') {
         const text =
           r.status === 'spare' ? `Spare ${terms.locker.one.toLowerCase()}` : 'Out of service'
-        const f = fit(text)
-        return textBlock(e, f.lines, f.sizePt)
+        return words(text, true)
       }
       const first = r.firstName ?? ''
       const last = r.lastName ?? ''
       if (e.nameMode === 'one_line') {
         const f = fit(`${first} ${last}`.trim())
         if (f.tooLong) tooLong.push({ number: r.number, name: `${first} ${last}` })
-        return textBlock(e, f.lines, f.sizePt)
+        return textBlock(e, f.lines, f.sizePt, f.tooLong)
       }
       // Stacked: each name gets half the box and its own size, then both use the smaller.
       const half = { w: e.w, h: e.h / 2 }
@@ -93,27 +113,19 @@ function renderElement(
     }
     case 'group': {
       if (!r.group || r.status !== 'assigned') return ''
-      const f = fit(r.group, undefined, false)
-      return textBlock(e, f.lines, f.sizePt)
+      return words(r.group)
     }
     case 'yearLevel': {
       if (!r.yearLevel || r.status !== 'assigned') return ''
-      const f = fit(`${terms.yearLevel.one} ${r.yearLevel}`, undefined, false)
-      return textBlock(e, f.lines, f.sizePt)
+      return words(`${terms.yearLevel.one} ${r.yearLevel}`)
     }
     case 'lockerNumber': {
-      const text = e.showWord ? `${terms.locker.one.toUpperCase()} ${r.number}` : r.number
-      const f = fit(text, undefined, false)
-      return textBlock(e, f.lines, f.sizePt)
+      return words(e.showWord ? `${terms.locker.one.toUpperCase()} ${r.number}` : r.number)
     }
-    case 'area': {
-      const f = fit(r.area, undefined, false)
-      return textBlock(e, f.lines, f.sizePt)
-    }
-    case 'bank': {
-      const f = fit(r.bank, undefined, false)
-      return textBlock(e, f.lines, f.sizePt)
-    }
+    case 'area':
+      return words(r.area)
+    case 'bank':
+      return words(r.bank)
     case 'rule':
       return `<div class="rule" style="left:${mm(e.x)};top:${mm(e.y)};width:${mm(e.w)};height:${mm(Math.max(0.2, e.h))}"></div>`
     case 'qr': {
@@ -124,8 +136,7 @@ function renderElement(
     }
     case 'text': {
       if (!e.text.trim()) return ''
-      const f = fit(e.text)
-      return textBlock(e, f.lines, f.sizePt)
+      return words(e.text, true)
     }
   }
 }
