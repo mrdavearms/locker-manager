@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Redo2, Search, Undo2 } from 'lucide-react'
 import type { RecordRestorePreview } from '@shared/history'
+import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { Modal } from '@renderer/components/Modal'
 import { useAction } from '@renderer/lib/appContext'
@@ -134,6 +135,13 @@ export function HistoryScreen({ state }: { state: OpenFileState }): React.JSX.El
         }
         testId="restore-record"
       >
+        {restore?.preview.blocked && (
+          <div className="mb-4" data-testid="restore-record-blocked">
+            <Banner tone="warn" title="This cannot be put back as it is">
+              {restore.preview.blocked}
+            </Banner>
+          </div>
+        )}
         {restore && restore.preview.changes.length === 0 ? (
           <p>It is already the same as before this change. Nothing to put back.</p>
         ) : (
@@ -161,7 +169,9 @@ export function HistoryScreen({ state }: { state: OpenFileState }): React.JSX.El
             Cancel
           </Button>
           <Button
-            disabled={!restore || restore.preview.changes.length === 0}
+            disabled={
+              !restore || restore.preview.changes.length === 0 || restore.preview.blocked !== null
+            }
             data-testid="restore-record-apply"
             onClick={() =>
               void act(async () => {

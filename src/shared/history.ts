@@ -16,6 +16,8 @@ export interface RecordRestorePreview {
   entity: 'student' | 'locker'
   backupAt: string
   changes: { field: string; now: string; before: string }[]
+  /** Why it cannot be put back as it is (it would break a rule), or null. */
+  blocked: string | null
 }
 
 export interface QuickResult {
