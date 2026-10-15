@@ -84,7 +84,8 @@ export function listProblems(db: LockerDb): Problem[] {
       id: 'name-check',
       tone: 'warn',
       title: `${plural(counts.nameCheck, 'name')} to check`,
-      detail: 'Surnames such as MacDonald or De La Rue need a person to check the capitals.',
+      detail:
+        'Surnames such as MacDonald or De La Rue need a person to check the capitals, and so does a name corrected by hand that the student system now spells differently.',
       fix: { label: 'See students', screen: 'students' }
     })
 

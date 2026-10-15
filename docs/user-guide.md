@@ -358,7 +358,9 @@ two-word surnames.
 2. Click a student. The yellow box says what to check and shows the name as it is in the
    student system.
 3. If the name is right, click **The spelling is right**. If not, correct it and click
-   **Save name**. A name you correct is never changed by a later import.
+   **Save name**. A name you correct is never changed by a later import. If a later import
+   spells that student's name differently from your correction, the student goes back on
+   **Names to check** so someone can decide which spelling is right.
 
 ## Possible leavers
 

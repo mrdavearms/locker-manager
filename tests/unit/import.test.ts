@@ -21,6 +21,7 @@ import {
 } from '../../src/main/import/parse'
 import { analyseImport, buildStudents } from '../../src/main/import/analyse'
 import { applyImport } from '../../src/main/import/apply'
+import { getStudent, studentCounts, updateStudent } from '../../src/main/repos/students'
 import { testContext } from './helpers'
 
 // Every sample here is SYNTHETIC.
@@ -334,6 +335,50 @@ describe('comparing with the data file and applying (SPEC.md 4.2 steps 6 and 7)'
     expect(row('SYN0003')?.not_in_import_since).not.toBeNull()
     expect(row('SYN0001')?.first_name).toBe('Ava-Rose') // operator correction survives
     expect(row('SYN0100')?.not_in_import_since).toBeNull() // Year 8 untouched
+  })
+
+  it('keeps flagging a hand-corrected name the student system now spells differently (spec audit gap 6)', async () => {
+    const db = await createNewDatabase(testContext(), {
+      schoolName: 'SYNTHETIC',
+      appVersion: '0.11.2'
+    })
+    const ctx = testContext()
+    const first = await compassFile('Year 7.csv', ['SYN0001,I,NGUYEN,Ava,F,M,07A,R'])
+    const a1 = analyseImport(db, buildStudents([first], [settingsFor(first)], OPTS), OPTS)
+    applyImport(
+      db,
+      ctx,
+      a1,
+      { add: ['SYN0001'], update: [], markMissing: [] },
+      { files: ['Year 7.csv'], profile: 'compass' }
+    )
+    const id = db.get<{ id: string }>("SELECT id FROM student WHERE external_id = 'SYN0001'")!.id
+    updateStudent(db, ctx, id, { firstName: 'Ava-Rose' })
+
+    // The student system now spells the first name another way.
+    const again = await compassFile('Year 7.csv', ['SYN0001,I,NGUYEN,Eva,F,M,07A,R'])
+    const a2 = analyseImport(db, buildStudents([again], [settingsFor(again)], OPTS), OPTS)
+    expect(a2.changed).toEqual([
+      expect.objectContaining({ externalId: 'SYN0001', overrideKept: true })
+    ])
+    applyImport(
+      db,
+      ctx,
+      a2,
+      { add: [], update: [id], markMissing: [] },
+      { files: ['Year 7.csv'], profile: 'compass' }
+    )
+    const s = getStudent(db, id)!
+    expect(s.firstName).toBe('Ava-Rose') // the correction is kept
+    expect(s.firstNameRaw).toBe('Eva')
+    expect(s.nameCheck).toContain('import_differs')
+    expect(studentCounts(db).nameCheck).toBe(1)
+
+    // Confirming the spelling clears it, and the same import does not raise it again.
+    updateStudent(db, ctx, id, { confirmName: true })
+    expect(getStudent(db, id)!.nameCheck).toEqual([])
+    const a3 = analyseImport(db, buildStudents([again], [settingsFor(again)], OPTS), OPTS)
+    expect(a3.changed).toEqual([])
   })
 
   it('treats the whole school as covered when told to', async () => {
