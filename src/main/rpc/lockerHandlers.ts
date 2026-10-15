@@ -42,6 +42,7 @@ type Keys =
   | 'codes.resetDoneMany'
   | 'codes.reveal'
   | 'codes.recode'
+  | 'codes.issue'
   | 'codes.setFixed'
   | 'allocation.plan.get'
   | 'allocation.plan.set'
@@ -141,6 +142,17 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
         issueCode(db, ctx, requireLock(db, p.lockerId), 'compromised')
       )
     })
+  },
+  'codes.issue': {
+    kind: 'write',
+    audit: (p) => ({ action: 'code.issued', entity: 'locker', entityId: p.lockerId }),
+    run: (db, ctx, p) => {
+      const lockId = requireLock(db, p.lockerId)
+      // Only for a lock on 0 0 0 0; a lock someone may know needs New code instead.
+      if (lockForLocker(db, p.lockerId)?.code_status !== 'reset_no_code')
+        throw new Error('This lock already has a code. Use New code if someone else may know it.')
+      return { code: shownCode(db, ctx, p.lockerId, issueCode(db, ctx, lockId, 'issued')) }
+    }
   },
   'codes.setFixed': {
     kind: 'write',

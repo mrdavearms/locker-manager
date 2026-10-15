@@ -501,6 +501,11 @@ To do many at once:
 - Click **Print this list** to open the **Locks to reset** report, then print it or save it
   as a PDF to take round the lockers.
 
+The list also shows any locker a student holds whose lock is on 0 0 0 0 with no code yet,
+for example after giving out lockers without **Issue a code now**. That lock needs no reset
+and has no tick box: click **Issue a code**, then print the student's letter. The printed
+**Locks to reset** report leaves these out, because there is nothing to do at the lock.
+
 On the Lockers screen the list is folded to one line. Click **Show** to open it.
 
 ## Undo a mistake

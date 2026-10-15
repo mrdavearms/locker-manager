@@ -238,6 +238,7 @@ export const rpcParams = {
   'codes.resetDoneMany': z.object({ lockIds: z.array(id).min(1).max(10_000) }),
   'codes.reveal': z.object({ lockerId: id }),
   'codes.recode': z.object({ lockerId: id, reason: z.string().trim().min(3).max(200) }),
+  'codes.issue': z.object({ lockerId: id }),
   'codes.setFixed': z.object({
     lockerId: id,
     code: z.string().trim().min(1).max(20),
@@ -415,6 +416,7 @@ export interface RpcResults {
   'codes.resetDoneMany': number
   'codes.reveal': { code: string | null }
   'codes.recode': { code: string | null }
+  'codes.issue': { code: string | null }
   'codes.setFixed': null
   'allocation.plan.get': AllocationPlan
   'allocation.plan.set': AllocationPlan

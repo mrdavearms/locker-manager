@@ -101,6 +101,22 @@ export function listProblems(db: LockerDb): Problem[] {
       fix: null
     })
 
+  // A held lock on 0 0 0 0: its holder cannot be given a letter until a code is issued.
+  const noCode = count(
+    db,
+    `SELECT COUNT(*) AS n FROM lock k WHERE k.code_status = 'reset_no_code' AND k.status IN ('in_use','spare')
+       AND EXISTS (SELECT 1 FROM assignment a WHERE a.locker_id = k.locker_id AND a.status = 'current')`
+  )
+  if (noCode > 0)
+    out.push({
+      id: 'no-code',
+      tone: 'warn',
+      title: `${plural(noCode, 'held lock')} ${noCode === 1 ? 'has' : 'have'} no code yet`,
+      detail:
+        'They are on 0 0 0 0. Click Issue a code under Locks to reset below, then print their letters.',
+      fix: null
+    })
+
   const spares = count(
     db,
     "SELECT COUNT(*) AS n FROM code_set_entry e JOIN code_set s ON s.id = e.code_set_id WHERE s.purpose = 'spares' AND e.status = 'available'"

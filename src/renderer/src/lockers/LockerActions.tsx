@@ -493,10 +493,14 @@ export function ResetList({
   const canEdit = useCanEdit()
   const act = useAction()
   const notify = useNotify()
+  const gate = useCodeGate()
   const { data: tasks } = useRpc('codes.resetTasks', {})
   const [ticked, setTicked] = useState<Set<string>>(new Set())
   const [shown, setShown] = useState(false)
+  const [issued, setIssued] = useState<{ code: string | null; number: string } | null>(null)
   if (!tasks || tasks.length === 0) return null
+  // A held lock on 0 0 0 0 needs a code, not a reset, so it has no tick box.
+  const resettable = tasks.filter((t) => t.status !== 'reset_no_code')
   // A lock that was reset elsewhere is no longer on the list, so it cannot stay ticked.
   const chosen = tasks.filter((t) => ticked.has(t.lockId)).map((t) => t.lockId)
   const toggle = (lockId: string, on: boolean): void =>
@@ -533,13 +537,14 @@ export function ResetList({
       </h2>
       <p className="mt-1 text-sm text-ink-muted">
         Reset each lock to 0 0 0 0 with the master key, then tick it off. Letters for these wait
-        until the lock is reset.
+        until the lock is reset. A held lock already on 0 0 0 0 needs no reset: click Issue a code,
+        then print the student's letter.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => setTicked(new Set(tasks.map((t) => t.lockId)))}
+          onClick={() => setTicked(new Set(resettable.map((t) => t.lockId)))}
         >
           Tick all
         </Button>
@@ -568,37 +573,68 @@ export function ResetList({
       <ul className="mt-4 divide-y divide-line">
         {tasks.map((t) => (
           <li key={t.lockId} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
-            <input
-              type="checkbox"
-              className="size-4"
-              aria-label={`${terms.locker.one} ${t.lockerNumber ?? 'spare'} is reset`}
-              checked={ticked.has(t.lockId)}
-              onChange={(e) => toggle(t.lockId, e.target.checked)}
-            />
+            {t.status === 'reset_no_code' ? (
+              <span className="size-4" aria-hidden />
+            ) : (
+              <input
+                type="checkbox"
+                className="size-4"
+                aria-label={`${terms.locker.one} ${t.lockerNumber ?? 'spare'} is reset`}
+                checked={ticked.has(t.lockId)}
+                onChange={(e) => toggle(t.lockId, e.target.checked)}
+              />
+            )}
             <span className="stencil w-16 text-2xl leading-none">{t.lockerNumber ?? '?'}</span>
             <span className="flex-1">
               {t.holder ?? `Spare ${terms.locker.one.toLowerCase()}`}
               <span className="block text-ink-muted">
                 {t.status === 'awaiting_physical_reset'
                   ? 'New code issued; reset the lock so the student can set it.'
-                  : 'Old holder knows the code; reset it before reuse.'}
+                  : t.status === 'reset_no_code'
+                    ? 'On 0 0 0 0 with no code yet. Issue a code, then print their letter.'
+                    : 'Old holder knows the code; reset it before reuse.'}
               </span>
             </span>
-            <Button
-              size="sm"
-              disabled={!canEdit}
-              onClick={() =>
-                void act(async () => {
-                  await call('codes.resetDone', { lockId: t.lockId })
-                  notify(`${terms.locker.one} ${t.lockerNumber ?? ''} marked as reset.`)
-                })
-              }
-            >
-              Reset done
-            </Button>
+            {t.status === 'reset_no_code' && t.lockerId ? (
+              <Button
+                size="sm"
+                disabled={!canEdit}
+                data-testid="issue-code"
+                onClick={() =>
+                  void act(async () => {
+                    if (!(await gate())) return
+                    const r = await call('codes.issue', { lockerId: t.lockerId! })
+                    setIssued({ code: r.code, number: t.lockerNumber ?? '' })
+                  })
+                }
+              >
+                Issue a code
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                disabled={!canEdit}
+                onClick={() =>
+                  void act(async () => {
+                    await call('codes.resetDone', { lockId: t.lockId })
+                    notify(`${terms.locker.one} ${t.lockerNumber ?? ''} marked as reset.`)
+                  })
+                }
+              >
+                Reset done
+              </Button>
+            )}
           </li>
         ))}
       </ul>
+      {issued && (
+        <IssuedDialog
+          title="Code issued"
+          code={issued.code}
+          lockerNumber={issued.number}
+          onClose={() => setIssued(null)}
+        />
+      )}
     </section>
   )
 }

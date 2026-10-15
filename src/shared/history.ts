@@ -84,6 +84,7 @@ export function describeAction(action: string): string {
     'codes.reset_done_many': 'Marked locks as reset',
     'code.shown': 'Showed a code',
     'code.changed': 'Issued a new code',
+    'code.issued': 'Issued a code for a lock on 0 0 0 0',
     'code.fixed_recorded': 'Recorded a padlock code',
     'allocation.plan_saved': 'Saved the allocation plan',
     'allocation.committed': 'Allocated lockers',

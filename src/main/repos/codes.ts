@@ -399,7 +399,11 @@ export function resetTasks(db: LockerDb): ResetTask[] {
               (SELECT COALESCE(s.preferred_name, s.first_name) || ' ' || s.last_name FROM assignment a JOIN student s ON s.id = a.student_id
                 WHERE a.locker_id = l.id AND a.status = 'current' LIMIT 1) AS holder
          FROM lock k LEFT JOIN locker l ON l.id = k.locker_id
-        WHERE k.code_status IN ('needs_new_code', 'awaiting_physical_reset') AND k.status IN ('in_use','spare')
+        WHERE k.status IN ('in_use','spare')
+          AND (k.code_status IN ('needs_new_code', 'awaiting_physical_reset')
+               -- A held lock on 0 0 0 0 waits for a code (SPEC.md section 15 item 3).
+               OR (k.code_status = 'reset_no_code' AND EXISTS
+                     (SELECT 1 FROM assignment a WHERE a.locker_id = k.locker_id AND a.status = 'current')))
         ORDER BY l.sort_key`
     )
     .map((r) => ({
