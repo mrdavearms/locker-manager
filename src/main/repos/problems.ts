@@ -106,6 +106,7 @@ export function listProblems(db: LockerDb): Problem[] {
   const noCode = count(
     db,
     `SELECT COUNT(*) AS n FROM lock k WHERE k.code_status = 'reset_no_code' AND k.status IN ('in_use','spare')
+       AND k.type IN ('combination_builtin', 'combination_padlock_settable', 'electronic')
        AND EXISTS (SELECT 1 FROM assignment a WHERE a.locker_id = k.locker_id AND a.status = 'current')`
   )
   if (noCode > 0)

@@ -27,6 +27,7 @@ import {
   swapStudents
 } from '../repos/assignments'
 import { listHistory, quickSearch } from '../repos/history'
+import { LOCK_TYPE_INFO } from '@shared/locks'
 import type { LockerDb } from '../db/db'
 import type { Handlers } from './registry'
 import { assertCodesAllowed, shownCode } from '../privacy'
@@ -148,8 +149,11 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
     audit: (p) => ({ action: 'code.issued', entity: 'locker', entityId: p.lockerId }),
     run: (db, ctx, p) => {
       const lockId = requireLock(db, p.lockerId)
+      const lock = lockForLocker(db, p.lockerId)
+      if (lock && !LOCK_TYPE_INFO[lock.type].codeSettable)
+        throw new Error('This padlock’s code comes with it, so the app cannot issue one.')
       // Only for a lock on 0 0 0 0; a lock someone may know needs New code instead.
-      if (lockForLocker(db, p.lockerId)?.code_status !== 'reset_no_code')
+      if (lock?.code_status !== 'reset_no_code')
         throw new Error('This lock already has a code. Use New code if someone else may know it.')
       return { code: shownCode(db, ctx, p.lockerId, issueCode(db, ctx, lockId, 'issued')) }
     }

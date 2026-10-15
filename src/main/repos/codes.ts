@@ -403,7 +403,10 @@ export function resetTasks(db: LockerDb): ResetTask[] {
         WHERE k.status IN ('in_use','spare')
           AND (k.code_status IN ('needs_new_code', 'awaiting_physical_reset')
                -- A held lock on 0 0 0 0 waits for a code (SPEC.md section 15 item 3).
-               OR (k.code_status = 'reset_no_code' AND EXISTS
+               -- Only a lock whose code can be set: a fixed padlock's code comes with it.
+               OR (k.code_status = 'reset_no_code'
+                   AND k.type IN ('combination_builtin', 'combination_padlock_settable', 'electronic')
+                   AND EXISTS
                      (SELECT 1 FROM assignment a WHERE a.locker_id = k.locker_id AND a.status = 'current')))
         ORDER BY l.sort_key`
     )

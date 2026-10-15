@@ -80,3 +80,15 @@ describe('Issue a code, from the to-do list', () => {
     expect(() => issue.run(db, ctx, { lockerId: held.locker_id })).toThrow(/already has a code/)
   })
 })
+
+describe('a held fixed-code padlock with no code recorded (PR #7 review)', () => {
+  it('is not offered Issue a code: its code comes with the padlock', async () => {
+    const { db, ctx, lock } = await heldOnZero()
+    db.run("UPDATE lock SET type = 'combination_padlock_fixed' WHERE id = $id", { $id: lock.id })
+    expect(resetTasks(db).find((t) => t.lockId === lock.id)).toBeUndefined()
+    expect(listProblems(db).find((p) => p.id === 'no-code')).toBeUndefined()
+    const issue = lockerHandlers['codes.issue']
+    if (issue.kind !== 'write') throw new Error('codes.issue must be a write')
+    expect(() => issue.run(db, ctx, { lockerId: lock.locker_id })).toThrow(/padlock/)
+  })
+})
