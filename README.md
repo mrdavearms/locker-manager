@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mrdavearms/locker-manager/releases"><img src="https://img.shields.io/github/v/release/mrdavearms/locker-manager?include_prereleases&label=newest%20version&color=0e4a57" alt="Newest version" /></a>
+  <a href="https://github.com/mrdavearms/locker-manager/releases"><img src="https://img.shields.io/github/v/release/mrdavearms/locker-manager?label=newest%20version&color=0e4a57" alt="Newest version" /></a>
   <img src="https://img.shields.io/badge/Windows%20%7C%20Mac-free-c4511c" alt="Windows and Mac, free" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-56616b" alt="MIT licence" /></a>
 </p>
@@ -36,9 +36,10 @@
 </p>
 
 > [!NOTE]
-> **Pre-release (version 0.x), ready to try at a school.** Version 1.0 follows after the hand
-> checks in [the release checklist](docs/release-checklist.md): real label sheets on a laser
-> printer, letters on paper, a Windows install at a school, and code signing once it is bought.
+> **Version 0.11.3, ready to use at a school.** Every release goes to every school straight
+> away, and the app updates itself. Version 1.0 follows after the hand checks in
+> [the release checklist](docs/release-checklist.md): real label sheets on a laser printer,
+> letters on paper, a Windows install at a school, and code signing once it is bought.
 
 ## Download
 
@@ -90,9 +91,11 @@ Applications folder). Every version, with its release notes, is on the
   a school can change both rules. Codes are hidden until asked for, and the app records who
   showed, printed or exported each code. An optional PIN guards codes.
 - **Prints labels** at exact millimetre positions on Avery sheets, with your own
-  measurements, a calibration page and printer nudges.
+  measurements, a calibration page and printer nudges. Your logo gets a one-colour version
+  for black-and-white printers, and words that do not fit are listed before you print.
 - **Prints letters**: one page per student, with only the sections that suit their lock,
-  in more than one language if you need, with a progress bar and Cancel.
+  in more than one language if you need (Arabic, Persian and Dari read right to left), with a
+  progress bar and Cancel. Pale school colours are adjusted so the words stay readable.
 - **Reports and exports**: group lists, a confidential master list, lockers by bank, reset
   checklists, sign-off sheets, a key register and changes since a date, as PDF, Excel or CSV.
 - **Through the year**: new students, leavers, moves and swaps (Move or swap on Home), a
@@ -106,7 +109,8 @@ Applications folder). Every version, with its release notes, is on the
   codes; labels and letters can be marked "We don't use this" so the app stops suggesting
   them.
 - **Help built in**: a short tour the first time, a getting-started list on Home, the guide
-  inside the app, a demo school with made-up students, and a practice copy for training.
+  inside the app, a demo school with made-up students (its printouts say DEMO), and a practice
+  copy for training.
 
 Not built yet, although the [specification](SPEC.md) mentions them: a passphrase that
 encrypts codes (an optional PIN is built instead), opt-in crash reports, release notes shown

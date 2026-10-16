@@ -4,6 +4,8 @@ One release is one version tag. The tag starts the Release workflow, which build
 Windows and Mac installers, checks every file is present, writes the release notes and
 publishes. Every release is a full public release and becomes the latest, 0.x included:
 never publish a pre-release. Only a beta-suffixed version (1.3.0-beta.2) is a pre-release.
+`scripts/release.sh` also writes the new version into the README and the website; check
+their feature wording describes this version before releasing.
 
 ## The quick way
 

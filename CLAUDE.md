@@ -80,6 +80,10 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
   that the previous release updates itself to it (update-proof.yml).
 - The app takes only full releases, unless the operator chooses the beta channel (see
   Decisions).
+- **README.md and site/index.html always describe the current version** (Dave, 17 Oct 2026):
+  version, status and what the app does. `scripts/release.sh` writes the version into
+  `**Version X.Y.Z` and `<strong>Version X.Y.Z</strong>`; update feature wording with the
+  change that adds the feature, without asking.
 
 ## Decisions made so far (and why)
 

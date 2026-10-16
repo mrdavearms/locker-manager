@@ -10,7 +10,12 @@ cd "$(dirname "$0")/.."
 # from the current commit instead of bumping again.
 if [ "$(node -p 'require("./package.json").version')" != "$VERSION" ]; then
   npm version "$VERSION" --no-git-tag-version >/dev/null
-  git add package.json package-lock.json
+  # The README and the website always describe the current version (Dave, 17 Oct 2026).
+  perl -pi -e "s/\*\*Version [0-9]+\.[0-9]+\.[0-9]+/**Version $VERSION/" README.md
+  perl -pi -e "s#<strong>Version [0-9]+\.[0-9]+\.[0-9]+</strong>#<strong>Version $VERSION</strong>#" site/index.html
+  grep -q "\*\*Version $VERSION" README.md && grep -q "<strong>Version $VERSION</strong>" site/index.html \
+    || { echo "README.md or site/index.html does not show Version $VERSION; fix it first." >&2; exit 1; }
+  git add package.json package-lock.json README.md site/index.html
   git -c user.name=mrdavearms -c user.email=dave@dandsarmstrong.com commit -q -m "chore(release): v$VERSION"
 fi
 SHA=$(git rev-parse HEAD)
