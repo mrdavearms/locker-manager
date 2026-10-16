@@ -11,6 +11,17 @@ import { namedPaper, nearPaperEdge } from '../../src/shared/labelGeometry'
 import { lockerIdFromLink } from '../../src/shared/lockerLink'
 import { lockerQrText, qrSvg } from '../../src/main/render/qr'
 import { quickSearch } from '../../src/main/repos/history'
+import {
+  getStock,
+  labelRecords,
+  listStocks,
+  recordLabelPrint,
+  recordPrintJob,
+  resetStock,
+  saveStock
+} from '../../src/main/repos/labels'
+import { prepareLabels } from '../../src/main/render/prepare'
+import { updateStudent } from '../../src/main/repos/students'
 import { allocatedDemo } from './fixtures'
 
 const L7163 = BUILT_IN_STOCKS.find((s) => s.id === 'avery-l7163')!
@@ -267,5 +278,111 @@ describe('words near the paper edge (print audit, Low)', () => {
   it('warns when a nudge pushes words into the edge printers cannot reach', () => {
     expect(nearPaperEdge(L7163, { right: -6, down: 0 }, 5)).toEqual(['left'])
     expect(nearPaperEdge(L7163, { right: 0, down: 20 }, 5)).toEqual(['bottom'])
+  })
+})
+
+describe('labels changed since they were last printed (spec audit gap 5)', () => {
+  const due = (db: Parameters<typeof labelRecords>[0]): string[] =>
+    labelRecords(db, { mode: 'changed' }, true).map((r) => r.number)
+
+  it('is per locker, and sees a name, preferred name or group change', async () => {
+    const { db, ctx } = await allocatedDemo()
+    const all = labelRecords(db, { mode: 'all' }, true)
+    expect(due(db)).toHaveLength(all.length)
+    recordLabelPrint(db, ctx, all)
+    expect(due(db)).toEqual([])
+
+    const held = all.filter((r) => r.status === 'assigned')
+    const [a, b, c, d] = held.map((r) => ({
+      number: r.number,
+      student: db.get<{ student_id: string }>(
+        "SELECT student_id FROM assignment WHERE locker_id = $l AND status = 'current'",
+        { $l: r.lockerId }
+      )!.student_id
+    }))
+    ctx.advance(60_000)
+    updateStudent(db, ctx, a!.student, { firstName: 'Synthetica' })
+    updateStudent(db, ctx, b!.student, { preferredName: 'Syn' })
+    updateStudent(db, ctx, c!.student, { groupCode: '09Z' })
+    expect(due(db)).toEqual([a!.number, b!.number, c!.number])
+
+    // Printing one other locker does not hide the others still waiting.
+    ctx.advance(60_000)
+    recordLabelPrint(db, ctx, labelRecords(db, { mode: 'lockers', numbers: d!.number }, true))
+    expect(due(db)).toEqual([a!.number, b!.number, c!.number])
+
+    // Printing one of them takes only that one off the list.
+    ctx.advance(60_000)
+    recordLabelPrint(db, ctx, labelRecords(db, { mode: 'lockers', numbers: a!.number }, true))
+    expect(due(db)).toEqual([b!.number, c!.number])
+  })
+})
+
+describe("a school's measured label sizes (spec audit gap 9)", () => {
+  it('are saved, read back and used for printing, and can be put back to the published sizes', async () => {
+    const { db, ctx } = await allocatedDemo()
+    saveStock(db, ctx, MEASURED)
+    const got = getStock(db, MEASURED.id)
+    expect(got).toMatchObject({ top: 14.0, labelHeight: 38.0, pitchY: 38.0 })
+    expect(listStocks(db).find((s) => s.id === MEASURED.id)).toMatchObject({ top: 14.0 })
+
+    // Labels print from the measured top: the first label sits 14.0 mm down.
+    const out = prepareLabels(db, {
+      selection: { mode: 'lockers', numbers: '1' },
+      startAt: 1,
+      printer: null,
+      outlines: false
+    })
+    expect(out.placed[0]!.y).toBeCloseTo(14.0, 3)
+    expect(out.html).toContain('top:14mm')
+
+    resetStock(db, ctx, MEASURED.id)
+    expect(getStock(db, MEASURED.id).top).toBe(L7163.top)
+  })
+})
+
+describe('labels changed since printed: shared lockers and older prints (PR #7 review)', () => {
+  const due = (db: Parameters<typeof labelRecords>[0]): string[] =>
+    labelRecords(db, { mode: 'changed' }, true).map((r) => `${r.number} ${r.lastName ?? ''}`)
+
+  it('treats both holders of a shared locker as one set of labels', async () => {
+    const { db, ctx } = await allocatedDemo()
+    const held = db.get<{ locker_id: string }>(
+      "SELECT locker_id FROM assignment WHERE status = 'current' LIMIT 1"
+    )!.locker_id
+    const spare = db.get<{ id: string }>(
+      `SELECT s.id FROM student s WHERE s.active = 1 AND NOT EXISTS
+         (SELECT 1 FROM assignment a WHERE a.student_id = s.id AND a.status = 'current') LIMIT 1`
+    )!.id
+    db.run('UPDATE locker SET capacity = 2 WHERE id = $id', { $id: held })
+    db.run(
+      `INSERT INTO assignment (id, student_id, locker_id, school_year_id, start_date, status, created_at, updated_at, updated_by)
+       SELECT 'syn-second', $s, $l, school_year_id, start_date, 'current', created_at, updated_at, updated_by
+         FROM assignment WHERE locker_id = $l AND status = 'current' LIMIT 1`,
+      { $s: spare, $l: held }
+    )
+    recordLabelPrint(db, ctx, labelRecords(db, { mode: 'all' }, true))
+    expect(due(db)).toEqual([])
+  })
+
+  it('counts a holder’s name change on a locker printed before labels were remembered', async () => {
+    const { db, ctx } = await allocatedDemo()
+    const all = labelRecords(db, { mode: 'all' }, true)
+    // An older print: recorded as a print job, with no remembered words.
+    recordPrintJob(
+      db,
+      ctx,
+      'labels',
+      all.map((r) => r.lockerId)
+    )
+    expect(due(db)).toEqual([])
+    const r = all.find((x) => x.status === 'assigned')!
+    const student = db.get<{ student_id: string }>(
+      "SELECT student_id FROM assignment WHERE locker_id = $l AND status = 'current'",
+      { $l: r.lockerId }
+    )!.student_id
+    ctx.advance(60_000)
+    updateStudent(db, ctx, student, { lastName: 'Synthetic' })
+    expect(due(db)).toEqual([`${r.number} Synthetic`])
   })
 })

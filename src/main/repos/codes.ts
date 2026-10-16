@@ -2,6 +2,7 @@ import {
   CodeRulesSchema,
   DEFAULT_CODE_RULES,
   type CodeRules,
+  type CodeRulesSummary,
   type CodeSetView,
   type CodeStatus,
   type ResetTask
@@ -399,7 +400,14 @@ export function resetTasks(db: LockerDb): ResetTask[] {
               (SELECT COALESCE(s.preferred_name, s.first_name) || ' ' || s.last_name FROM assignment a JOIN student s ON s.id = a.student_id
                 WHERE a.locker_id = l.id AND a.status = 'current' LIMIT 1) AS holder
          FROM lock k LEFT JOIN locker l ON l.id = k.locker_id
-        WHERE k.code_status IN ('needs_new_code', 'awaiting_physical_reset') AND k.status IN ('in_use','spare')
+        WHERE k.status IN ('in_use','spare')
+          AND (k.code_status IN ('needs_new_code', 'awaiting_physical_reset')
+               -- A held lock on 0 0 0 0 waits for a code (SPEC.md section 15 item 3).
+               -- Only a lock whose code can be set: a fixed padlock's code comes with it.
+               OR (k.code_status = 'reset_no_code'
+                   AND k.type IN ('combination_builtin', 'combination_padlock_settable', 'electronic')
+                   AND EXISTS
+                     (SELECT 1 FROM assignment a WHERE a.locker_id = k.locker_id AND a.status = 'current')))
         ORDER BY l.sort_key`
     )
     .map((r) => ({
@@ -412,17 +420,9 @@ export function resetTasks(db: LockerDb): ResetTask[] {
     }))
 }
 
-/**
- * Next year's code set (SPEC.md 4.6): one code per locker, never the locker's
- * code from before, plus a pool of spares. Deterministic when a seed is given.
- */
-export function generateYearSet(
-  db: LockerDb,
-  ctx: OperatorContext,
-  input: { name: string; schoolYearId: string | null; seed: string | null }
-): { set: string; codes: number; spares: number; validCount: number; overHalf: boolean } {
-  const rules = codeRules(db)
-  const lockers = db.all<{
+/** The lockers a year code set gives a code to: those with a lock whose code can be set. */
+function lockersTakingCodes(db: LockerDb) {
+  return db.all<{
     locker_id: string
     lock_id: string
     dials: number | null
@@ -433,6 +433,31 @@ export function generateYearSet(
       WHERE l.archived_at IS NULL AND k.type IN ('combination_builtin', 'combination_padlock_settable', 'electronic')
       ORDER BY l.sort_key`
   )
+}
+
+/** Whether a year set plus its spares would use more than half the codes the rules allow. */
+function codeSetSize(rules: CodeRules, lockers: number): { count: number; overHalf: boolean } {
+  const { count } = countValidCodes(rules)
+  return { count, overHalf: lockers + rules.sparePoolSize > count / 2 }
+}
+
+/** The rules summary for Settings, with the more-than-half check for this file's lockers. */
+export function rulesPreview(db: LockerDb, rules: CodeRules): CodeRulesSummary {
+  const lockers = lockersTakingCodes(db).length
+  return { ...rulesSummary(rules), lockers, overHalf: codeSetSize(rules, lockers).overHalf }
+}
+
+/**
+ * Next year's code set (SPEC.md 4.6): one code per locker, never the locker's
+ * code from before, plus a pool of spares. Deterministic when a seed is given.
+ */
+export function generateYearSet(
+  db: LockerDb,
+  ctx: OperatorContext,
+  input: { name: string; schoolYearId: string | null; seed: string | null }
+): { set: string; codes: number; spares: number; validCount: number; overHalf: boolean } {
+  const rules = codeRules(db)
+  const lockers = lockersTakingCodes(db)
   const odd = lockers.find(
     (l) =>
       (l.dials ?? rules.length) !== rules.length ||
@@ -450,7 +475,7 @@ export function generateYearSet(
   const notForSpares = new Set([...taken, ...codesOnLocks(db), ...codesInOtherSets(db)])
   // This year's codes on the locks do not block next year's set; only other sets do.
   for (const a of avoid) for (const c of a) taken.delete(c)
-  const { count } = countValidCodes(rules)
+  const { count, overHalf } = codeSetSize(rules, lockers.length)
   const total = lockers.length + rules.sparePoolSize
   const avoidPerSlot = [
     ...avoid,
@@ -515,7 +540,7 @@ export function generateYearSet(
     codes: lockers.length,
     spares: rules.sparePoolSize,
     validCount: count,
-    overHalf: total > count / 2
+    overHalf
   }
 }
 

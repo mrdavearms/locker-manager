@@ -1,6 +1,6 @@
 import type { ReportData } from '@shared/reports'
 import { fontFaceCss } from './fonts'
-import { esc } from './html'
+import { DEMO_MARK, demoMarkCss, esc } from './html'
 
 // Reports as HTML tables (SPEC.md 5.4): school name, title and print date at the
 // top, table headings repeated on every page, a CONFIDENTIAL banner and watermark
@@ -11,6 +11,8 @@ export interface ReportPage {
   printedAt: Date
   /** Screen preview: a grey surround and the page width shown. */
   preview: boolean
+  /** The demo school: every page carries the DEMO mark. */
+  demo?: boolean
 }
 
 export function reportDate(d: Date): string {
@@ -83,7 +85,8 @@ td.code{font-weight:700;letter-spacing:.12em}
 td.blank{height:9mm}
 td.tick .box{display:inline-block;width:4mm;height:4mm;border:0.35mm solid #111;border-radius:0.6mm}
 td.none{color:#666;font-style:italic}
-</style></head><body>${report.confidential ? '<div class="wm">CONFIDENTIAL</div>' : ''}${sections}</body></html>`
+${page.demo ? demoMarkCss('110pt', 'fixed') : ''}
+</style></head><body>${page.demo ? DEMO_MARK : ''}${report.confidential ? '<div class="wm">CONFIDENTIAL</div>' : ''}${sections}</body></html>`
 }
 
 function titleBlock(report: ReportData, page: ReportPage): string {
@@ -100,5 +103,5 @@ function titleBlock(report: ReportData, page: ReportPage): string {
 export function reportFooter(report: ReportData, page: ReportPage): string {
   return `<div style="font-family:Arial,sans-serif;font-size:7.5pt;color:#555;width:100%;padding:0 12mm;display:flex;justify-content:space-between"><span>${esc(
     page.school
-  )} · ${esc(report.title)}${report.confidential ? ' · CONFIDENTIAL' : ''}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`
+  )} · ${esc(report.title)}${report.confidential ? ' · CONFIDENTIAL' : ''}${page.demo ? ' · DEMO' : ''}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`
 }

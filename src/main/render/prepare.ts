@@ -1,4 +1,5 @@
-import type { LabelSelection, Stock } from '@shared/labels'
+import type { LabelRecord, LabelSelection, Stock } from '@shared/labels'
+import { getMeta } from '../db/context'
 import type { LockerDb } from '../db/db'
 import { getTerms } from '../repos/school'
 import { getStock, labelRecords, labelTemplate, printerOffset, schoolLogos } from '../repos/labels'
@@ -9,6 +10,7 @@ import { lockerQrText, qrSvg } from './qr'
 export interface PreparedLabels extends SheetOutput {
   stock: Stock
   lockerIds: string[]
+  records: LabelRecord[]
 }
 
 /** Everything needed to show, save or print labels, from the open file. */
@@ -32,9 +34,10 @@ export function prepareLabels(
     terms: getTerms(db),
     logo: schoolLogos(db),
     qr,
-    outlines: opts.outlines
+    outlines: opts.outlines,
+    demo: getMeta(db, 'demo') === '1'
   })
-  return { ...out, stock, lockerIds: records.map((r) => r.lockerId) }
+  return { ...out, stock, lockerIds: records.map((r) => r.lockerId), records }
 }
 
 export function prepareCalibration(

@@ -16,6 +16,7 @@ import { buildLabelSheets } from '../render/labelSheet'
 import { prepareCalibration, prepareLabels } from '../render/prepare'
 import { lockerQrText, qrSvg } from '../render/qr'
 import { labelRecords, schoolLogos } from '../repos/labels'
+import { getMeta } from '../db/context'
 import type { LockerDb } from '../db/db'
 import type { Handlers } from './registry'
 
@@ -55,7 +56,8 @@ function previewWith(
     terms: getTerms(db),
     logo: schoolLogos(db),
     qr,
-    outlines: true
+    outlines: true,
+    demo: getMeta(db, 'demo') === '1'
   })
   return { ...out, stock, lockerIds: records.map((r) => r.lockerId) }
 }

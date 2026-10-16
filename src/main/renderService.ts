@@ -7,7 +7,7 @@ import { LabelSelectionSchema } from '@shared/labels'
 import type { ActionResult } from '@shared/ipc'
 import { whileBusy } from './busy'
 import { fileSession } from './fileService'
-import { recordPrintJob } from './repos/labels'
+import { recordLabelPrint } from './repos/labels'
 import { pdfPageCount, htmlToPdf, printHtml } from './render/pdf'
 import { prepareCalibration, prepareLabels } from './render/prepare'
 
@@ -105,7 +105,7 @@ export function registerRenderHandlers(): void {
               entity: 'print_job',
               after: { labels: prepared.lockerIds.length, to: 'pdf' }
             },
-            (db, ctx) => recordPrintJob(db, ctx, 'labels', prepared.lockerIds)
+            (db, ctx) => recordLabelPrint(db, ctx, prepared.records)
           )
         }
         return { ok: true, path }
@@ -140,7 +140,7 @@ export function registerRenderHandlers(): void {
             entity: 'print_job',
             after: { labels: prepared.lockerIds.length, to: 'printer' }
           },
-          (db, ctx) => recordPrintJob(db, ctx, 'labels', prepared.lockerIds)
+          (db, ctx) => recordLabelPrint(db, ctx, prepared.records)
         )
       }
       return { ok: true }

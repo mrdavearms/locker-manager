@@ -10,7 +10,7 @@ import type { Terminology } from '@shared/terminology'
 import { codeParts, formatBody, formatLine, isRightToLeft, type MergeValues } from '../letters/text'
 import { fitText } from './fit'
 import { fontFaceCss, PT_TO_MM, textWidthMm } from './fonts'
-import { esc, mm, safeImageUrl } from './html'
+import { DEMO_MARK, demoMarkCss, esc, mm, safeImageUrl } from './html'
 import { darkenFor, textOn } from '@shared/colour'
 
 // Student letters as HTML pages in millimetres (SPEC.md 5.2 and 5.3). One student
@@ -42,6 +42,8 @@ export interface LetterBuildInput {
   today: Date
   /** Preview: the page end is drawn and anything past it stays visible. */
   preview: boolean
+  /** The demo school: every letter carries the DEMO mark. */
+  demo?: boolean
 }
 
 export interface LetterItem {
@@ -351,13 +353,13 @@ export function buildLetters(input: LetterBuildInput, items: readonly LetterItem
     const lang = input.template.languages.some((l) => l.code === item.lang)
       ? item.lang
       : (input.template.languages[0]?.code ?? 'en')
-    return `<section class="letter" lang="${esc(lang)}" dir="${isRightToLeft(lang) ? 'rtl' : 'ltr'}" data-student="${esc(item.record.studentId)}"><div class="content">${blocks}</div>${
+    return `<section class="letter" lang="${esc(lang)}" dir="${isRightToLeft(lang) ? 'rtl' : 'ltr'}" data-student="${esc(item.record.studentId)}"><div class="content">${blocks}</div>${input.demo ? DEMO_MARK : ''}${
       input.preview ? '<div class="pageend">The page ends here</div>' : ''
     }</section>`
   })
-  const html = `<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"><title>Letters</title><style>${pageCss(
-    input
-  )}</style></head><body>${pages.join('')}</body></html>`
+  const html = `<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"><title>Letters</title><style>${pageCss(input)}${
+    input.demo ? demoMarkCss('120pt') : ''
+  }</style></head><body>${pages.join('')}</body></html>`
   return { html, tooLong }
 }
 

@@ -82,6 +82,48 @@ async function findBefore(session: DataFileSession, entryId: string): Promise<Fo
   )
 }
 
+function holders(db: LockerDb, lockerId: string): number {
+  return Number(
+    db.get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM assignment WHERE locker_id = $id AND status = 'current'",
+      { $id: lockerId }
+    )?.n ?? 0
+  )
+}
+
+/**
+ * Why putting these old values back would break a rule the normal screens keep, or
+ * null when it is safe. Lockers given out are not touched by a put-back, so a held
+ * locker cannot go out of service or take fewer students than hold it, and a
+ * student who holds a locker cannot be marked as left (spec audit, gap 4).
+ */
+export function restoreProblem(
+  db: LockerDb,
+  entity: Entity,
+  entityId: string,
+  values: Record<string, unknown>
+): string | null {
+  if (entity === 'locker') {
+    const n = holders(db, entityId)
+    if (n === 0) return null
+    const who = n === 1 ? 'A student holds' : `${n} students hold`
+    if (values.status === 'out_of_service')
+      return `${who} this locker now, so it cannot go back to out of service. Move them to another locker first, then put it back.`
+    if (Number(values.capacity) < n)
+      return `${who} this locker now, so it must take at least ${n}. Move a student first, then put it back.`
+    return null
+  }
+  if (Number(values.active) === 0) {
+    const holds = db.get(
+      "SELECT 1 AS x FROM assignment WHERE student_id = $id AND status = 'current'",
+      { $id: entityId }
+    )
+    if (holds)
+      return 'This student still holds a locker, so they cannot be put back as left. Use "Student has left" so the locker is freed and its code changed.'
+  }
+  return null
+}
+
 function differences(db: LockerDb, f: Found): RecordRestorePreview['changes'] {
   const cols = FIELDS[f.entity].map(([c]) => c).join(', ')
   const now = db.get<Record<string, unknown>>(`SELECT ${cols} FROM ${f.entity} WHERE id = $id`, {
@@ -101,7 +143,10 @@ export async function previewRecordRestore(
   return {
     entity: f.entity,
     backupAt: f.backupAt,
-    changes: session.read((db) => differences(db, f))
+    ...session.read((db) => ({
+      changes: differences(db, f),
+      blocked: restoreProblem(db, f.entity, f.entityId, f.values)
+    }))
   }
 }
 
@@ -119,6 +164,8 @@ export async function restoreRecord(
     }),
     (db: LockerDb, ctx: OperatorContext) => {
       const changes = differences(db, f)
+      const blocked = restoreProblem(db, f.entity, f.entityId, f.values)
+      if (blocked) throw new Error(blocked)
       const sets = FIELDS[f.entity].map(([c]) => `${c} = $${c}`).join(', ')
       const params: Record<string, string | number | null> = {
         $id: f.entityId,
@@ -131,7 +178,7 @@ export async function restoreRecord(
         `UPDATE ${f.entity} SET ${sets}, updated_at = $at, updated_by = $by WHERE id = $id`,
         params
       )
-      return { entity: f.entity, backupAt: f.backupAt, changes }
+      return { entity: f.entity, backupAt: f.backupAt, changes, blocked: null }
     }
   )
 }

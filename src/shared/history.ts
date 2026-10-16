@@ -16,6 +16,8 @@ export interface RecordRestorePreview {
   entity: 'student' | 'locker'
   backupAt: string
   changes: { field: string; now: string; before: string }[]
+  /** Why it cannot be put back as it is (it would break a rule), or null. */
+  blocked: string | null
 }
 
 export interface QuickResult {
@@ -82,6 +84,7 @@ export function describeAction(action: string): string {
     'codes.reset_done_many': 'Marked locks as reset',
     'code.shown': 'Showed a code',
     'code.changed': 'Issued a new code',
+    'code.issued': 'Issued a code for a lock on 0 0 0 0',
     'code.fixed_recorded': 'Recorded a padlock code',
     'allocation.plan_saved': 'Saved the allocation plan',
     'allocation.committed': 'Allocated lockers',

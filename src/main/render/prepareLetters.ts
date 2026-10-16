@@ -5,6 +5,7 @@ import {
   type LetterSelection,
   type LetterTemplate
 } from '@shared/letters'
+import { getMeta } from '../db/context'
 import type { LockerDb } from '../db/db'
 import {
   letterImages,
@@ -43,7 +44,8 @@ function prepareParts(db: LockerDb, opts: PrepareOptions) {
     school: letterSchool(db, template),
     images: letterImages(db),
     today: new Date(),
-    preview: opts.preview
+    preview: opts.preview,
+    demo: getMeta(db, 'demo') === '1'
   }
   return { template, set, items, input }
 }

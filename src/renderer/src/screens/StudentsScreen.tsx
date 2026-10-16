@@ -15,7 +15,8 @@ import { IssuedDialog, StudentLockerCard, type LockerIntent } from '@renderer/lo
 const NAME_CHECK_TEXT: Record<string, string> = {
   mac: 'Mac name: MacDonald or Macdonald?',
   particle: 'Surname with de, van, von…: check the capitals',
-  two_word: 'Two-word surname: check spelling and capitals'
+  two_word: 'Two-word surname: check spelling and capitals',
+  import_differs: 'Corrected by hand, and the student system now spells it differently'
 }
 
 function StudentPanel({

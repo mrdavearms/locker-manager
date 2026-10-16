@@ -8,7 +8,7 @@ import {
 import type { Terminology } from '@shared/terminology'
 import { fitText } from './fit'
 import { fontFaceCss, LINE_HEIGHT } from './fonts'
-import { esc, mm, safeImageUrl } from './html'
+import { DEMO_MARK, demoMarkCss, esc, mm, safeImageUrl } from './html'
 import { labelPosition, labelsPerSheet } from './stocks'
 
 // Label sheets as HTML at exact millimetre geometry (SPEC.md 5.1 and 5.3). Every
@@ -27,6 +27,8 @@ export interface SheetInput {
   qr: ReadonlyMap<string, string>
   /** Draw label outlines (preview only; never on the printed PDF). */
   outlines: boolean
+  /** The demo school: every label carries the DEMO mark. */
+  demo?: boolean
 }
 
 export interface PlacedLabel {
@@ -182,7 +184,7 @@ export function buildLabelSheets(input: SheetInput): SheetOutput {
     const x = pos.x + input.offset.right
     const y = pos.y + input.offset.down
     ;(pages[page] ??= []).push(
-      `<div class="label${input.outlines ? ' outline' : ''}" data-locker="${esc(r.number)}" style="left:${mm(x)};top:${mm(y)}">${elements.map((e) => renderElement(e, r, input, tooLong)).join('')}</div>`
+      `<div class="label${input.outlines ? ' outline' : ''}" data-locker="${esc(r.number)}" style="left:${mm(x)};top:${mm(y)}">${elements.map((e) => renderElement(e, r, input, tooLong)).join('')}${input.demo ? DEMO_MARK : ''}</div>`
     )
     placed.push({ lockerId: r.lockerId, number: r.number, page, x, y })
   })
@@ -196,7 +198,7 @@ export function buildLabelSheets(input: SheetInput): SheetOutput {
       )
     }
   }
-  const html = `<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><title>Labels</title><style>${pageCss(stock, labelLogo(input))}</style></head><body>${pages
+  const html = `<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><title>Labels</title><style>${pageCss(stock, labelLogo(input))}${input.demo ? demoMarkCss(mm(stock.labelHeight * 0.5)) : ''}</style></head><body>${pages
     .map((p) => `<div class="page">${p.join('')}</div>`)
     .join('')}</body></html>`
   return { html, sheets: pages.length, placed, tooLong }

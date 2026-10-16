@@ -123,7 +123,8 @@ Only one person does this, once, for the whole school.
 ## Practise with the demo school
 
 1. On the Welcome screen, click **Try the demo school**.
-2. Everything you see is made up, and every screen shows **DEMO**.
+2. Everything you see is made up. Every screen shows **DEMO**, and every label, letter and
+   report printed from it carries a pale **DEMO** mark, so it is never handed out by mistake.
 3. When you finish, click **Close file** at the bottom right.
 
 The demo starts fresh every time you open it.
@@ -357,7 +358,9 @@ two-word surnames.
 2. Click a student. The yellow box says what to check and shows the name as it is in the
    student system.
 3. If the name is right, click **The spelling is right**. If not, correct it and click
-   **Save name**. A name you correct is never changed by a later import.
+   **Save name**. A name you correct is never changed by a later import. If a later import
+   spells that student's name differently from your correction, the student goes back on
+   **Names to check** so someone can decide which spelling is right.
 
 ## Possible leavers
 
@@ -500,6 +503,11 @@ To do many at once:
 - Click **Print this list** to open the **Locks to reset** report, then print it or save it
   as a PDF to take round the lockers.
 
+The list also shows any locker a student holds whose lock is on 0 0 0 0 with no code yet,
+for example after giving out lockers without **Issue a code now**. That lock needs no reset
+and has no tick box: click **Issue a code**, then print the student's letter. The printed
+**Locks to reset** report leaves these out, because there is nothing to do at the lock.
+
 On the Lockers screen the list is folded to one line. Click **Show** to open it.
 
 ## Undo a mistake
@@ -520,6 +528,9 @@ that record's own details change; lockers given out, codes and history stay as t
 1. Click **Labels** in the left-hand menu.
 2. Under **Which labels**, choose every locker, one Homeroom, one bank, chosen locker numbers
    (for example `1-10, 15`), lockers changed since the last print, or spare lockers only.
+   "Changed since the last print" is worked out locker by locker: it lists every locker whose
+   label would now read differently from the last label printed for that locker, such as a
+   new holder, a corrected name, a new preferred name or a new Homeroom.
 3. Check the preview on the right. It is the real sheet, exactly as it will print, before
    your printer nudge moves it.
 4. Click **Save as PDF…** (best) or **Print…**.

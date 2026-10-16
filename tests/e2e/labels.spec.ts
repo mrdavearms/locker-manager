@@ -72,8 +72,10 @@ test('labels: a real PDF at exact millimetres, and the preview matches the refer
   PNG.bitblt(whole, shot, x0, y0, w, h, 0, 0)
   const goldenPath = resolve('tests/golden/labels-L7163-sheet1.png')
   if (process.platform === 'darwin') {
-    if (!existsSync(goldenPath) || process.env.UPDATE_GOLDEN === '1')
-      writeFileSync(goldenPath, PNG.sync.write(shot))
+    // A missing reference fails rather than quietly becoming the new reference
+    // (spec audit gap 9). Run with UPDATE_GOLDEN=1 to make it on purpose.
+    if (process.env.UPDATE_GOLDEN === '1') writeFileSync(goldenPath, PNG.sync.write(shot))
+    expect(existsSync(goldenPath), `${goldenPath} is missing; run with UPDATE_GOLDEN=1`).toBe(true)
     const golden = PNG.sync.read(readFileSync(goldenPath))
     expect([shot.width, shot.height]).toEqual([golden.width, golden.height])
     const diff = pixelmatch(shot.data, golden.data, undefined, shot.width, shot.height, {

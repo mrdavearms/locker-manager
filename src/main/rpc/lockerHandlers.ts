@@ -1,5 +1,5 @@
 import {
-  rulesSummary,
+  rulesPreview,
   codeRules,
   setCodeRules,
   generateYearSet,
@@ -27,6 +27,7 @@ import {
   swapStudents
 } from '../repos/assignments'
 import { listHistory, quickSearch } from '../repos/history'
+import { LOCK_TYPE_INFO } from '@shared/locks'
 import type { LockerDb } from '../db/db'
 import type { Handlers } from './registry'
 import { assertCodesAllowed, shownCode } from '../privacy'
@@ -42,6 +43,7 @@ type Keys =
   | 'codes.resetDoneMany'
   | 'codes.reveal'
   | 'codes.recode'
+  | 'codes.issue'
   | 'codes.setFixed'
   | 'allocation.plan.get'
   | 'allocation.plan.set'
@@ -79,7 +81,7 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
       return codeRules(db)
     }
   },
-  'codes.rules.preview': { kind: 'pure', run: (p) => rulesSummary(p.rules) },
+  'codes.rules.preview': { kind: 'read', run: (db, p) => rulesPreview(db, p.rules) },
   'codes.sets.list': { kind: 'read', run: (db) => listCodeSets(db) },
   'codes.sets.generate': {
     kind: 'write',
@@ -141,6 +143,20 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
         issueCode(db, ctx, requireLock(db, p.lockerId), 'compromised')
       )
     })
+  },
+  'codes.issue': {
+    kind: 'write',
+    audit: (p) => ({ action: 'code.issued', entity: 'locker', entityId: p.lockerId }),
+    run: (db, ctx, p) => {
+      const lockId = requireLock(db, p.lockerId)
+      const lock = lockForLocker(db, p.lockerId)
+      if (lock && !LOCK_TYPE_INFO[lock.type].codeSettable)
+        throw new Error('This padlock’s code comes with it, so the app cannot issue one.')
+      // Only for a lock on 0 0 0 0; a lock someone may know needs New code instead.
+      if (lock?.code_status !== 'reset_no_code')
+        throw new Error('This lock already has a code. Use New code if someone else may know it.')
+      return { code: shownCode(db, ctx, p.lockerId, issueCode(db, ctx, lockId, 'issued')) }
+    }
   },
   'codes.setFixed': {
     kind: 'write',
