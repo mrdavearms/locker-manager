@@ -4,15 +4,14 @@ import type { UpdateMode } from '@shared/ipc'
 // Pure decision rules for the updater. No Electron imports, so Vitest covers them.
 
 /**
- * Milestone builds are GitHub pre-releases. electron-updater ignores pre-releases
- * unless told otherwise, so every 0.x build accepts them. From 1.0.0 only
- * normal releases are taken, unless the running version itself is a beta
- * (1.3.0-beta.2), which then follows the beta channel.
+ * Every release is a full public release, 0.x included, so only normal releases
+ * are taken. A running beta (1.3.0-beta.2) follows the beta channel, which is
+ * the one kind of GitHub pre-release. (The beta channel setting turns it on too.)
  */
 export function allowPrerelease(version: string): boolean {
   const v = semver.parse(version)
   if (v === null) return false
-  return v.major === 0 || v.prerelease.length > 0
+  return v.prerelease.length > 0
 }
 
 /** True when `candidate` is a newer version than `current`. */

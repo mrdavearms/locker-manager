@@ -60,9 +60,9 @@ signature is in place the prompt disappears.
   and set `autoUpdate` to `false`.
 - A failed check (proxy, firewall, offline) is logged and never shown, unless the user
   asked for the check by hand.
-- Versions below 1.0.0 are pre-releases and accept pre-release updates. From 1.0.0 the app
-  takes only stable releases, unless the user chooses **Test versions too** in Settings,
-  This computer. To prevent that, set `updateChannel` to `stable` in managed settings.
+- Every release is a full public release, and the app takes only those, unless the user
+  chooses **Test versions too** in Settings, This computer. To prevent that, set
+  `updateChannel` to `stable` in managed settings.
 
 ### Network needs
 

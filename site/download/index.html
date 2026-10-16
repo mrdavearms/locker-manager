@@ -879,8 +879,8 @@
             var published = releases.filter(function (r) {
               return !r.draft
             })
-            // A normal release wins once one exists (1.0 onwards); before that, the newest
-            // pre-release is the version to use.
+            // Every release is a full release; the newest one wins. Older 0.x releases were
+            // pre-releases, so the newest pre-release is still the fallback.
             var release =
               published.filter(function (r) {
                 return !r.prerelease

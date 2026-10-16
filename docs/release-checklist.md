@@ -2,7 +2,8 @@
 
 One release is one version tag. The tag starts the Release workflow, which builds the
 Windows and Mac installers, checks every file is present, writes the release notes and
-publishes. Milestone builds (0.x) are published as pre-releases.
+publishes. Every release is a full public release and becomes the latest, 0.x included:
+never publish a pre-release. Only a beta-suffixed version (1.3.0-beta.2) is a pre-release.
 
 ## The quick way
 

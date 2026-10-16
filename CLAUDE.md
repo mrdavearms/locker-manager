@@ -75,10 +75,11 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
   This overrides the global "work on `test`" rule: this repo has no server environment to
   test against, CI runs on every push, and releases happen only on tags.
 - Releases are tag-driven (`v*.*.*`). CI must be green before tagging.
-- Every milestone ends with a tagged GitHub pre-release and proof that the previous
-  pre-release auto-updates to it.
-- The app accepts GitHub pre-releases while its own version is below 1.0.0, and only
-  stable releases from 1.0.0 on (see Decisions).
+- **No pre-releases** (Dave, 17 Oct 2026). Every release, 0.x included, is a full public
+  release marked latest, so fixes reach schools straight away. Each one ends with proof
+  that the previous release updates itself to it (update-proof.yml).
+- The app takes only full releases, unless the operator chooses the beta channel (see
+  Decisions).
 
 ## Decisions made so far (and why)
 
@@ -93,10 +94,13 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
 3. **MIT licence** (Dave, 6 Oct 2026). LICENSE is at the root.
 4. **Public repository.** Needed so the updater needs no token and Mac and Windows CI
    minutes are free.
-5. **Pre-releases and auto-update.** electron-updater ignores releases GitHub marks as
-   pre-release unless `allowPrerelease` is on. Rule: `allowPrerelease = version < 1.0.0`.
-   Milestone releases are GitHub pre-releases; 1.0.0 onwards are normal releases, and the
-   beta channel (`1.3.0-beta.2`) uses semver pre-release suffixes as SPEC.md 9.1 says.
+5. **No pre-releases; auto-update takes full releases** (changed by Dave, 17 Oct 2026).
+   release.yml publishes every version as a full release marked latest; only a version
+   with a beta suffix (`1.3.0-beta.2`) is a GitHub pre-release. electron-updater ignores
+   pre-releases unless `allowPrerelease` is on, which `policy.allowPrerelease` sets only for
+   a running beta or the beta channel. v0.0.x to v0.11.1 were published as pre-releases;
+   v0.11.2 was changed to a full release. Installed copies up to 0.11.2 still accept
+   pre-releases, so they take full releases too.
 6. **Windows code signing**: Azure Artifact Signing (the new name for Azure Trusted
    Signing) lists Australia as a supported country for organisation validation as of
    October 2026. Earlier notes in the redaction tool repo saying it was unavailable here

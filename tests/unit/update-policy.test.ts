@@ -14,11 +14,9 @@ import {
 } from '../../src/main/update/policy'
 
 describe('allowPrerelease', () => {
-  it('accepts GitHub pre-releases while the version is below 1.0.0', () => {
-    expect(allowPrerelease('0.0.1')).toBe(true)
-    expect(allowPrerelease('0.9.12')).toBe(true)
-  })
-  it('refuses pre-releases from 1.0.0 on', () => {
+  it('refuses pre-releases for every normal version, 0.x included (all releases are public)', () => {
+    expect(allowPrerelease('0.0.1')).toBe(false)
+    expect(allowPrerelease('0.11.2')).toBe(false)
     expect(allowPrerelease('1.0.0')).toBe(false)
     expect(allowPrerelease('2.3.1')).toBe(false)
   })
