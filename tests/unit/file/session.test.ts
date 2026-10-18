@@ -457,6 +457,40 @@ describe('conflicts (SPEC.md 6.4)', () => {
     ).toEqual(['r1'])
   })
 
+  it('undo keeps the record of what was printed (SPEC.md 5.6)', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    await dave.session.open(path)
+    dave.session.write({ action: 'labels.printed', entity: 'print_job' }, (db) =>
+      db.run(
+        "INSERT INTO print_job (id, kind, printed_at, printed_by, machine, created_at, updated_at, updated_by) VALUES ('p1', 'labels', 'x', 'Dave', 'M', 'x', 'x', 'Dave')"
+      )
+    )
+    expect(await dave.session.undo()).toEqual({ ok: true })
+    expect(
+      dave.session.read((db) => db.all<{ id: string }>('SELECT id FROM print_job')).map((r) => r.id)
+    ).toEqual(['p1'])
+  })
+
+  it('a file that cannot be brought up to date gives back the edit lock', async () => {
+    const dir = tempDir()
+    const path = join(dir, 'Locker data.lockers')
+    const db = await createNewDatabase(
+      { operator: 'Setup', machine: 'SETUP-PC', now: () => new Date('2026-10-01T00:00:00Z') },
+      { schoolName: 'SYNTHETIC High School', appVersion: '0.1.0' }
+    )
+    // Looks one version old, but the last migration's index is already there, so it fails.
+    db.run('PRAGMA user_version = 3')
+    writeFileSync(path, db.export())
+    db.close()
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    const result = await dave.session.open(path)
+    expect(result).toMatchObject({ ok: false, message: /could not be updated/ })
+    expect(dave.session.state.status).not.toBe('open')
+    expect(existsSync(lockPathFor(path))).toBe(false)
+  })
+
   it('a vanished file is noticed and can be written back', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)
@@ -543,6 +577,19 @@ describe('sync copies beside the file (SPEC.md 6.3)', () => {
         b.includes('replaced by Locker data-OFFICE-PC')
       )
     ).toBe(true)
+  })
+
+  it('only a copy the app found can be sorted out, never another file in the folder', async () => {
+    const { dir, dave } = await withCopy()
+    writeFileSync(
+      join(dir, 'Something else.lockers'),
+      readFileSync(join(dir, 'Locker data.lockers'))
+    )
+    expect(await dave.session.resolveCopy('Something else.lockers', 'keep_current')).toEqual({
+      ok: false,
+      message: 'That copy is no longer there.'
+    })
+    expect(existsSync(join(dir, 'Something else.lockers'))).toBe(true)
   })
 
   it('can be ignored when the operator says it is not a copy', async () => {

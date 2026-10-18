@@ -360,20 +360,34 @@ export class DataFileSession {
         }
       }
       if (schema.kind === 'older') {
-        if (c.mode === 'edit') {
-          // SPEC.md 6.6: named backup, migrate, verify, save.
-          await this.backupBytes(read.bytes, `before update to ${this.d.appVersion}`)
-          migrate(db)
-          appendAudit(db, this.ctx(), {
-            action: 'file.migrated',
-            entity: 'file',
-            after: { from: schema.from, to: schema.to, appVersion: this.d.appVersion }
-          })
-          this.markChanged()
-          await this.flush()
-        } else {
-          // Viewing only: bring it up to date in memory, never write it.
-          migrate(db)
+        try {
+          if (c.mode === 'edit') {
+            // SPEC.md 6.6: named backup, migrate, verify, save.
+            await this.backupBytes(read.bytes, `before update to ${this.d.appVersion}`)
+            migrate(db)
+            appendAudit(db, this.ctx(), {
+              action: 'file.migrated',
+              entity: 'file',
+              after: { from: schema.from, to: schema.to, appVersion: this.d.appVersion }
+            })
+            this.markChanged()
+            await this.flush()
+          } else {
+            // Viewing only: bring it up to date in memory, never write it.
+            migrate(db)
+          }
+        } catch (error) {
+          // Nothing has been written to the file yet; give back the edit lock so
+          // nobody else is shut out by a file this computer could not open.
+          if (c.mode === 'edit') await releaseLock(this.lockDeps()).catch(() => undefined)
+          db.close()
+          this.cur = null
+          this.emit()
+          const why = error instanceof Error ? error.message : String(error)
+          return {
+            ok: false,
+            message: `This file could not be updated for this version of the app (${why}). The file was not changed.`
+          }
         }
       }
     }
@@ -486,11 +500,11 @@ export class DataFileSession {
     const current = c.db.export()
     const next = await LockerDb.fromBytes(step.bytes)
     try {
-      // History rows may point at students or lockers the older snapshot does not
+      // History, reveal and print records may point at students or lockers the older snapshot does not
       // have yet; history is kept whole, so the link check is off while copying.
       next.run('PRAGMA foreign_keys = OFF')
       next.transaction(() => {
-        for (const table of ['audit_log', 'code_reveal_log']) {
+        for (const table of ['audit_log', 'code_reveal_log', 'print_job']) {
           const have = new Set(next.all<{ id: string }>(`SELECT id FROM ${table}`).map((r) => r.id))
           const cols = next.all<{ name: string }>(`PRAGMA table_info(${table})`).map((r) => r.name)
           for (const row of c.db.all<Record<string, string | number | null>>(
@@ -879,6 +893,8 @@ export class DataFileSession {
     if (!c) return { ok: false, message: 'No file is open.' }
     if (c.mode !== 'edit')
       return { ok: false, message: 'Only the person editing can sort out copies.' }
+    if (!c.conflictCopies.includes(copyName))
+      return { ok: false, message: 'That copy is no longer there.' }
     const copyPath = join(dirname(c.path), copyName)
     const r = await readDataFile(this.d.fs, copyPath)
     if (!r.ok) return { ok: false, message: readProblemMessage(r.problem) }
