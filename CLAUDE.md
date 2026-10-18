@@ -125,7 +125,7 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
 10. **M1 scope decisions** (Dave, 6 Oct 2026). The conflict screen in M1 lets the operator
     keep one whole version (the other is always kept as a dated backup); change-by-change
     merging arrives in M4. Every release runs an automatic update proof on GitHub's
-    Windows and Mac machines (job `prove-update` in release.yml).
+    Windows and Mac machines (`.github/workflows/update-proof.yml`, job `prove`).
 11. **Migration 001 is the whole SPEC.md section 3 data model**, so the migration machinery
     is exercised from the first release. Later milestones add numbered migrations; never
     edit a migration that has shipped in a release.
@@ -224,6 +224,10 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
 - `npm audit` reports sprintf-js (moderate, denial of service) through electron-builder's
   own dependencies. It runs only on the build machine and is not inside the shipped app.
   No fixed electron-builder exists as of 6 Oct 2026; re-check after each electron-builder bump.
+- `npm audit --omit=dev` reports uuid below 11.1.1 (moderate) through exceljs. The flaw is
+  in uuid's v3, v5 and v6 when a buffer is passed; exceljs only calls `v4()` with no buffer,
+  so it cannot be reached. The only "fix" offered is exceljs 3.4.0, years older. Re-check
+  after each exceljs bump (18 Oct 2026).
 - The renderer bundle is about 870 kB. Loaded from disk inside Electron this is
   instant; look at it only if start-up ever feels slow.
 
@@ -430,7 +434,7 @@ version and replays the ticked changes through `replayChange` in `src/main/rpc/r
 skipping any that throw. History "Put back to before this…" (`src/main/restoreRecord.ts`)
 reads the student or locker from the first backup after the change that does not yet hold
 its history line. Label QR links open the locker (`src/main/links.ts`). Landing page draft
-in `site/index.html`, not published (GitHub Pages needs Dave's yes).
+in `site/index.html`, published to GitHub Pages by `.github/workflows/pages.yml`.
 
 **Independent review fixes** (7 Oct 2026, before v0.9.0). Undo copies history rows into the
 older snapshot with foreign keys off, and puts the step back if it fails. Every file with

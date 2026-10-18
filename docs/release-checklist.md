@@ -10,8 +10,10 @@ their feature wording describes this version before releasing.
 ## The quick way
 
 `scripts/release.sh 0.8.0` does the steps below in order: sets the version, commits, pushes,
-waits for CI on that commit, then tags it. It stops if CI fails, and can be run again with
-the same number once the fault is fixed. The Update proof workflow then runs by itself.
+waits for CI on that commit, then tags it. It always pushes to `main`. It commits only
+package.json, package-lock.json, README.md and site/index.html, so commit any
+`docs/release-highlights/vX.Y.Z.md` first, or the release notes will not find it. It stops
+if CI fails, and can be run again with the same number once the fault is fixed. The Update proof workflow then runs by itself.
 
 ## Before tagging
 
@@ -64,7 +66,7 @@ git tag -d v0.0.2 && git push origin :refs/tags/v0.0.2
    file. Confirm it reports the new version, downloads it and restarts into it by itself.
 3. On a Mac with the previous version (0.11.0 or later) in Applications: the same as
    Windows. A Mac copy of 0.10.0 or older only offers the download page.
-4. From M5 onwards, before any minor release: print one real label sheet on a laser
+4. Before any minor release: print one real label sheet on a laser
    printer and check it against the calibration page.
 5. Note anything learned in CLAUDE.md.
 

@@ -136,7 +136,7 @@ says, for example, **Being edited by Hannah on OFFICE-PC since 9:12 am**, and th
 bar says **Read-only**.
 
 - You can still look things up, and print labels and lists that carry no codes.
-- Codes and letters are locked on a read-only computer. Every code that is shown is
+- Codes, and letters that carry codes, are locked on a read-only computer. Every code that is shown is
   recorded in the file, and only the computer that is editing can write to the file. The
   screen says this where a code would be.
 - Every screen shows who is editing.
@@ -614,7 +614,8 @@ stops it.
 After you allocate lockers, **Print labels** and **Print letters** buttons take you here. After an
 import that added students, **Give out lockers now** takes you to Allocate.
 
-**Letters print only while the file is open for editing.** Every code that is printed is
+**Letters with codes print only while the file is open for editing.** Letters for locks
+with no code can be printed from any computer. Every code that is printed is
 recorded in the history with your name. If someone else is editing, wait until they close
 the file. When you click **Print…**, the codes are recorded before the print window opens.
 If you cancel, the history notes that the letters were not printed, and the codes stay
@@ -763,6 +764,10 @@ When the list is empty, Home says **Nothing needs attention**.
 
 From then on, anyone who shows, prints or exports a code is asked for the PIN first, on
 every computer. After the PIN, codes can be shown for 10 minutes on that computer.
+
+After five wrong PINs in a row, the app waits 30 seconds before you can try again. If your
+IT team requires a PIN, Settings, Privacy says **Required by your IT team** and the PIN can
+be changed but not removed.
 
 To change or remove the PIN, type the current PIN first. Keep the PIN somewhere safe, for
 example with the master key: if it is forgotten, codes cannot be shown.

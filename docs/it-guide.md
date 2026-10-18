@@ -1,6 +1,6 @@
 # Locker Manager: guide for school IT
 
-_Last updated: 9 October 2026 (version 0.11.0)._
+_Last updated: 18 October 2026 (version 0.11.3)._
 
 ## What it is
 
@@ -63,6 +63,13 @@ signature is in place the prompt disappears.
 - Every release is a full public release, and the app takes only those, unless the user
   chooses **Test versions too** in Settings, This computer. To prevent that, set
   `updateChannel` to `stable` in managed settings.
+- Each user can turn automatic installs off in Settings, This computer (**Install updates
+  by themselves**); the app then shows a bar with a link to the download page instead.
+  Managed settings can fix this for everyone (`autoUpdate`).
+- **Windows builds are not yet code-signed.** Until they are, an update is trusted because
+  it comes from the project's GitHub release, with a SHA-512 check against `latest.yml` on
+  the same release; there is no publisher signature to check. If your school needs more
+  than that, set `autoUpdate` to `false` in managed settings and deploy versions yourself.
 
 ### Network needs
 
@@ -143,9 +150,11 @@ third of its size (a 22.5 MB file gives a 7.9 MB backup). Restore them through t
 **Backups** button, not by double-clicking. To open one outside the app, unzip it first
 (macOS Archive Utility, or 7-Zip on Windows) to get a `.lockers` file.
 
-Retention: everything from the last day, the newest of each hour to 7 days, the newest of
-each day to 99 days, then the newest of each week while there is room, up to 500 MB per
-place (the limit can be raised to 5000 MB in Settings, Storage). Named backups (before an
+Retention by default: everything from the last day, the newest of each hour to 7 days, the
+newest of each day to 99 days, then the newest of each week while there is room, up to
+500 MB per place. A school can change every stage in Settings, Storage: keep everything for
+1 to 90 days, hourly for up to 90 days, daily for 7 to 730 days, and a size limit of 50 to
+5000 MB. Named backups (before an
 update to the file format, before a restore, a version set aside in a conflict) are kept
 regardless of age and removed last. When the limit is reached, the busiest stages are thinned first so
 the backups still span 99 days: weekly backups older than 99 days go, then the last day is
@@ -155,9 +164,10 @@ do the oldest backups go. Settings, Storage shows how far back each place really
 notes when backups are being spread out, and warns when the limit cuts them short of 99
 days. A school of about 2,000
 students has a file of about 24 MB after five years; it needs roughly 1 GB per place to
-keep 99 days of backups at about 30 saves a school day. **Backups contain lock codes** (from M4 onwards): the backup folder sits
+keep 99 days of backups at about 30 saves a school day. **Backups contain lock codes**: the backup folder sits
 beside the data file and has the same permissions, so restrict the shared folder to staff
-who should see codes.
+who should see codes. The backups kept on each computer that edits the file hold codes too;
+remove that computer's `backups` folder (see the table above) when it leaves the school.
 
 Before the year rollover archives a year, the app saves and keeps a named backup called
 "Before starting <year>" in both backup folders. If neither can be written, the archive
@@ -206,8 +216,12 @@ ordinary users cannot change:
 
 | Platform | Path |
 |---|---|
-| Windows | `%ProgramData%\Locker Manager\managed.json` |
+| Windows | `C:\ProgramData\Locker Manager\managed.json` |
 | macOS | `/Library/Application Support/Locker Manager/managed.json` |
+
+The app always reads this exact path. It does not follow a changed `%ProgramData%`
+variable, and an installed copy ignores any other way of pointing it elsewhere, so users
+cannot step around these settings.
 
 Every key is optional. A key that is present cannot be changed in the app. The update
 settings are marked "Set by your IT team"; a required PIN shows "Required by your IT team";
@@ -243,7 +257,7 @@ the data file.
 ## Privacy settings in the data file
 
 - **PIN for codes**: stored as a salted scrypt hash, never the PIN. After five wrong tries the
-  app waits 30 seconds. A correct PIN lasts 10 minutes, in memory only, on that computer.
+  app waits 30 seconds before the next try. A correct PIN lasts 10 minutes, in memory only, on that computer.
 - **Hide codes after**: 10 seconds to 2 minutes, 30 seconds by default.
 - Codes in the file are encrypted with AES-256-GCM using a key kept in the same file. This
   stops casual reading of the file in a database tool. It does not protect against someone
@@ -253,8 +267,9 @@ the data file.
 ## Practice copies and settings files
 
 - A practice copy is written to the app folder (`Practice\` beside `preferences.json`) and
-  replaced each time practice starts. It holds the same data as the school's file,
-  including codes, so treat that folder like the data file.
+  replaced each time practice starts. A copy made on the computer that is editing holds
+  the codes, and the school's file records that it was made. A copy made on any other
+  computer has every code removed. Treat the folder like the data file.
 - A `.lockersettings` file is JSON. It holds terminology, code rules, lock defaults, label
   stock measurements and layout, printer nudges, the letter and its pictures, and import
   column choices. It never holds students, lockers, codes, the PIN or history.

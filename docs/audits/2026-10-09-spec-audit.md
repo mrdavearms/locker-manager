@@ -22,7 +22,17 @@ has a test that failed before it.
 | 9. Printout tests weaker than they look | Partly fixed | The label reference image now fails when missing (UPDATE_GOLDEN=1 makes it). Measured label sizes now have a save, read-back and print test. Still open: the label golden image is of the preview, not the PDF, and macOS only; letters have no golden image; the real letter-overflow measurer is only tested with a mock. |
 | 10. "More than half the codes" warning wrong before the first set | Fixed | `codes.rules.preview` now reads the file and returns `overHalf`, worked out as Make the code set does. Test: `tests/unit/codesOverHalf.test.ts` |
 
-The "close behind these" list was not part of this pass.
+The "close behind these" list, as of 18 October 2026:
+
+| Item | Status |
+|---|---|
+| Fixed year level typed as "Year 8" in import | Fixed: stored as "8". Test in import.test.ts |
+| Year-level exclusion typed as "Year 12" | Fixed for new exclusions: stored as "12". Test in students.test.ts. One typed before this still matches nothing; remove it and add it again |
+| Failed migration or backup inside `open()` | Fixed: the edit lock is given back and the file is closed. Test in session.test.ts |
+| Ctrl+Z after printing loses the print record | Fixed: undo keeps `print_job` rows like history. Test in session.test.ts |
+| Fixed-code padlocks cannot be recorded from a screen | Open: `codes.setFixed` still has no caller in the window |
+| Release notes fetched but never shown | Open |
+| Sync-copy comparison open at close | Data safe (kept as a backup); the changes do not reach the school file |
 
 ## Status meanings
 

@@ -97,7 +97,7 @@ automatically with these details.
 
 ### Part F: check it worked
 
-Tag the next release (docs/release-checklist.md). In the Actions log for "Build macOS"
+Tag the next release (docs/release-checklist.md). In the Actions log for "Build macOS (universal)"
 you should see "Developer ID certificate found" and lines from `notarytool`. On any Mac
 with the new version installed:
 
@@ -172,7 +172,7 @@ The build signs as an "app registration", a robot identity with its own secret.
 
 ### Part F: check it worked
 
-Tag the next release. The "Build Windows" log should say "Azure Artifact Signing secrets
+Tag the next release. The "Build Windows (x64 + arm64)" log should say "Azure Artifact Signing secrets
 found". On a Windows PC, right-click the downloaded installer, **Properties**, and the
 **Digital Signatures** tab lists the organisation. Once installed, the app's **About** shows
 **Signed: Yes** (it reads the signature from its own program file). The blue SmartScreen screen disappears
