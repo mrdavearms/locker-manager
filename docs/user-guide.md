@@ -3,7 +3,7 @@
 This guide is for school office staff and year level leaders. Each section is one task.
 The same guide is inside the app: click **Guide** at the top.
 
-_Last updated: 9 October 2026 (after version 0.10.0)._
+_Last updated: 18 October 2026 (after version 0.11.3)._
 
 ## Getting started
 
@@ -71,7 +71,13 @@ settings and data are kept. The most common fix is to drag Locker Manager into
 Applications once and open it from there.
 
 To check by hand, open the **Help** menu (on a Mac, the **Locker Manager** menu) and choose
-**Check for updates**.
+**Check for updates…**. To go straight to the page where every version can be downloaded,
+open the **Help** menu and choose **Open the download page**.
+
+If you would rather install updates yourself, go to **Settings**, **This computer**, and set
+**Install updates by themselves** to **No, tell me and I will download it**. The app still
+checks. When a new version is out, a bar at the top says so and offers **Open the download
+page**. If this setting shows **Set by your IT team**, it cannot be changed here.
 
 ## Find out which version you have
 
@@ -105,6 +111,10 @@ folder such as OneDrive or SharePoint.
 2. Find the file in your school's shared folder and click **Open**.
 
 Next time, it is in the list **Opened recently on this computer**. Click **Open** beside it.
+
+Your IT team can set the school's file for every computer. The Welcome screen then shows
+**Your school's file, set by your IT team**: click **Open it**. IT can also hide **Try the
+demo school**.
 
 If a yellow box says **This might not be the shared file**, you may have opened a copy from
 Downloads or an email. Close it and open the one in the shared folder instead.
@@ -267,6 +277,9 @@ number** and the **Kind of lock**, then click **Add lockers**. The app puts them
 called "All lockers" with one bank called "Bank 1"; click **Rename** to change either name.
 Lockers you add later start with the same kind of lock.
 
+**Add all your lockers at once** shows only while the file has no areas, and takes 1 to 2000
+lockers. Once the file has an area, add more lockers as below.
+
 Lockers belong to a **bank** (a row or wall), and banks belong to an **area** (a group with
 a purpose, such as "Year 7 side").
 
@@ -294,7 +307,8 @@ it and its lock.
      to anyone until you click **Back in service**.
    - **Reserve**: keeps it out of allocation, for example for staff or sports gear.
    - **Accessible**: tick it for a low, wide, or easy-to-reach locker. Students who need one
-     get these first.
+     get these first. To mark a student who needs one, find the student and tick **Needs an
+     accessible locker** in their panel.
    - **Students who share it**: 2 for a shared locker.
 
 ## Renumber a locker
@@ -305,6 +319,17 @@ To give a student a different locker, use **Move** instead.
 
 1. Click **Lockers** on the left, then click the locker.
 2. Click **Renumber…**, type the new number and why, and click **Renumber**.
+
+## Remove a locker
+
+Use this only for a locker that no longer exists, for example when a bank is taken out. A
+broken locker that will be fixed should be marked **Out of service…** instead.
+
+1. Click **Lockers** on the left, then click the locker.
+2. Click **Remove…**, type why, and click **Remove**.
+
+**Remove…** works only on an empty locker. If a student holds it, move them first. The
+locker stays in the history, and its lock becomes a spare.
 
 ## Change the kind of lock
 
@@ -402,8 +427,19 @@ Do this after importing students.
    Every line uses it unless you give that line its own order (see below).
 4. Click **Make a draft**. Check the summary: if any students did not fit, they are listed.
 5. Look at the draft. To change two students' places, click one locker, then the other.
+   **Back to the draft as made** undoes these changes and puts the draft back as the app
+   made it.
 6. If any locker in the draft takes a code, leave **Issue a code to each locker now** ticked.
    (Locks with no code, such as keyed locks, never show this.) Click **Give out … lockers**.
+
+**If students did not fit**, a red box names them. There are not enough lockers for them in
+the areas their lines send them to. You can:
+
+- add lockers (Settings, **Areas and lockers**),
+- let two students share a locker (**Students who share it** on the Lockers screen),
+- shorten the list, for example by changing a line so fewer students go to that area, or
+- give out the lockers for everyone who fitted, then give the others a locker by hand (see
+  **A new student arrives**).
 
 Students on the **Who never gets a locker** list are skipped. If you change your mind straight
 away, **Undo** (Ctrl+Z, or the History screen) puts everything back.
@@ -517,6 +553,9 @@ to redo it.
 The History screen also has **Undo** and **Redo** buttons, and lists every change: who made
 it, on which computer, and when. Up to 50 changes can be undone while the file is open (fewer
 in a very large file). Setting or changing the PIN clears the list of changes to undo.
+
+To find a change, type in the search box at the top of History: part of a student's name,
+the name of the person who made it, a word from the reason, or a whole locker number.
 
 **Put one student or locker back**: on the History screen, find the change and click **Put
 back to before this…** under the student's or locker's name. The app finds that record in the
@@ -650,6 +689,12 @@ run onto a second page, the app names it and prints nothing until you shorten it
    - click a detail, such as **Locker number**, to put each student's own detail in
 4. Use the arrows to move a section up or down. **Add a section…** adds one.
 5. Click **Check every letter fits**, then **Save the letter**.
+
+At the top of the letter settings:
+
+- **Paper**: **A4**, or **US Letter** if your school buys that paper.
+- **Colour**: choose **Black and white** if your printer has no colour. Colour headings and
+  the coloured band print faint grey on a black-and-white printer.
 
 **Start again from the standard letter** undoes all your changes. The standard letter has
 no footer or credit line: your school's name is the only sign-off.
