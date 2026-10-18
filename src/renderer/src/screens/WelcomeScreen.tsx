@@ -25,6 +25,7 @@ interface Props {
 export function WelcomeScreen({ onNew, onError, managed }: Props): React.JSX.Element {
   const [recent, setRecent] = useState<RecentFile[]>([])
   const [busy, setBusy] = useState(false)
+  const [rebuilding, setRebuilding] = useState(false)
 
   const refresh = (): void => {
     void window.api.recentFiles().then(setRecent)
@@ -142,12 +143,26 @@ export function WelcomeScreen({ onNew, onError, managed }: Props): React.JSX.Ele
           disabled={busy}
           className="font-semibold text-brand underline-offset-2 hover:underline"
           data-testid="file-from-export"
-          onClick={() => void act(() => window.api.fileFromExport())}
+          onClick={() =>
+            void act(async () => {
+              setRebuilding(true)
+              try {
+                return await window.api.fileFromExport()
+              } finally {
+                setRebuilding(false)
+              }
+            })
+          }
         >
           Make a new file from it…
         </button>{' '}
         The workbook itself is never changed.
       </p>
+      {rebuilding && (
+        <p role="status" className="mt-2 text-sm text-ink-muted" data-testid="from-export-busy">
+          Making the data file from the workbook… this can take a minute.
+        </p>
+      )}
 
       {recent.length > 0 && (
         <section className="mt-10 animate-rise" aria-labelledby="recent-heading">

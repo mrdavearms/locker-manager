@@ -384,6 +384,20 @@ export function registerFileHandlers(): void {
           const locked = session.read((db) => codesLocked(db))
           if (locked) return { ok: false, message: locked }
         }
+        // Where to save is asked first: a large school's workbook takes up to a minute
+        // to make, and that wait should come after the choice, not before it.
+        const path = await pickOutputPath(
+          `${includeCodes ? 'CONFIDENTIAL ' : ''}${st.summary.schoolName} portable export ${stampDate()}.xlsx`,
+          { name: 'Excel workbook', extension: 'xlsx' }
+        )
+        if (!path) return { ok: false, cancelled: true, message: '' }
+        if (session.state.status !== 'open')
+          return { ok: false, message: 'The file was closed. Nothing was saved.' }
+        if (includeCodes) {
+          // The PIN can time out while the save dialog is open.
+          const locked = session.read((db) => codesLocked(db))
+          if (locked) return { ok: false, message: `${locked} Nothing was saved.` }
+        }
         // Which lockers' codes the workbook will hold: current, past and next year's.
         // Worked out before the export runs, while nothing else can change the file.
         const lockerIds = includeCodes ? session.read((db) => lockersWithAnyCode(db)) : []
@@ -396,11 +410,6 @@ export function registerFileHandlers(): void {
             now: new Date()
           })
         )
-        const path = await pickOutputPath(
-          `${includeCodes ? 'CONFIDENTIAL ' : ''}${st.summary.schoolName} portable export ${stampDate()}.xlsx`,
-          { name: 'Excel workbook', extension: 'xlsx' }
-        )
-        if (!path) return { ok: false, cancelled: true, message: '' }
         // Recorded before the file is written: no code leaves the app unrecorded.
         try {
           if (
