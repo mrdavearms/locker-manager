@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { ImportOptions } from '../../src/shared/importTypes'
 import { createDemoDatabase } from '../../src/main/demo/demoSchool'
-import { createStudent, getStudent, updateStudent } from '../../src/main/repos/students'
+import {
+  addExclusion,
+  createStudent,
+  getStudent,
+  listExclusions,
+  updateStudent
+} from '../../src/main/repos/students'
 import { analyseImport, buildStudents } from '../../src/main/import/analyse'
 import { detectPreset, mapColumns } from '../../src/shared/importPresets'
 import { findHeaderRow, firstDataSheet, parseFile } from '../../src/main/import/parse'
@@ -98,5 +104,16 @@ describe("changing a student's group and year level", () => {
     const s = db.get<{ id: string }>("SELECT id FROM student WHERE year_level = '7' LIMIT 1")!
     const v = updateStudent(db, testContext(), s.id, { yearLevel: 'Year 8', groupCode: '08A' })
     expect(v).toMatchObject({ yearLevel: '8', groupCode: '08A' })
+  })
+})
+
+describe('exclusions', () => {
+  it('a year level typed as "Year 12" is kept as the plain number, so it matches students', async () => {
+    const db = await createDemoDatabase(testContext(), '0.10.0')
+    addExclusion(db, testContext(), 'year_level', 'Year 12', 'SYNTHETIC: seniors bring their own')
+    expect(listExclusions(db).find((e) => e.kind === 'year_level')).toMatchObject({ value: '12' })
+    expect(() => addExclusion(db, testContext(), 'year_level', '12', 'SYNTHETIC: twice')).toThrow(
+      /already excluded/
+    )
   })
 })

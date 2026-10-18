@@ -124,7 +124,11 @@ export function buildStudents(
       const fromColumn = normaliseYearLevel(cell(row, m.yearLevel) || null)
       const fromGroup = yearFromGroup(groupCode)
       const yearLevel =
-        s.yearSource === 'fixed' ? s.fixedYear : s.yearSource === 'group' ? fromGroup : fromColumn
+        s.yearSource === 'fixed'
+          ? normaliseYearLevel(s.fixedYear)
+          : s.yearSource === 'group'
+            ? fromGroup
+            : fromColumn
       // SPEC.md section 15, item 5: a Year 8 student in the Year 7 file.
       const evidence = [fromColumn, fromGroup].filter((x): x is string => x !== null)
       const yearConflict = yearLevel ? (evidence.find((e) => e !== yearLevel) ?? null) : null

@@ -279,7 +279,8 @@ export function addExclusion(
   value: string,
   reason: string
 ): string {
-  const v = value.trim()
+  // Year levels are stored as plain numbers ("12"), so "Year 12" must match them too.
+  const v = kind === 'year_level' ? (normaliseYearLevel(value) ?? '') : value.trim()
   const why = reason.trim()
   if (!v) throw new Error('Say who or what to exclude.')
   if (why.length < 3) throw new Error('Give a short reason.')

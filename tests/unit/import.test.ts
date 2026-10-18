@@ -235,7 +235,7 @@ describe('building and checking students (SPEC.md 4.2 step 5)', () => {
       [y7, y8],
       [
         settingsFor(y7, { yearSource: 'fixed', fixedYear: '7' }),
-        settingsFor(y8, { yearSource: 'fixed', fixedYear: '8' })
+        settingsFor(y8, { yearSource: 'fixed', fixedYear: 'Year 8' })
       ],
       OPTS
     )
@@ -245,6 +245,8 @@ describe('building and checking students (SPEC.md 4.2 step 5)', () => {
       'SYN0003',
       'SYN0010'
     ])
+    // A fixed year typed as "Year 8" is stored as the plain number, like every other.
+    expect(built.students.find((s) => s.externalId === 'SYN0010')?.yearLevel).toBe('8')
     const kinds = built.problems.map((p) => p.kind)
     expect(kinds).toContain('duplicate_in_file')
     expect(kinds).toContain('duplicate_across_files')
