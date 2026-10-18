@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { app, BrowserWindow, shell } from 'electron'
 import log from 'electron-log/main'
 import { brand } from '@shared/brand'
+import { isAllowedExternalUrl } from '@shared/externalUrls'
 import type { Preferences } from './prefs/preferences'
 
 // SPEC.md 9.3: if a new version fails to start twice in a row, show a recovery
@@ -77,7 +78,7 @@ such as 7-Zip on Windows) to get a <code>.lockers</code> file you can open.</li>
           app.exit(0)
         })
     } else if (url === 'lmrecovery:backups') void shell.openPath(backups)
-    else if (url.startsWith(brand.repoUrl)) void shell.openExternal(url)
+    else if (isAllowedExternalUrl(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (e) => e.preventDefault())

@@ -162,7 +162,14 @@ export const rpcParams = {
   'setup.notUsed': z.object({ item: z.enum(['labels', 'letters']), notUsed: z.boolean() }),
   'import.load': z.object({
     files: z
-      .array(z.object({ name: z.string().min(1).max(260), bytes: z.instanceof(Uint8Array) }))
+      .array(
+        z.object({
+          name: z.string().min(1).max(260),
+          bytes: z
+            .instanceof(Uint8Array)
+            .refine((b) => b.byteLength <= 50 * 1024 * 1024, 'is larger than 50 megabytes')
+        })
+      )
       .max(12),
     pasted: z.string().max(5_000_000).nullable()
   }),

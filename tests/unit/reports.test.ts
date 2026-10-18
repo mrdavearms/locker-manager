@@ -86,6 +86,7 @@ describe('reports (SPEC.md 4.9 and 5.4)', () => {
       note: null,
       columns: [
         { key: 'a', label: 'Name', width: 1 },
+        { key: 'b', label: '=HYPERLINK("x")', width: 1 },
         { key: 't', label: 'Done', width: 1, kind: 'tick' }
       ],
       sections: [{ heading: null, rows: [{ a: '=SUM(A1)' }, { a: 'Zoë' }] }],
@@ -95,7 +96,8 @@ describe('reports (SPEC.md 4.9 and 5.4)', () => {
       landscape: false,
       rows: 2
     })
-    expect(csv.startsWith('﻿Name\r\n')).toBe(true)
+    expect(csv.startsWith('﻿Name,')).toBe(true)
+    expect(csv).toContain(`"'=HYPERLINK(""x"")"`)
     expect(csv).toContain("'=SUM(A1)")
     expect(csv).toContain('Zoë')
     expect(csv).not.toContain('Done')

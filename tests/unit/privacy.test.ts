@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { parseManaged, resetManagedCache } from '../../src/main/managed'
+import { managedPath, parseManaged, resetManagedCache } from '../../src/main/managed'
 import {
   codesLocked,
   noteOpenFile,
@@ -62,6 +62,16 @@ describe('managed settings for school IT (SPEC.md 9.5)', () => {
     expect(parseManaged('{"autoUpdate": "no"}').problem).toMatch(/ignored/)
     expect(parseManaged('{"colour": "red"}').problem).toMatch(/ignored/)
     expect(parseManaged('not json').problem).toMatch(/not valid JSON/)
+  })
+  it('an installed copy ignores the test override and the user-changeable ProgramData', () => {
+    process.env.LOCKER_MANAGER_MANAGED = '/tmp/elsewhere.json'
+    process.env.ProgramData = 'D:\\Mine'
+    expect(managedPath('darwin', false)).toBe('/tmp/elsewhere.json')
+    expect(managedPath('darwin', true)).toBe(
+      '/Library/Application Support/Locker Manager/managed.json'
+    )
+    expect(managedPath('win32', true)).toMatch(/^C:\\ProgramData.Locker Manager.managed\.json$/)
+    delete process.env.ProgramData
   })
   it('a managed PIN requirement blocks codes until a PIN is set, and the PIN cannot be removed', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'lm-managed-'))

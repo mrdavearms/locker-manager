@@ -27,6 +27,10 @@ tests/golden/**/diff/
 *.lockers
 *.lockers.lock
 *.lockers.tmp-*
+*.lockers.gz
+*.lockersettings
+# Saved labels, letters and reports hold names and can hold codes.
+*.pdf
 *.csv
 *.xlsx
 *.xls
@@ -36,6 +40,8 @@ tests/golden/**/diff/
 !tests/fixtures/**/*.xls
 !tests/fixtures/**/*.ods
 !tests/fixtures/**/*.lockers
+!tests/fixtures/**/*.lockersettings
+!tests/fixtures/**/*.pdf
 !resources/demo/**/*.csv
 !resources/demo/**/*.xlsx
 Locker Manager backups/

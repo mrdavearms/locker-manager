@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { unlink, writeFile } from 'node:fs/promises'
+import { readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BrowserWindow, session, type Session } from 'electron'
@@ -20,6 +20,8 @@ let render: Session | null = null
 function renderSession(): Session {
   if (!render) {
     render = session.fromPartition(RENDER_PARTITION)
+    render.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
+    render.setPermissionCheckHandler(() => false)
     render.webRequest.onBeforeRequest((details, callback) =>
       callback({ cancel: !renderRequestAllowed(details.url) })
     )
@@ -27,12 +29,30 @@ function renderSession(): Session {
   return render
 }
 
+const TEMP_PREFIX = 'locker-manager-'
+
+/**
+ * Removes pages left in the temporary folder by a crash or a forced quit. They can
+ * hold names and codes. Run once at start-up; pages younger than an hour are left,
+ * in case another copy of the app is printing.
+ */
+export async function sweepRenderTemp(now = Date.now()): Promise<void> {
+  const dir = tmpdir()
+  const names = await readdir(dir).catch(() => [] as string[])
+  for (const name of names) {
+    if (!name.startsWith(TEMP_PREFIX) || !name.endsWith('.html')) continue
+    const file = join(dir, name)
+    const info = await stat(file).catch(() => null)
+    if (info && now - info.mtimeMs > 60 * 60 * 1000) await unlink(file).catch(() => undefined)
+  }
+}
+
 async function withPage<T>(
   html: string,
   fn: (win: BrowserWindow) => Promise<T>,
   javascript = false
 ): Promise<T> {
-  const file = join(tmpdir(), `locker-manager-${randomBytes(8).toString('hex')}.html`)
+  const file = join(tmpdir(), `${TEMP_PREFIX}${randomBytes(8).toString('hex')}.html`)
   await writeFile(file, html, { encoding: 'utf8', mode: 0o600 })
   const win = new BrowserWindow({
     show: false,

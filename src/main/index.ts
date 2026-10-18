@@ -16,6 +16,7 @@ import { handlers as rpcHandlers } from './rpc/handlers'
 import { registerRenderHandlers } from './renderService'
 import { registerDocumentHandlers } from './documentService'
 import { setFontDir } from './render/fonts'
+import { sweepRenderTemp } from './render/pdf'
 import { registerRpc } from './rpc/registry'
 import { buildMenu } from './menu'
 import { detectDeveloperIdSignature, detectWindowsSignature } from './signing'
@@ -104,6 +105,7 @@ if (!app.requestSingleInstanceLock()) {
         : join(app.getAppPath(), 'resources', 'fonts')
     )
     installContentSecurityPolicy()
+    void sweepRenderTemp()
     await initFileService()
     registerIpcHandlers(signed)
     registerFileHandlers()

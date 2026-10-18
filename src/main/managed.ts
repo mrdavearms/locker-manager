@@ -6,10 +6,20 @@ import { ManagedSchema, type Managed } from '@shared/computer'
 // folder that ordinary users cannot change. Every key is optional. A file that
 // cannot be read is ignored and the reason shown in Settings, This computer.
 
-export function managedPath(platform: NodeJS.Platform = process.platform): string {
-  if (process.env.LOCKER_MANAGER_MANAGED) return process.env.LOCKER_MANAGER_MANAGED
-  if (platform === 'win32')
-    return join(process.env.ProgramData ?? 'C:\\ProgramData', 'Locker Manager', 'managed.json')
+/** True in an installed copy; false under `electron .` (the tests) and plain Node. */
+function installed(): boolean {
+  return !!process.versions.electron && !process.defaultApp
+}
+
+export function managedPath(
+  platform: NodeJS.Platform = process.platform,
+  packaged: boolean = installed()
+): string {
+  // The override is for tests only: staff could otherwise start an installed copy
+  // with it and drop the settings IT chose. For the same reason the Windows folder is
+  // fixed rather than read from %ProgramData%, which any user can change.
+  if (!packaged && process.env.LOCKER_MANAGER_MANAGED) return process.env.LOCKER_MANAGER_MANAGED
+  if (platform === 'win32') return join('C:\\ProgramData', 'Locker Manager', 'managed.json')
   if (platform === 'darwin') return '/Library/Application Support/Locker Manager/managed.json'
   return '/etc/locker-manager/managed.json'
 }

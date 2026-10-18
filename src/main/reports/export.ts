@@ -27,7 +27,7 @@ function safe(v: string): string {
 export function reportCsv(report: ReportData): string {
   const { header, rows } = table(report)
   // A byte order mark so Excel opens names with accents correctly.
-  return `\uFEFF${Papa.unparse([header, ...rows.map((r) => r.map(safe))], { newline: '\r\n' })}`
+  return `\uFEFF${Papa.unparse([header.map(safe), ...rows.map((r) => r.map(safe))], { newline: '\r\n' })}`
 }
 
 export async function reportXlsx(report: ReportData, school: string): Promise<Uint8Array> {

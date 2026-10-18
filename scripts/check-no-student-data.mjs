@@ -5,7 +5,7 @@
 //   node scripts/check-no-student-data.mjs --staged   checks what is about to be committed (pre-commit hook)
 //
 // Rules (SPEC.md section 11):
-//   1. Data files (.lockers, .csv, .xlsx, .xls, .ods) may live ONLY under tests/fixtures/ or
+//   1. Data files (.lockers, .lockersettings, .pdf, .csv, .xlsx, .xls, .ods) may live ONLY under tests/fixtures/ or
 //      resources/demo/, and each must carry a SYNTHETIC marker: either in its file name or,
 //      for text files, in its contents.
 //   2. Certificates and keys (.p12, .pfx, .pem, .key, .cer, .mobileprovision) are never committed.
@@ -17,7 +17,7 @@ const staged = process.argv.includes('--staged')
 const listArgs = staged ? ['diff', '--cached', '--name-only', '--diff-filter=ACMR'] : ['ls-files']
 const files = execFileSync('git', listArgs, { encoding: 'utf8' }).split('\n').filter(Boolean)
 
-const DATA_EXT = /\.(lockers|csv|xlsx|xls|ods)$/i
+const DATA_EXT = /\.(lockers|lockers\.gz|lockersettings|pdf|csv|xlsx|xls|ods)$/i
 const SECRET_EXT = /\.(p12|pfx|pem|key|cer|mobileprovision)$/i
 const ALLOWED_DATA_DIRS = ['tests/fixtures/', 'resources/demo/']
 const TEXT_LIKE = /\.(ts|tsx|js|mjs|cjs|json|yml|yaml|md|txt|csv|env|sh|ps1|html|css|plist)$/i

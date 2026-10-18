@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, session, shell } from 'electron'
 import { brand } from '@shared/brand'
+import { isAllowedExternalUrl } from '@shared/externalUrls'
 
 const isDev = !!process.env['ELECTRON_RENDERER_URL']
 
@@ -33,6 +34,11 @@ export function contentSecurityPolicy(dev: boolean): string {
 }
 
 export function installContentSecurityPolicy(): void {
+  // The window never needs the camera, location, notifications or the like.
+  session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) =>
+    callback(false)
+  )
+  session.defaultSession.setPermissionCheckHandler(() => false)
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -57,6 +63,9 @@ export function createMainWindow(): BrowserWindow {
     backgroundColor: '#f6f7f9',
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
+      // On Windows the spell checker fetches dictionaries from Google; the app
+      // promises to contact nothing but GitHub.
+      spellcheck: false,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -69,7 +78,7 @@ export function createMainWindow(): BrowserWindow {
 
   // Links open in the operator's browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith(brand.repoUrl)) void shell.openExternal(url)
+    if (isAllowedExternalUrl(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (event) => event.preventDefault())

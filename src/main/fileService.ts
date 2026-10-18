@@ -27,7 +27,7 @@ import {
 import { setBusy, whileBusy } from './busy'
 import { createNewDatabase } from './db/newFile'
 import { makePracticeCopy } from './practice'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { z } from 'zod'
 import { lockersWithAnyCode, logReveal, spareCodeCount } from './repos/codes'
 import { exportWorkbook, importWorkbook } from './portable/workbook'
@@ -230,6 +230,12 @@ export function registerFileHandlers(): void {
 
   ipcMain.handle(channels.fileOpenPath, async (_e, raw: unknown): Promise<ActionResult> => {
     const { path } = FilePathSchema.parse(raw)
+    // The window only offers recent files and the file IT named. Anything else
+    // goes through the Open dialog, so a stray path never reaches a network share.
+    const known =
+      prefs.get().recentFiles.some((r) => r.path === path) ||
+      readManaged().managed.defaultDataFile === path
+    if (!known) return { ok: false, message: 'Use Open to choose that file.' }
     return afterOpen(await session.open(path))
   })
 
@@ -326,6 +332,8 @@ export function registerFileHandlers(): void {
       const source = pick.filePaths[0]
       if (pick.canceled || !source) return { ok: false, cancelled: true, message: '' }
       try {
+        if ((await stat(source)).size > 20 * 1024 * 1024)
+          return { ok: false, message: 'That file is too big to be a settings file.' }
         const file = parseSettingsFile(await readFile(source, 'utf8'))
         const r = session.write(
           (res: { fromSchool: string; pictures: number }) => ({
@@ -440,6 +448,8 @@ export function registerFileHandlers(): void {
           : await dialog.showOpenDialog(openOpts)
         const source = pick.filePaths[0]
         if (pick.canceled || !source) return { ok: false, cancelled: true, message: '' }
+        if ((await stat(source)).size > 100 * 1024 * 1024)
+          return { ok: false, message: 'That file is too big to be a Locker Manager export.' }
         let built: Awaited<ReturnType<typeof importWorkbook>>
         try {
           built = await importWorkbook(new Uint8Array(await readFile(source)), {
