@@ -3,8 +3,8 @@ import { codeAt, codeSpace, formatCode, isValidCode } from './rules'
 import type { IntSource } from './random'
 
 export interface GenerateOptions {
-  /** Codes already in use that must not be issued again (uniqueness). */
-  taken: ReadonlySet<string>
+  /** Codes already in use that must not be issued again (uniqueness). Only looked up, never copied. */
+  taken: { has(code: string): boolean }
   /** Per slot (for example per locker): codes that slot must not get, such as last year's. */
   avoidPerSlot?: readonly (ReadonlySet<string> | undefined)[]
 }
@@ -21,7 +21,7 @@ export function generateCodes(
   opts: GenerateOptions
 ): string[] {
   const space = codeSpace(rules)
-  const used = new Set(opts.taken)
+  const used = new Set<string>()
   const out: string[] = []
   for (let slot = 0; slot < n; slot++) {
     const avoid = opts.avoidPerSlot?.[slot]
@@ -29,7 +29,7 @@ export function generateCodes(
     for (let attempt = 0; attempt < 5000 && found === null; attempt++) {
       const code = codeAt(source.below(space), rules)
       const text = formatCode(code, rules.positions)
-      if (used.has(text) || avoid?.has(text)) continue
+      if (opts.taken.has(text) || used.has(text) || avoid?.has(text)) continue
       if (isValidCode(code, rules, avoid)) found = text
     }
     if (found === null) {
@@ -38,7 +38,13 @@ export function generateCodes(
       for (let k = 0; k < space && found === null; k++) {
         const code = codeAt((start + k) % space, rules)
         const text = formatCode(code, rules.positions)
-        if (!used.has(text) && !avoid?.has(text) && isValidCode(code, rules, avoid)) found = text
+        if (
+          !opts.taken.has(text) &&
+          !used.has(text) &&
+          !avoid?.has(text) &&
+          isValidCode(code, rules, avoid)
+        )
+          found = text
       }
     }
     if (found === null)
