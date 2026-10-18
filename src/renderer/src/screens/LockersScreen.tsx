@@ -6,10 +6,16 @@ import { LOCK_TYPE_INFO } from '@shared/locks'
 import { Button } from '@renderer/components/Button'
 import { Field, TextInput } from '@renderer/components/Field'
 import { Modal } from '@renderer/components/Modal'
-import { useAction, useCanEdit, useNotify, useTerms } from '@renderer/lib/appContext'
+import {
+  useAction,
+  useCanEdit,
+  useLockedReason,
+  useNotify,
+  useTerms
+} from '@renderer/lib/appContext'
 import { call, useRpc } from '@renderer/lib/rpc'
 import { CodeReveal } from '@renderer/components/CodeReveal'
-import { ResetList, type LockerIntent } from '@renderer/lockers/LockerActions'
+import { RecordPadlockDialog, ResetList, type LockerIntent } from '@renderer/lockers/LockerActions'
 import { cn } from '@renderer/lib/cn'
 
 const CODE_STATUS_TEXT: Record<string, string> = {
@@ -79,7 +85,13 @@ function LockerPanel({
   const canEdit = useCanEdit()
   const act = useAction()
   const only = l.holders.length === 1 ? l.holders[0] : undefined
-  const [dialog, setDialog] = useState<'renumber' | 'out' | 'remove' | null>(null)
+  const [dialog, setDialog] = useState<'renumber' | 'out' | 'remove' | 'padlock' | null>(null)
+  const fixedPadlock =
+    l.lockType !== null &&
+    LOCK_TYPE_INFO[l.lockType].hasCode &&
+    !LOCK_TYPE_INFO[l.lockType].codeSettable
+  const noCodeYet = l.codeStatus === 'reset_no_code'
+  const lockedReason = useLockedReason()
   const [text, setText] = useState('')
   const [reason, setReason] = useState('')
 
@@ -156,6 +168,39 @@ function LockerPanel({
         <div className="mt-4">
           <CodeReveal lockerId={l.id} />
         </div>
+      )}
+      {fixedPadlock && (
+        <div className="mt-4">
+          <Button
+            size="sm"
+            variant={noCodeYet ? 'primary' : 'secondary'}
+            disabled={!canEdit}
+            data-testid="record-padlock-open"
+            onClick={() => setDialog('padlock')}
+          >
+            <Lock size={15} aria-hidden />{' '}
+            {noCodeYet ? 'Record its code…' : 'Record a new padlock…'}
+          </Button>
+          {!canEdit && (
+            <p className="mt-1 text-xs text-ink-muted" data-testid="padlock-locked-reason">
+              {lockedReason}
+            </p>
+          )}
+          {canEdit && noCodeYet && (
+            <p className="mt-1 text-xs text-ink-muted">
+              A fixed-code padlock&apos;s code comes with it. Type it in from the tag so it can go
+              on the letter.
+            </p>
+          )}
+        </div>
+      )}
+      {dialog === 'padlock' && (
+        <RecordPadlockDialog
+          lockerId={l.id}
+          lockerNumber={l.number}
+          replacing={!noCodeYet}
+          onClose={() => setDialog(null)}
+        />
       )}
       {l.lockType && LOCK_TYPE_INFO[l.lockType].keyed && <KeyPanel l={l} />}
       <div className="mt-6 space-y-3">

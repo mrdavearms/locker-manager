@@ -491,6 +491,20 @@ Marking a locker **Out of service** while a student holds it offers to move the 
 - **Someone else knows it**: find the student, click **New code…**, and say why. The lock goes
   on **Locks to reset**.
 
+**Fixed-code padlocks.** A fixed-code padlock's code comes with it and cannot change, so a
+new code means a new padlock.
+
+1. Put the new padlock on the locker.
+2. Find the student and click **New code…**. On the Lockers screen, click the locker and
+   then **Record a new padlock…**.
+3. Type the code and, if you like, the serial from the padlock's tag. Click **Record the new
+   padlock**.
+
+A locker whose fixed padlock has no code yet shows **Record its code…** on the Lockers
+screen. The old padlock's code stays in the history. Typing a code in is not counted as
+showing it, but if your school uses a PIN, you need it to record a padlock. Like every
+change, this needs the computer that is editing the file.
+
 ## Locks to reset
 
 Home and the Lockers screen list every lock that needs a physical reset. Reset each lock to
