@@ -66,6 +66,10 @@ signature is in place the prompt disappears.
   a translocated copy, the app reports the new version and opens the download page instead.
   On managed Macs, either give users write access to the app, or deploy updates yourself
   and set `autoUpdate` to `false`.
+- macOS: if the power goes off in the instant the app swaps its bundle, Applications may
+  have no Locker Manager. The previous version is then in Applications as the hidden
+  `.Locker Manager.app.previous`: in Terminal, `mv "/Applications/.Locker Manager.app.previous"
+  "/Applications/Locker Manager.app"` puts it back. A shut-down or log-out puts it back by itself.
 - macOS, versions 0.11.0 to 0.11.3: after one self-update these stop updating and report
   `ENOTEMPTY` (they cannot delete the previous download in
   `~/Library/Application Support/Locker Manager/pending-update`). Install 0.11.4 or later by

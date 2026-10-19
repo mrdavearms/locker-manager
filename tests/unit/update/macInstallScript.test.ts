@@ -1,10 +1,11 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import {
   chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync
 } from 'node:fs'
@@ -82,5 +83,30 @@ describe.skipIf(!onMac)('Mac install script', () => {
     const result = JSON.parse(readFileSync(s.result, 'utf8')) as { ok: boolean; message: string }
     expect(result.ok).toBe(false)
     expect(result.message).toMatch(/could not be copied/)
+  })
+
+  it('puts the old version back if it is stopped between the two renames', async () => {
+    const s = setUp()
+    const old = join(root, 'Applications', '.Locker Manager.app.previous')
+    // The app is still running, so the script waits; then it is stopped at the worst
+    // moment: the old app moved aside and the new one not yet in place.
+    const app = spawn('/bin/sleep', ['30'])
+    const child = spawn('/bin/bash', [
+      s.script,
+      String(app.pid),
+      s.target,
+      s.newApp,
+      '0',
+      s.result,
+      '1.1.0'
+    ])
+    await new Promise((r) => setTimeout(r, 500))
+    renameSync(s.target, old)
+    const ended = new Promise((r) => child.once('exit', r))
+    child.kill('SIGTERM')
+    await ended
+    app.kill()
+    expect(readFileSync(join(s.target, 'Contents', 'version.txt'), 'utf8')).toBe('1.0.0')
+    expect(existsSync(old)).toBe(false)
   })
 })

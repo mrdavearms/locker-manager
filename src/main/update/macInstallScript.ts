@@ -7,6 +7,9 @@ export const macInstallScript = `#!/bin/bash
 PID="$1"; TARGET="$2"; NEW="$3"; RELAUNCH="$4"; RESULT="$5"; VERSION="$6"
 DIR=$(dirname "$TARGET"); BASE=$(basename "$TARGET")
 TMP="$DIR/.$BASE.updating"; OLD="$DIR/.$BASE.previous"
+# Stopped part way (shut down, log out) between the two renames: put the old app back,
+# or Applications would have no Locker Manager at all (stability audit, item 19).
+trap 'if [ ! -e "$TARGET" ] && [ -e "$OLD" ]; then mv "$OLD" "$TARGET"; fi; exit 1' TERM INT HUP
 result() { printf '{"ok":%s,"version":"%s","message":"%s"}' "$1" "$VERSION" "$2" > "$RESULT"; }
 reopen() { if [ "$RELAUNCH" = 1 ]; then /usr/bin/open "$TARGET"; fi; }
 for _ in $(seq 1 300); do kill -0 "$PID" 2>/dev/null || break; sleep 0.2; done

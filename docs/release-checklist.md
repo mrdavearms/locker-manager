@@ -106,3 +106,16 @@ Automated tests cannot do these. Each needs a person, real paper or a real compu
    settings show "Set by your IT team".
 7. **Text size**: set 200% and use every screen.
 8. **Real export**: import a real Compass export on a school computer (never commit it).
+9. **Per-machine updates** (stability audit, finding 2): on a PC installed with
+   `/S /allusers`, sign in as a standard (non-administrator) account. The app must show the
+   new version with the download page, and must not quit to install it.
+10. **Windows shutdown** (finding 7): open the school file, make a change, and shut Windows
+    down within two seconds. On the next start the change is in the file, or the app says
+    where the backup is; the file is not left locked.
+11. **Mac self-update on a real Mac** (item 20): install the previous version in
+    /Applications from the DMG, open the school file from OneDrive, let it update itself,
+    and open the file again. Note whether macOS asks again for access to the folder (each
+    ad-hoc build has a new signature). If it does, add the answer to the user guide.
+12. **School proxy** (item 22): on a school network with a proxy that asks for a password,
+    use Help > Check for updates. It must either find the update or say plainly that it
+    could not check. If it cannot, record what the proxy needs in the IT guide.
