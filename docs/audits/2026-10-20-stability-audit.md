@@ -1,6 +1,39 @@
 # Stability and reliability audit, 20 October 2026
 
-Version audited: 0.11.4 (commit 9abac61). Nothing was fixed; this is a report for Dave to decide on.
+Version audited: 0.11.4 (commit 9abac61). The report below was written first, with nothing fixed. Dave then asked for all 22 to be fixed; the status of each is in the next section. Nothing has been released.
+
+## Fix status (20 October 2026, same branch)
+
+Each fix has its own commit with a test that fails without it, except where the table says otherwise. All unit tests, lint, formatting, type-check and the end-to-end suite pass on this Mac.
+
+| Finding | Fix | Commit | Shown working by | Not yet checked |
+|---|---|---|---|---|
+| 1 Undo broken links | Undo clears a link the older copy lacks; migration 005 repairs affected files; `migrate()` fails only on links it breaks | ed49eaa | Unit tests; the audit's proof test now opens the file | |
+| 2 Windows install loop | `update-attempt.json`: a failed install is offered as a download, not retried; per-machine copies a standard account cannot change go to download-page mode | 64232ee | Unit tests of the rules and the record | A real Windows PC (hand check 9 in docs/release-checklist.md) |
+| 3 Invisible app after a start-up error | Start-up in one try/catch; recovery page with the error; updater still starts | e9011ae | End-to-end test with a forced start-up failure | |
+| 4 Release checks | `--self-test`; onward update proof before publishing on both platforms; rollout 0 withdraws; self-test after the update proofs | 03e3d3f | Mac onward proof run on this Mac (0.11.4 updated itself to 0.11.5 after an earlier self-update); YAML parses | The Windows onward proof and the workflow changes run only on GitHub: the first release run is their test |
+| 5 No way to open a backup | **Open a backup…** on the first screen | df32238 | Unit and end-to-end tests | |
+| 6 Lost changes at quit and update | Save first, then ask (Try again, Close anyway, Cancel); update refused while unsaved | 5a02b9f | End-to-end test with a read-only folder | |
+| 7 Windows shutdown, own lock after a crash | `session-end` saves, backs up and releases the lock synchronously; next start says where the backup is; own stopped copy's lock is free | 4f9cd5c | Unit tests of the shutdown save and the lock rule | The Windows shutdown event itself (hand check 10) |
+| 8 Two editors on OneDrive | Copies looked for at every check, shown in the bottom bar; ignored by name, size and time; saves wait a minute after waking | cf33ac5 | Unit tests | |
+| 9 Backup flood | No second backup of the same version; a crowded last hour is thinned before older history | 05551bf | Unit tests (5 retries make 1 backup; daily backups survive) | |
+| 10 Lock clocks | Lock also judged by this computer's clock; held reads retried | 8904748 | Unit tests | |
+| 11 managed.json byte-order mark | Mark removed before reading | 64232ee | Unit test | |
+| 12 Hung share blocks quit | Saves at close wait at most 20 seconds, then back up | f240b6a | Unit test | |
+| 13 Older copy edits a newer file | Takeover, keep theirs and merge go read-only and give back the lock | f240b6a | Unit test | |
+| 14 Failed takeover leaves a lock | File read before the lock; lock given back on failure | f240b6a | Unit test | |
+| 15 One bad field resets preferences | Each field falls back on its own | e9011ae | Unit test | |
+| 16 Preference writes out of order | Writes queued; renames retried | e9011ae | Unit test | |
+| 17 File double-clicked during start-up | Waits until start-up has finished | e9011ae | Traced | |
+| 18 Mac recovery window | Closing it quits | e9011ae | End-to-end test | |
+| 19 Mac install stopped between renames | Script puts the old app back when stopped; IT guide covers a power cut | b3c0197 | Unit test that stops the script between the renames | |
+| 20 macOS asking again for folder access | Not fixable in code while unsigned | b3c0197 (hand check) | | Hand check 11 on a real Mac |
+| 21 Unsigned release after signing | `REQUIRE_SIGNING` repository variable stops the release | 03e3d3f | | Runs only on GitHub |
+| 22 Authenticating proxy | Not fixable without knowing the proxy | b3c0197 (hand check) | | Hand check 12 on a school network |
+
+Start-up findings F2, F3, F10 and F11 from the detail file are fixed in e9011ae (start counted first and reset only when the app has drawn; error page with Reload and reload after a crash; the database engine retried and not reported as a damaged file; graphics turned off after a graphics process failure).
+
+One side effect to know about: migration 005 means the next release changes the file's schema. Once a computer with the new version opens a school's file for editing, computers still on 0.11.x open that file read-only, saying a newer version made it, until they update themselves (which they do at their next start).
 
 The question asked: is there anything else as serious as the 0.11.0 to 0.11.3 Mac update fault? That is, anything the app leaves on disk, or any single fault, that could stop installed copies updating or starting, lose or damage a school's `.lockers` file, or lock a school out of it.
 

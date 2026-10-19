@@ -219,6 +219,22 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     the logo goes on a white tile only when it would vanish (`needsLogoTile`). The logo is
     written into each page's style sheet once. Print… sends A4 or Letter by name.
 
+28. **Stability audit fixes** (Dave, 20 Oct 2026; docs/audits/2026-10-20-stability-audit.md).
+    Undo clears a reveal line's link to a student or locker the older snapshot lacks;
+    migration 005 repairs files that already have one, and `migrate()` fails only on links
+    a migration breaks. Start-up runs in one try/catch: a failure shows the recovery page
+    and still starts the updater. Windows writes `update-attempt.json` before installing
+    and offers a version whose install did not finish as a download; a copy the account
+    cannot change (per-machine) is download-page only. Closing, quitting and updating save
+    first and ask (Try again, Close anyway, Cancel); saves wait at most 20 seconds
+    (`saveWaitMs`). Windows `session-end` runs `emergencyStop` (synchronous backup, save,
+    lock release). Locks are also judged by this computer's clock (`observeLock`), and a
+    lock from the same person's stopped copy on this computer is free. **Open a backup…**
+    on the first screen (`restoreBackupFile.ts`). `--self-test` checks an installed copy;
+    every release build runs it and the onward update proof (`scripts/update-proof/onward-*`)
+    before publishing. Rollout accepts 0 to withdraw a release; `REQUIRE_SIGNING` (repo
+    variable) stops an unsigned release once signing exists.
+
 ## Known, accepted
 
 - `npm audit` reports sprintf-js (moderate, denial of service) through electron-builder's
@@ -298,6 +314,11 @@ All data reads and writes from the window go through ONE channel, `rpc`:
   an update (`freshStagingDir`), and the Mac update proof starts from a copy that has
   already updated itself once (from 0.11.4 on). The rule behind all three: nothing an
   update leaves on disk may stop the next update.
+
+- A copy started with `--user-data-dir` logs into that folder (`resolvePathFn` in
+  index.ts): electron-log ignores `app.setAppLogsPath`. The Mac install script passes that
+  flag on when it reopens the app. In `macInstallScript.ts`, bash's `${...}` must be
+  written `\${...}` because the script is a JavaScript template string.
 
 - End-to-end test windows open in the background (`LOCKER_MANAGER_BACKGROUND=1`, set in
   `tests/e2e/launch.ts`) so they do not take focus while you work.
