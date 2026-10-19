@@ -391,8 +391,14 @@ export function registerFileHandlers(): void {
           { name: 'Excel workbook', extension: 'xlsx' }
         )
         if (!path) return { ok: false, cancelled: true, message: '' }
-        if (session.state.status !== 'open')
-          return { ok: false, message: 'The file was closed. Nothing was saved.' }
+        // Another file can be opened while the dialog is up (from Finder or Explorer).
+        // Never write one school's data where the operator chose to save another's.
+        const now = session.state
+        if (now.status !== 'open' || now.path !== st.path || now.openedAt !== st.openedAt)
+          return {
+            ok: false,
+            message: 'A different file was opened while you chose where to save. Nothing was saved.'
+          }
         if (includeCodes) {
           // The PIN can time out while the save dialog is open.
           const locked = session.read((db) => codesLocked(db))
