@@ -8,6 +8,7 @@ import {
   releasePageUrl,
   updateMode,
   macBlocker,
+  windowsBlocker,
   macZipFile,
   releaseFileUrl,
   installAtStartup
@@ -98,6 +99,21 @@ describe('updateMode', () => {
   })
   it('installs on Windows even unsigned', () => {
     expect(updateMode({ platform: 'win32', packaged: true, signed: false })).toBe('auto')
+  })
+  it('only notifies on Windows when this account cannot change the installed app', () => {
+    expect(
+      updateMode({ platform: 'win32', packaged: true, signed: false, windowsBlocker: 'no' })
+    ).toBe('manual-download')
+    expect(
+      updateMode({ platform: 'win32', packaged: true, signed: false, windowsBlocker: null })
+    ).toBe('auto')
+  })
+})
+
+describe('windowsBlocker', () => {
+  it('allows a copy this account can change, and explains one it cannot', () => {
+    expect(windowsBlocker(true)).toBeNull()
+    expect(windowsBlocker(false)).toMatch(/installed for everyone on this computer/)
   })
 })
 

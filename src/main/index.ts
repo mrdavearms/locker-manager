@@ -24,7 +24,8 @@ import { registerRpc } from './rpc/registry'
 import { buildMenu } from './menu'
 import { detectDeveloperIdSignature, detectWindowsSignature } from './signing'
 import { buildCommit } from './buildInfo'
-import { macBlocker, updateMode } from './update/policy'
+import { macBlocker, updateMode, windowsBlocker } from './update/policy'
+import { failedWindowsAttempt, folderWritable, recordWindowsAttempt } from './update/windowsAttempt'
 import {
   bundleWritable,
   readLastMacResult,
@@ -132,10 +133,13 @@ if (!app.requestSingleInstanceLock()) {
       macSelfInstall: unsignedMac && blocker === null,
       manualReason: blocker ?? undefined,
       lastMacResult: lastMacResult,
-      closeFile
+      closeFile,
+      failedWindowsVersion,
+      recordInstall: (version) => recordWindowsAttempt(app.getPath('userData'), version, new Date())
     })
   }
   let lastMacResult: MacResult | null = null
+  let failedWindowsVersion: string | null = null
 
   async function start(): Promise<void> {
     const signed = !app.isPackaged
@@ -148,17 +152,28 @@ if (!app.requestSingleInstanceLock()) {
     // An unsigned Mac copy replaces its own app bundle when macOS allows it (update/macInstaller.ts).
     unsignedMac = app.isPackaged && process.platform === 'darwin' && !signed
     const bundle = unsignedMac ? runningBundle() : ''
-    blocker = unsignedMac ? macBlocker(bundle, await bundleWritable(bundle)) : null
+    // A Windows copy IT installed for everyone cannot be changed by a standard account.
+    const windowsCopy = app.isPackaged && process.platform === 'win32'
+    const winBlock = windowsCopy
+      ? windowsBlocker(await folderWritable(dirname(process.execPath)))
+      : null
+    blocker = unsignedMac ? macBlocker(bundle, await bundleWritable(bundle)) : winBlock
     mode = updateMode({
       platform: process.platform,
       packaged: app.isPackaged,
       signed,
-      macBlocker: blocker
+      macBlocker: unsignedMac ? blocker : null,
+      windowsBlocker: winBlock
     })
+    failedWindowsVersion = windowsCopy
+      ? failedWindowsAttempt(app.getPath('userData'), app.getVersion())
+      : null
     lastMacResult = unsignedMac ? await readLastMacResult() : null
     log.info(
       `${brand.name} ${app.getVersion()} starting; build=${buildCommit} platform=${process.platform} signed=${signed} updates=${mode}` +
-        (unsignedMac ? ` mac-self-install=${blocker === null ? 'yes' : 'no'}` : '')
+        (unsignedMac ? ` mac-self-install=${blocker === null ? 'yes' : 'no'}` : '') +
+        (windowsCopy ? ` windows-self-install=${winBlock === null ? 'yes' : 'no'}` : '') +
+        (failedWindowsVersion ? ` windows-install-failed=${failedWindowsVersion}` : '')
     )
 
     // For the end-to-end test of a failed start only; an installed copy ignores it.

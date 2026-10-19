@@ -44,12 +44,27 @@ export function updateMode(input: {
   signed: boolean
   /** Unsigned Mac only: why the app cannot replace itself, or null if it can. */
   macBlocker?: string | null
+  /** Windows only: why this account cannot install updates (windowsBlocker). */
+  windowsBlocker?: string | null
 }): UpdateMode {
   if (!input.packaged) return 'disabled'
   if (input.platform === 'darwin' && !input.signed && input.macBlocker !== null) {
     return 'manual-download'
   }
+  if (input.platform === 'win32' && input.windowsBlocker) return 'manual-download'
   return 'auto'
+}
+
+/**
+ * Why this Windows account cannot install updates, in words for staff, or null when
+ * it can. `writable` is whether the account can create a file in the app's own
+ * folder. A copy IT installed for everyone (Program Files) cannot be changed by a
+ * standard account: the installer would ask for an administrator password, and when
+ * nobody could give one the app quit at every start (stability audit, finding 2).
+ */
+export function windowsBlocker(writable: boolean): string | null {
+  if (writable) return null
+  return 'Locker Manager is installed for everyone on this computer, and this account cannot change it, so it cannot update itself. Ask your IT team to install the new version, or install it from the download page if you have an administrator password.'
 }
 
 /**

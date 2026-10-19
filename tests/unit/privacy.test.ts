@@ -63,6 +63,12 @@ describe('managed settings for school IT (SPEC.md 9.5)', () => {
     expect(parseManaged('{"colour": "red"}').problem).toMatch(/ignored/)
     expect(parseManaged('not json').problem).toMatch(/not valid JSON/)
   })
+  it('reads a file that starts with a byte-order mark (Windows PowerShell 5.1)', () => {
+    expect(parseManaged('﻿{"autoUpdate": false}')).toEqual({
+      managed: { autoUpdate: false },
+      problem: null
+    })
+  })
   it('an installed copy ignores the test override and the user-changeable ProgramData', () => {
     process.env.LOCKER_MANAGER_MANAGED = '/tmp/elsewhere.json'
     process.env.ProgramData = 'D:\\Mine'

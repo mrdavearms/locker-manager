@@ -33,6 +33,9 @@ let macStaged: { version: string; app: string } | null = null
 let macDownloading: string | null = null
 /** A version whose install failed on this Mac; it is offered as a download instead. */
 let macFailed: MacResult | null = null
+/** Windows: a version whose install did not finish on this computer (windowsAttempt.ts). */
+let winFailed: string | null = null
+let recordInstall: (version: string) => void = () => undefined
 let installing = false
 
 // An update found by the check at launch installs straight away, before work starts.
@@ -59,8 +62,10 @@ export function applyUpdatePrefs(next: UpdatePrefs): void {
   mode = platformMode === 'auto' && !next.autoInstall ? 'manual-download' : platformMode
   autoUpdater.allowPrerelease = next.channel === 'beta' || allowPrerelease(app.getVersion())
   const install = mode === 'auto'
-  // On an unsigned Mac, Squirrel.Mac would refuse the download; macInstaller.ts does it.
-  autoUpdater.autoDownload = install && !macSelfInstall
+  // Downloads start from the update-available handler, which skips a version that
+  // already failed to install here. On an unsigned Mac, Squirrel.Mac would refuse
+  // the download; macInstaller.ts does it.
+  autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = install && !macSelfInstall
   if (!next.autoCheck) {
     if (timer) clearTimeout(timer)
@@ -125,6 +130,10 @@ export interface SetupOptions {
   lastMacResult: MacResult | null
   /** Saves and closes the data file before a restart. */
   closeFile: () => Promise<unknown>
+  /** Windows: a version whose install did not finish on this computer. */
+  failedWindowsVersion?: string | null
+  /** Windows: writes down the version about to be installed. Synchronous. */
+  recordInstall?: (version: string) => void
 }
 
 export function setupUpdater(
@@ -139,6 +148,9 @@ export function setupUpdater(
   manualReason = options.manualReason
   macFailed = options.lastMacResult && !options.lastMacResult.ok ? options.lastMacResult : null
   closeFile = options.closeFile
+  winFailed = options.failedWindowsVersion ?? null
+  recordInstall = options.recordInstall ?? (() => undefined)
+  if (winFailed) log.info(`windows update: the install of ${winFailed} did not finish here`)
   if (options.lastMacResult) {
     log.info(
       `mac update: last install of ${options.lastMacResult.version}: ${options.lastMacResult.message}`
@@ -166,10 +178,14 @@ export function setupUpdater(
     })
   })
   autoUpdater.on('update-available', (info) => {
-    const failedHere = macSelfInstall && macFailed?.version === info.version
+    const failedHere = macSelfInstall
+      ? macFailed?.version === info.version
+      : winFailed === info.version
     const statusMode: UpdateMode = failedHere ? 'manual-download' : mode
     const reason = failedHere
-      ? `Locker Manager tried to install version ${info.version} by itself, but ${macFailed?.message ?? 'it did not work'}. Install it from the download page.`
+      ? macSelfInstall
+        ? `Locker Manager tried to install version ${info.version} by itself, but ${macFailed?.message ?? 'it did not work'}. Install it from the download page.`
+        : `Locker Manager tried to install version ${info.version}, but the install did not finish on this computer. Install it from the download page, or ask your IT team.`
       : statusMode === 'manual-download'
         ? manualReason
         : undefined
@@ -185,7 +201,13 @@ export function setupUpdater(
       ...(info.releaseDate ? { releaseDate: info.releaseDate } : {})
     })
     if (statusMode !== 'auto') startup = false
-    if (macSelfInstall && mode === 'auto' && !failedHere) void downloadForMac(info)
+    if (statusMode === 'auto' && macSelfInstall) void downloadForMac(info)
+    else if (statusMode === 'auto') {
+      autoUpdater.downloadUpdate().catch((error: unknown) => {
+        // The error event has already reported it.
+        log.warn('update download failed', String(error))
+      })
+    }
   })
   autoUpdater.on('download-progress', (p) => {
     const version =
@@ -219,6 +241,11 @@ export function setupUpdater(
     if (macSelfInstall && macStaged && mode === 'auto' && !installing) {
       installing = true
       installMacUpdate({ newApp: macStaged.app, version: macStaged.version, relaunch: false })
+    }
+    // Windows: electron-updater installs a downloaded update as the app quits, just
+    // after this. Write down the version first, so a failed install is known next start.
+    if (!macSelfInstall && mode === 'auto' && status.state === 'ready' && !installing) {
+      recordInstall(status.version)
     }
   })
 }
@@ -331,6 +358,8 @@ export async function installUpdateNow(
     setImmediate(() => app.quit())
     return { started: true }
   }
+  installing = true
+  recordInstall(status.version)
   setImmediate(() => autoUpdater.quitAndInstall(true, true))
   return { started: true }
 }

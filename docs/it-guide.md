@@ -49,6 +49,14 @@ signature is in place the prompt disappears.
   found later downloads in the background and installs when the user restarts or closes
   the app. The app never restarts during a save, print or import.
 - Windows: the installed copy is replaced in place by the NSIS installer; data is untouched.
+  A copy installed for everyone (`/allusers`, in Program Files) cannot be changed by a
+  standard account, so for those accounts the app reports the new version and opens the
+  download page instead of trying, and asking for an administrator password. Deploy updates
+  yourself for those computers, and set `autoUpdate` to `false`.
+- Windows: before installing, the app writes the version to `update-attempt.json` in its data
+  folder. If the next start is still the old version, the install did not finish (a security
+  policy blocked the installer, or an administrator prompt was cancelled). The app then offers
+  that version on the download page instead of trying again; a newer version is tried as usual.
 - macOS: Squirrel.Mac (the usual Electron Mac updater) refuses unsigned builds, so the app
   installs its own updates. It downloads the universal ZIP, checks its SHA-512 against
   `latest-mac.yml`, unpacks it with `ditto`, checks the bundle identifier, version and code

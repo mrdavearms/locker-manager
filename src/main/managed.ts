@@ -27,7 +27,9 @@ export function managedPath(
 export function parseManaged(text: string): { managed: Managed; problem: string | null } {
   let raw: unknown
   try {
-    raw = JSON.parse(text)
+    // Windows PowerShell 5.1 starts files with a byte-order mark, which JSON.parse
+    // refuses; every managed setting was then ignored (stability audit, finding 11).
+    raw = JSON.parse(text.replace(/^\uFEFF/, ''))
   } catch {
     return { managed: {}, problem: 'managed.json is not valid JSON, so it was ignored.' }
   }
