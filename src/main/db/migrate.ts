@@ -2,6 +2,7 @@ import m001 from './migrations/001_initial.sql?raw'
 import m002 from './migrations/002_import.sql?raw'
 import m003 from './migrations/003_letters.sql?raw'
 import m004 from './migrations/004_code_set_entry_locker.sql?raw'
+import m005 from './migrations/005_reveal_links.sql?raw'
 import type { LockerDb } from './db'
 
 export interface Migration {
@@ -15,7 +16,8 @@ export const migrations: readonly Migration[] = [
   { version: 1, name: '001_initial', sql: m001 },
   { version: 2, name: '002_import', sql: m002 },
   { version: 3, name: '003_letters', sql: m003 },
-  { version: 4, name: '004_code_set_entry_locker', sql: m004 }
+  { version: 4, name: '004_code_set_entry_locker', sql: m004 },
+  { version: 5, name: '005_reveal_links', sql: m005 }
 ]
 
 export const LATEST_SCHEMA_VERSION = migrations[migrations.length - 1]?.version ?? 0
@@ -54,6 +56,9 @@ export function migrate(
   const from = db.userVersion
   const latest = list[list.length - 1]?.version ?? 0
   if (from > latest) throw new Error(`This file was made by a newer version (schema ${from}).`)
+  // Only links a migration breaks count against it. A file that already had a link to
+  // nothing (finding 1 of docs/audits/2026-10-20-stability-audit.md) must still open.
+  const brokenBefore = from < latest ? db.foreignKeyProblems() : 0
   for (const m of list) {
     if (m.version <= from) continue
     db.transaction(() => {
@@ -63,6 +68,7 @@ export function migrate(
   }
   const problems = db.integrityProblems()
   if (problems.length > 0) throw new Error(`Integrity check failed after migrating: ${problems[0]}`)
-  if (db.foreignKeyProblems() > 0) throw new Error('Foreign key check failed after migrating.')
+  if (db.foreignKeyProblems() > brokenBefore)
+    throw new Error('Foreign key check failed after migrating.')
   return { from, to: db.userVersion }
 }

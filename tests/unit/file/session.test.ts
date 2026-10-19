@@ -448,13 +448,26 @@ describe('conflicts (SPEC.md 6.4)', () => {
     )
     expect(await dave.session.undo()).toEqual({ ok: true })
     expect(await dave.session.undo()).toEqual({ ok: true })
-    // The locker is gone; the reveal line is kept, as history always is.
+    // The locker is gone; the reveal line is kept, as history always is, but no
+    // longer points at a locker the file does not have. A broken link made every
+    // later migration refuse the file (docs/audits/2026-10-20-stability-audit.md, 1).
     expect(dave.session.read((db) => db.all('SELECT id FROM locker'))).toEqual([])
     expect(
-      dave.session
-        .read((db) => db.all<{ id: string }>('SELECT id FROM code_reveal_log'))
-        .map((r) => r.id)
-    ).toEqual(['r1'])
+      dave.session.read((db) =>
+        db.all<{ id: string; locker_id: string | null }>(
+          'SELECT id, locker_id FROM code_reveal_log'
+        )
+      )
+    ).toEqual([{ id: 'r1', locker_id: null }])
+    expect(dave.session.read((db) => db.foreignKeyProblems())).toBe(0)
+    // Redo brings the locker back, and the reveal line points at it again.
+    expect(await dave.session.redo()).toEqual({ ok: true })
+    expect(await dave.session.redo()).toEqual({ ok: true })
+    expect(
+      dave.session.read((db) =>
+        db.all<{ locker_id: string | null }>('SELECT locker_id FROM code_reveal_log')
+      )
+    ).toEqual([{ locker_id: 'l1' }])
   })
 
   it('undo keeps the record of what was printed (SPEC.md 5.6)', async () => {

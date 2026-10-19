@@ -501,7 +501,12 @@ export class DataFileSession {
     const next = await LockerDb.fromBytes(step.bytes)
     try {
       // History, reveal and print records may point at students or lockers the older snapshot does not
-      // have yet; history is kept whole, so the link check is off while copying.
+      // have yet; history is kept whole, so the link check is off while copying. A reveal line's
+      // student or locker is cleared when the snapshot lacks it: a link to nothing made every later
+      // migration refuse the file (docs/audits/2026-10-20-stability-audit.md, finding 1).
+      const has = (table: 'student' | 'locker', id: unknown): boolean =>
+        typeof id === 'string' &&
+        next.get(`SELECT 1 AS x FROM ${table} WHERE id = $id`, { $id: id }) !== undefined
       next.run('PRAGMA foreign_keys = OFF')
       next.transaction(() => {
         for (const table of ['audit_log', 'code_reveal_log', 'print_job']) {
@@ -511,6 +516,10 @@ export class DataFileSession {
             `SELECT * FROM ${table}`
           )) {
             if (have.has(String(row.id))) continue
+            if (table === 'code_reveal_log') {
+              if (row.student_id != null && !has('student', row.student_id)) row.student_id = null
+              if (row.locker_id != null && !has('locker', row.locker_id)) row.locker_id = null
+            }
             next.run(
               `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((col) => `$${col}`).join(', ')})`,
               Object.fromEntries(cols.map((col) => [`$${col}`, row[col] ?? null]))
