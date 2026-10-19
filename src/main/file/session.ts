@@ -14,6 +14,7 @@ import { historyOnlyIn, summarise } from '../db/summary'
 import { saveAtomically, SaveFailedError } from './atomicSave'
 import {
   BACKUP_FOLDER_NAME,
+  backupFileName,
   backupStem,
   compressBackup,
   listBackups,
@@ -22,6 +23,19 @@ import {
   writeBackup,
   type BackupPolicy
 } from './backups'
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+  writeSync
+} from 'node:fs'
+import { gzipSync } from 'node:zlib'
 import { errorCode, type FsPort } from './fsPort'
 import { sha256 } from './hash'
 import {
@@ -32,6 +46,8 @@ import {
   readLock,
   releaseLock,
   classifyLock,
+  processAlive,
+  STALE_AFTER_MS,
   takeOverLock,
   type LockInfo
 } from './lockFile'
@@ -59,6 +75,8 @@ export interface SessionDeps {
   localBackupRoot: string
   sessionId: string
   pid: number
+  /** Whether a process runs on this computer; defaults to asking the system. */
+  processAlive?: (pid: number) => boolean
   env: { home: string; tmpDir: string; platform: NodeJS.Platform }
   /** Sync copies the operator has said are not copies. */
   ignoredCopies?: (dataPath: string) => string[]
@@ -232,7 +250,8 @@ export class DataFileSession {
       lockPath: lockPathFor(this.cur?.path ?? ''),
       me,
       now: this.d.now,
-      randomSuffix: this.d.randomSuffix
+      randomSuffix: this.d.randomSuffix,
+      processAlive: this.d.processAlive ?? processAlive
     }
   }
 
@@ -1082,7 +1101,12 @@ export class DataFileSession {
         c.readOnly.reason === 'lost_lock')
     ) {
       const lock = await readLock(this.d.fs, lockPathFor(c.path))
-      const cls = classifyLock(lock, this.me.sessionId, this.d.now())
+      const deps = this.lockDeps()
+      const cls = classifyLock(lock, this.me.sessionId, this.d.now(), STALE_AFTER_MS, {
+        operator: deps.me.operator,
+        computer: deps.me.computer,
+        processAlive: deps.processAlive
+      })
       c.readOnly = {
         ...c.readOnly,
         reason:
@@ -1195,6 +1219,81 @@ export class DataFileSession {
     )
     await this.flush()
     return { ok: true }
+  }
+
+  // ------------------------------------------------------------ shutdown
+
+  /**
+   * Windows is shutting down or logging off, and the app gets no quit events and a few
+   * seconds at most (docs/audits/2026-10-20-stability-audit.md, finding 7). Everything
+   * here is synchronous. Unsaved changes are kept as a backup on this computer first,
+   * then saved to the file if it has not changed on disk; the lock is released either
+   * way. Returns whether anything was left unsaved, and the backup's name.
+   */
+  emergencyStop(): { unsaved: boolean; backup: string | null; path: string | null } {
+    const c = this.cur
+    if (!c || c.mode !== 'edit') return { unsaved: false, backup: null, path: null }
+    let backup: string | null = null
+    let unsaved = c.dirty
+    if (c.dirty) {
+      let bytes: Uint8Array | null = null
+      try {
+        bytes = c.db.export()
+      } catch {
+        // nothing more can be done in the time left
+      }
+      if (bytes) {
+        try {
+          const dir = this.localBackupDir()
+          mkdirSync(dir, { recursive: true })
+          const name = backupFileName(
+            baseName(basename(c.path)),
+            this.d.now(),
+            'unsaved changes at shutdown'
+          )
+          writeFileSync(join(dir, name), gzipSync(bytes, { level: 1 }), { flag: 'wx' })
+          backup = name
+        } catch {
+          // the save below may still work
+        }
+        if (!c.conflict && this.saveNowSync(c, bytes)) unsaved = false
+      }
+    }
+    try {
+      const lockPath = lockPathFor(c.path)
+      const info = JSON.parse(readFileSync(lockPath, 'utf8')) as { sessionId?: unknown }
+      if (info.sessionId === this.me.sessionId) unlinkSync(lockPath)
+    } catch {
+      // a lock left behind is freed by this person's next start (classifyLock)
+    }
+    return { unsaved, backup, path: c.path }
+  }
+
+  /** A save with no waiting, for shutdown: only if the file on disk is still ours. */
+  private saveNowSync(c: Open, bytes: Uint8Array): boolean {
+    const tmp = `${c.path}.tmp-${this.d.randomSuffix()}`
+    try {
+      const disk = existsSync(c.path) ? new Uint8Array(readFileSync(c.path)) : null
+      if ((disk === null ? null : sha256(disk)) !== c.hash) return false
+      const fd = openSync(tmp, 'wx')
+      try {
+        writeSync(fd, bytes)
+        fsyncSync(fd)
+      } finally {
+        closeSync(fd)
+      }
+      renameSync(tmp, c.path)
+      c.hash = sha256(bytes)
+      c.dirty = false
+      return true
+    } catch {
+      try {
+        unlinkSync(tmp)
+      } catch {
+        // tidied with other leftovers after a day
+      }
+      return false
+    }
   }
 
   // ---------------------------------------------------------------- close

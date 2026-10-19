@@ -257,6 +257,63 @@ describe('two people, one file (SPEC.md 6.2)', () => {
     expect(() => rename(dave, 'nope')).toThrow(/read-only/)
   })
 
+  // docs/audits/2026-10-20-stability-audit.md, finding 7.
+  it('after a crash, the same person on the same computer carries on editing at once', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const before = person('Hannah', 'OFFICE-PC', dir)
+    await before.session.open(path)
+    expect(openState(before).mode).toBe('edit')
+    // That copy stops without closing; its lock is left behind, still fresh.
+    const stopped = { processAlive: () => false }
+    const again = person('Hannah', 'OFFICE-PC', dir, undefined, stopped)
+    await again.session.open(path)
+    expect(openState(again).mode).toBe('edit')
+    // Anyone else still waits for the lock to go stale.
+    const other = person('Sam', 'OFFICE-PC', dir, undefined, stopped)
+    await other.session.open(path)
+    expect(openState(other)).toMatchObject({ mode: 'read_only', readOnly: { reason: 'locked' } })
+  })
+
+  it('at a Windows shutdown, saves at once, keeps a backup and releases the lock', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const hannah = person('Hannah', 'OFFICE-PC', dir)
+    await hannah.session.open(path)
+    rename(hannah, 'SYNTHETIC Shutdown College')
+    const r = hannah.session.emergencyStop()
+    expect(r).toMatchObject({ unsaved: false, path })
+    expect(r.backup).toMatch(/unsaved changes at shutdown\.lockers\.gz$/)
+    expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC Shutdown College')
+    expect(existsSync(lockPathFor(path))).toBe(false)
+    const local = readdirSync(join(dir, 'local-backups-OFFICE-PC'), { recursive: true })
+    expect(local.map(String).some((f) => f.endsWith(r.backup ?? 'none'))).toBe(true)
+  })
+
+  it('at a shutdown, never writes over a version saved by someone else', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const hannah = person('Hannah', 'OFFICE-PC', dir)
+    await hannah.session.open(path)
+    rename(hannah, 'SYNTHETIC Mine')
+    const other = await newSchoolFile(tempDir())
+    writeFileSync(path, readFileSync(other))
+    const r = hannah.session.emergencyStop()
+    expect(r.unsaved).toBe(true)
+    expect(r.backup).not.toBeNull()
+    expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC High School')
+  })
+
+  it('a lock from a copy still running on this computer is respected', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const first = person('Hannah', 'OFFICE-PC', dir)
+    await first.session.open(path)
+    const second = person('Hannah', 'OFFICE-PC', dir, undefined, { processAlive: () => true })
+    await second.session.open(path)
+    expect(openState(second).mode).toBe('read_only')
+  })
+
   it('the read-only copy reloads when the editor saves', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)

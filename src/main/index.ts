@@ -25,6 +25,7 @@ import { setFontDir } from './render/fonts'
 import { sweepRenderTemp } from './render/pdf'
 import { registerRpc } from './rpc/registry'
 import { buildMenu } from './menu'
+import { shutdownNoteMessage, takeShutdownNote, writeShutdownNote } from './shutdownNote'
 import { detectDeveloperIdSignature, detectWindowsSignature } from './signing'
 import { buildCommit } from './buildInfo'
 import { macBlocker, updateMode, windowsBlocker } from './update/policy'
@@ -224,6 +225,15 @@ if (!app.requestSingleInstanceLock()) {
     guardClose(win)
     ready = true
     win.webContents.once('did-finish-load', () => {
+      const note = takeShutdownNote(app.getPath('userData'))
+      if (note) {
+        void dialog.showMessageBox(win, {
+          type: 'warning',
+          title: brand.name,
+          message: 'Your last changes were not saved before Windows shut down',
+          detail: shutdownNoteMessage(note)
+        })
+      }
       const file = pendingFiles.pop()
       if (file) void openFromOs(file)
       const link = pendingLinks.pop()
@@ -277,6 +287,26 @@ if (!app.requestSingleInstanceLock()) {
   // Closing the window with changes that cannot be saved asks first (finding 6).
   let quitting = false
   function guardClose(win: BrowserWindow): void {
+    // Windows shutdown or log-off sends no quit events (finding 7): start saving when
+    // Windows asks, and when it ends the session, save or back up without waiting.
+    win.on('query-session-end', () => {
+      if (fileServiceReady())
+        void fileSession()
+          .flush()
+          .catch(() => undefined)
+    })
+    win.on('session-end', () => {
+      if (!fileServiceReady()) return
+      const r = fileSession().emergencyStop()
+      log.warn(`windows session ending; unsaved=${r.unsaved}`)
+      if (r.unsaved && r.path) {
+        writeShutdownNote(app.getPath('userData'), {
+          path: r.path,
+          backup: r.backup,
+          at: new Date().toISOString()
+        })
+      }
+    })
     let allowed = false
     win.on('close', (event) => {
       if (allowed || quitting || !fileServiceReady() || !fileSession().hasUnsavedChanges) return

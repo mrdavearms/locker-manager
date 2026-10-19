@@ -45,16 +45,44 @@ export async function readLock(fs: FsPort, lockPath: string): Promise<LockRead> 
 
 export type LockClass = 'free' | 'mine' | 'held' | 'stale'
 
+/** Who is asking, so a lock left by this person's own crashed copy can be recognised. */
+export interface LockHere {
+  operator: string
+  computer: string
+  processAlive: (pid: number) => boolean
+}
+
+/** Whether a process is running on this computer. EPERM means it runs as another user. */
+export function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return errorCode(error) === 'EPERM'
+  }
+}
+
 /** Pure: what a lock means to this session at this moment. */
 export function classifyLock(
   read: LockRead,
   mySessionId: string,
   now: Date,
-  staleAfterMs = STALE_AFTER_MS
+  staleAfterMs = STALE_AFTER_MS,
+  here?: LockHere
 ): LockClass {
   if (read.kind === 'none') return 'free'
   if (read.kind === 'corrupt') return 'stale'
   if (read.info.sessionId === mySessionId) return 'mine'
+  // The same person on the same computer, and the copy that wrote it has stopped (a
+  // crash, a force-quit, a power cut): it is theirs to carry on with, not a lock to
+  // wait 10 minutes for (docs/audits/2026-10-20-stability-audit.md, finding 7).
+  if (
+    here &&
+    read.info.computer === here.computer &&
+    read.info.operator === here.operator &&
+    !here.processAlive(read.info.pid)
+  )
+    return 'free'
   const beat = Date.parse(read.info.heartbeatAt)
   if (Number.isNaN(beat)) return 'stale'
   // A heartbeat far in the future (a wrong clock) is treated as fresh: never steal on a guess.
@@ -92,12 +120,19 @@ export interface LockDeps {
   me: LockInfo
   now: () => Date
   randomSuffix: () => string
+  processAlive?: (pid: number) => boolean
+}
+
+function hereOf(d: LockDeps): LockHere | undefined {
+  return d.processAlive
+    ? { operator: d.me.operator, computer: d.me.computer, processAlive: d.processAlive }
+    : undefined
 }
 
 /** Takes the lock if it is free (or already ours). Never takes a held or stale lock. */
 export async function acquireLock(d: LockDeps): Promise<AcquireResult> {
   const existing = await readLock(d.fs, d.lockPath)
-  const cls = classifyLock(existing, d.me.sessionId, d.now())
+  const cls = classifyLock(existing, d.me.sessionId, d.now(), STALE_AFTER_MS, hereOf(d))
   if (cls === 'held' && existing.kind === 'ok') return { result: 'held', info: existing.info }
   if (cls === 'stale')
     return { result: 'stale', info: existing.kind === 'ok' ? existing.info : null }
