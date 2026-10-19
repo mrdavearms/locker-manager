@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, powerMonitor } from 'electron'
 import log from 'electron-log/main'
 import { brand } from '@shared/brand'
 import {
@@ -224,6 +224,8 @@ if (!app.requestSingleInstanceLock()) {
     const win = createMainWindow()
     guardClose(win)
     ready = true
+    // After sleep, saves wait for the sync service and a fresh look at the lock (finding 8).
+    powerMonitor.on('resume', () => fileSession().afterWake())
     win.webContents.once('did-finish-load', () => {
       const note = takeShutdownNote(app.getPath('userData'))
       if (note) {

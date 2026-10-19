@@ -662,15 +662,62 @@ describe('sync copies beside the file (SPEC.md 6.3)', () => {
     expect(existsSync(join(dir, 'Something else.lockers'))).toBe(true)
   })
 
-  it('can be ignored when the operator says it is not a copy', async () => {
+  it('can be ignored when the operator says it is not a copy, until a new copy appears', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)
-    writeFileSync(join(dir, 'Locker data (1).lockers'), readFileSync(path))
-    const dave = person('Dave', 'DAVE-MAC', dir, undefined, {
-      ignoredCopies: () => ['Locker data (1).lockers']
-    })
+    const copy = join(dir, 'Locker data (1).lockers')
+    writeFileSync(copy, readFileSync(path))
+    const ignored: string[] = []
+    const dave = person('Dave', 'DAVE-MAC', dir, undefined, { ignoredCopies: () => ignored })
+    await dave.session.open(path)
+    const key = await dave.session.ignoreKey('Locker data (1).lockers')
+    expect(key).toMatch(/^Locker data \(1\)\.lockers\|\d+\|\d+$/)
+    ignored.push(key!)
     await dave.session.open(path)
     expect(openState(dave).conflictCopies).toEqual([])
+    // A later copy with the same name (finding 8 of the stability audit) shows again.
+    writeFileSync(copy, new Uint8Array([...readFileSync(path), 0]))
+    utimesSync(copy, new Date(), new Date(Date.now() + 5000))
+    await dave.session.tick()
+    expect(openState(dave).conflictCopies).toEqual(['Locker data (1).lockers'])
+  })
+
+  it('a copy made while the file is open is found at the next check', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    await dave.session.open(path)
+    expect(openState(dave).conflictCopies).toEqual([])
+    writeFileSync(join(dir, 'Locker data-OFFICE-PC.lockers'), readFileSync(path))
+    await dave.session.tick()
+    expect(openState(dave).conflictCopies).toEqual(['Locker data-OFFICE-PC.lockers'])
+  })
+
+  it('after waking from sleep, waits and checks the lock before saving', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const clock = { t: Date.parse('2026-10-06T09:12:00Z') }
+    const fired: Array<() => void> = []
+    const dave = person('Dave', 'DAVE-MAC', dir, clock, {
+      timers: {
+        setTimeout: (fn: () => void) => {
+          fired.push(fn)
+          return fired.length as unknown as ReturnType<typeof setTimeout>
+        },
+        clearTimeout: () => undefined
+      }
+    })
+    await dave.session.open(path)
+    fired.length = 0
+    rename(dave, 'SYNTHETIC After Sleep')
+    dave.session.afterWake(60_000)
+    const [debouncedSave, afterHold] = fired
+    debouncedSave!()
+    await new Promise((r) => setTimeout(r, 50))
+    expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC High School')
+    clock.t += 60_000
+    afterHold!()
+    await expect.poll(() => schoolNameOnDisk(path)).toBe('SYNTHETIC After Sleep')
   })
 })
 

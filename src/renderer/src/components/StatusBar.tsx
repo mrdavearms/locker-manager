@@ -1,4 +1,4 @@
-import { Archive, Eye, FolderOpen, PencilLine, X } from 'lucide-react'
+import { Archive, Copy, Eye, FolderOpen, PencilLine, X } from 'lucide-react'
 import type { OpenFileState } from '@renderer/lib/useFileState'
 import { formatWhen } from '@renderer/lib/format'
 import { cn } from '@renderer/lib/cn'
@@ -8,6 +8,8 @@ interface Props {
   state: OpenFileState
   onBackups: () => void
   onClose: () => void
+  /** Goes to Home, where copies of the file are compared. */
+  onCopies: () => void
 }
 
 function saveText(s: OpenFileState): string {
@@ -21,7 +23,7 @@ function saveText(s: OpenFileState): string {
 const barButton = 'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 hover:bg-surface-muted'
 
 /** One line along the bottom, like the label rail on a bank of lockers. */
-export function StatusBar({ state, onBackups, onClose }: Props): React.JSX.Element {
+export function StatusBar({ state, onBackups, onClose, onCopies }: Props): React.JSX.Element {
   const editing = state.mode === 'edit'
   return (
     <footer
@@ -53,6 +55,15 @@ export function StatusBar({ state, onBackups, onClose }: Props): React.JSX.Eleme
         </span>
         <VersionLabel className="hidden shrink-0 text-xs text-ink-muted xl:inline" />
         <span className="ml-auto flex shrink-0 items-center gap-1">
+          {state.conflictCopies.length > 0 && (
+            <button
+              className={cn(barButton, 'font-semibold text-warn')}
+              onClick={onCopies}
+              data-testid="copies-found"
+            >
+              <Copy size={16} aria-hidden /> Copy of this file found
+            </button>
+          )}
           <button
             className={barButton}
             onClick={() => void window.api.showInFolder()}

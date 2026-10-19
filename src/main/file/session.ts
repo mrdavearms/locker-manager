@@ -456,8 +456,15 @@ export class DataFileSession {
     } catch {
       return
     }
+    // An ignored copy is remembered with its size and time, so a later copy with the
+    // same name (OneDrive names them after the computer) is shown again (finding 8).
     const ignored = new Set(this.d.ignoredCopies?.(c.path) ?? [])
-    c.conflictCopies = findConflictCopies(name, siblings).filter((n) => !ignored.has(n))
+    const shown: string[] = []
+    for (const copy of findConflictCopies(name, siblings)) {
+      const key = await this.copyKey(join(folder, copy), copy)
+      if (key === null || !ignored.has(key)) shown.push(copy)
+    }
+    c.conflictCopies = shown
     // Leftovers older than a day are tidied (SPEC.md 6.3). Younger ones may be
     // another computer's save in progress.
     for (const leftover of leftoverTempFiles(name, siblings)) {
@@ -613,8 +620,36 @@ export class DataFileSession {
     if (this.saveTimer) this.timers.clearTimeout(this.saveTimer)
     this.saveTimer = this.timers.setTimeout(() => {
       this.saveTimer = null
-      void this.save()
+      this.saveUnlessHeld()
     }, this.d.saveDelayMs ?? 2000)
+  }
+
+  /** Until then, saves made by the timers wait (afterWake). */
+  private savesHeldUntil = 0
+
+  private saveUnlessHeld(): void {
+    if (this.d.now().getTime() < this.savesHeldUntil) return
+    void this.save()
+  }
+
+  /**
+   * The computer has woken from sleep. While it slept someone else may have taken
+   * over and saved, and the sync service has not caught up yet, so this copy's lock
+   * and file look unchanged: saving now would set the other person's work aside as
+   * a sync copy (docs/audits/2026-10-20-stability-audit.md, finding 8). Saves wait,
+   * then the lock and file are checked, then any changes are saved.
+   */
+  afterWake(holdMs = 60_000): void {
+    const c = this.cur
+    if (!c || c.mode !== 'edit') return
+    this.savesHeldUntil = this.d.now().getTime() + holdMs
+    this.timers.setTimeout(() => {
+      this.savesHeldUntil = 0
+      void this.tick().then(() => {
+        const now = this.cur
+        if (now && now.mode === 'edit' && now.dirty && !now.conflict) void this.save()
+      })
+    }, holdMs)
   }
 
   /** Saves now if there is anything to save, and waits for it. */
@@ -737,7 +772,7 @@ export class DataFileSession {
       )
       this.saveTimer = this.timers.setTimeout(() => {
         this.saveTimer = null
-        void this.save()
+        this.saveUnlessHeld()
       }, this.d.saveRetryMs ?? 10_000)
     } finally {
       if (this.cur === c) {
@@ -906,6 +941,23 @@ export class DataFileSession {
   }
 
   // --------------------------------------------------------- sync copies
+
+  /** How an ignored copy is remembered: its name, size and modified time. */
+  private async copyKey(path: string, name: string): Promise<string | null> {
+    try {
+      const s = await this.d.fs.stat(path)
+      return `${name}|${s.size}|${Math.round(s.mtimeMs)}`
+    } catch {
+      return null
+    }
+  }
+
+  /** The key to remember when the operator says a copy is not a copy. */
+  async ignoreKey(copyName: string): Promise<string | null> {
+    const c = this.cur
+    if (!c) return null
+    return this.copyKey(join(dirname(c.path), copyName), copyName)
+  }
 
   async compareCopy(copyName: string): Promise<OpenResult> {
     const c = this.cur
@@ -1105,12 +1157,16 @@ export class DataFileSession {
       const d = await this.diskChanged(c)
       if (d.changed) await this.enterConflict(d.missing ? 'missing' : 'changed_on_disk')
     }
+    // A sync service can make a copy while the file is open, when two people edited at
+    // once; it used to be noticed only at the next open (finding 8).
+    if (this.cur === c) await this.scanSiblings()
     this.emit()
   }
 
   private async readOnlyTick(c: Open): Promise<void> {
     const d = await this.diskChanged(c)
     if (d.changed && d.bytes) await this.replaceInMemory(d.bytes)
+    if (this.cur === c) await this.scanSiblings()
     if (
       c.readOnly &&
       (c.readOnly.reason === 'locked' ||

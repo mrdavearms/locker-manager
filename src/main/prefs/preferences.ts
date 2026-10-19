@@ -120,12 +120,13 @@ export class Preferences {
     await this.update((p) => ({ ...p, recentFiles: p.recentFiles.filter((r) => r.path !== path) }))
   }
 
-  async ignoreCopy(dataPath: string, copyName: string): Promise<void> {
+  /** `copyKey` is the copy's name, size and time (DataFileSession.ignoreKey). */
+  async ignoreCopy(dataPath: string, copyKey: string): Promise<void> {
     await this.update((p) => ({
       ...p,
       ignoredCopies: {
         ...p.ignoredCopies,
-        [dataPath]: [...new Set([...(p.ignoredCopies[dataPath] ?? []), copyName])]
+        [dataPath]: [...new Set([...(p.ignoredCopies[dataPath] ?? []), copyKey])]
       }
     }))
   }

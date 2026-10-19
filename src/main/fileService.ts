@@ -650,7 +650,8 @@ export function registerFileHandlers(): void {
     const { name, choice } = ResolveCopySchema.parse(raw)
     const s = session.state
     if (choice === 'ignore') {
-      if (s.status === 'open') await prefs.ignoreCopy(s.path, name)
+      const key = await session.ignoreKey(name)
+      if (s.status === 'open' && key) await prefs.ignoreCopy(s.path, key)
       session.closeComparison()
       if (s.status === 'open') await session.open(s.path)
       return { ok: true }
