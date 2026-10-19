@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { createWriteStream, rmSync } from 'node:fs'
-import { access, constants, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import { access, constants, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -9,6 +9,8 @@ import { app, net } from 'electron'
 import log from 'electron-log/main'
 import { macAppBundlePath } from '../signing'
 import { macInstallScript } from './macInstallScript'
+import { removeTree, removeTreeSync } from './removeTree'
+import { freshStagingDir } from './staging'
 
 // Installs an update on an unsigned Mac without Squirrel.Mac, which refuses any
 // update whose signature differs from the running app (every ad-hoc build does).
@@ -82,9 +84,9 @@ export async function prepareMacUpdate(input: {
   version: string
   onProgress: (percent: number) => void
 }): Promise<string> {
-  const dir = stagingDir()
-  await rm(dir, { recursive: true, force: true })
-  await mkdir(dir, { recursive: true })
+  const dir = await freshStagingDir(stagingDir(), removeTree, (message) =>
+    log.warn(`mac update: could not clear earlier downloads (${message}); using a new folder`)
+  )
   const zip = join(dir, 'update.zip')
 
   log.info(`mac update: downloading ${input.url}`)
@@ -121,7 +123,7 @@ export async function prepareMacUpdate(input: {
 
   const unpacked = join(dir, 'app')
   await run('/usr/bin/ditto', ['-x', '-k', zip, unpacked])
-  await rm(zip, { force: true })
+  await removeTree(zip)
   const name = (await readdir(unpacked)).find((n) => n.endsWith('.app'))
   if (!name) throw new Error('The download held no app.')
   const newApp = join(unpacked, name)
@@ -153,11 +155,12 @@ export function installMacUpdate(input: {
   relaunch: boolean
 }): void {
   const resultFile = join(app.getPath('userData'), RESULT)
-  rmSync(resultFile, { force: true })
+  removeTreeSync(resultFile)
+  // newApp is <download folder>/app/<name>.app; install.sh is in the download folder.
   const child = spawn(
     '/bin/bash',
     [
-      join(stagingDir(), 'install.sh'),
+      join(dirname(dirname(input.newApp)), 'install.sh'),
       String(process.pid),
       runningBundle(),
       input.newApp,
@@ -181,8 +184,11 @@ export async function readLastMacResult(): Promise<MacResult | null> {
   try {
     const parsed = JSON.parse(await readFile(file, 'utf8')) as MacResult
     if (parsed.ok) {
-      await rm(file, { force: true })
-      await rm(stagingDir(), { recursive: true, force: true })
+      await removeTree(file)
+      // Tidying only: the next download copes with anything left behind.
+      await removeTree(stagingDir()).catch((e: unknown) =>
+        log.warn('mac update: could not clear the installed download', String(e))
+      )
     }
     return parsed
   } catch {

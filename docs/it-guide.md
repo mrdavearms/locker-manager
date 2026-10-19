@@ -58,6 +58,10 @@ signature is in place the prompt disappears.
   a translocated copy, the app reports the new version and opens the download page instead.
   On managed Macs, either give users write access to the app, or deploy updates yourself
   and set `autoUpdate` to `false`.
+- macOS, versions 0.11.0 to 0.11.3: after one self-update these stop updating and report
+  `ENOTEMPTY` (they cannot delete the previous download in
+  `~/Library/Application Support/Locker Manager/pending-update`). Install 0.11.4 or later by
+  hand once, or delete that folder and let the app update itself.
 - A failed check (proxy, firewall, offline) is logged and never shown, unless the user
   asked for the check by hand.
 - Every release is a full public release, and the app takes only those, unless the user

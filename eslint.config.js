@@ -39,6 +39,24 @@ export default tseslint.config(
     languageOptions: { globals: globals.node }
   },
   {
+    // Electron's fs treats a .asar file as a folder, so deleting a folder that
+    // holds a downloaded app fails (ENOTEMPTY). This stopped Mac updates in 0.11.x.
+    files: ['src/main/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['fs', 'node:fs', 'fs/promises', 'node:fs/promises'].map((name) => ({
+            name,
+            importNames: ['rm', 'rmSync', 'rmdir', 'rmdirSync'],
+            message:
+              "Use removeTree or removeTreeSync from src/main/update/removeTree.ts: Electron's fs cannot delete a folder that holds a .asar file."
+          }))
+        }
+      ]
+    }
+  },
+  {
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]

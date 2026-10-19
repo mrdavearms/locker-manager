@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { removeTree } from './update/removeTree'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
@@ -272,7 +272,7 @@ export function registerFileHandlers(): void {
     // The demo always starts fresh, in this computer's own app folder.
     await session.close()
     const folder = join(app.getPath('userData'), 'Demo')
-    await rm(folder, { recursive: true, force: true })
+    await removeTree(folder)
     await nodeFs.mkdirp(folder)
     const path = join(folder, 'Demo school.lockers')
     const db = await createDemoDatabase(
@@ -299,7 +299,7 @@ export function registerFileHandlers(): void {
     const ctx = { operator: operatorName(), machine: machineName(), now: () => new Date() }
     const db = await makePracticeCopy(bytes, ctx, { withCodes: editing })
     const folder = join(app.getPath('userData'), 'Practice')
-    await rm(folder, { recursive: true, force: true })
+    await removeTree(folder)
     await nodeFs.mkdirp(folder)
     const safe = school.replace(/[\\/:*?"<>|]/g, ' ').trim() || 'School'
     log.info('practice copy started')

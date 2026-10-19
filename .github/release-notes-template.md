@@ -24,7 +24,7 @@ Locker Manager is free and open source, and is not yet registered with Apple or 
 3. Open **System Settings**, then **Privacy & Security**, scroll to the bottom and click **Open Anyway**, then **Open Anyway** again.
 4. You only do this once. After that, open it like any other app.
 
-Updates install themselves on Windows and on a Mac. On a Mac this needs the app to be in your Applications folder and your account to be allowed to change it; otherwise the app tells you when a new version is out and opens this download page, and you install the new version over the old one. Copies older than 0.11.0 on a Mac cannot update themselves yet: install 0.11.0 or later from this page once, and from then on it updates itself.
+Updates install themselves on Windows and on a Mac. On a Mac this needs the app to be in your Applications folder and your account to be allowed to change it; otherwise the app tells you when a new version is out and opens this download page, and you install the new version over the old one. On a Mac, copies older than 0.11.4 need one update by hand: they either cannot update themselves (before 0.11.0) or stop after their first update (0.11.0 to 0.11.3, which show "Could not check for updates: ENOTEMPTY"). Install 0.11.4 or later from this page once, over the old one. Your school's file is not touched, and from then on it updates itself.
 
 ## What's new in {{VERSION}}
 

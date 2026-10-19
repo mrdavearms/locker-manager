@@ -60,6 +60,8 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: { index: resolve('src/main/index.ts') },
+        // original-fs is built into Electron, not a package in node_modules.
+        external: ['original-fs'],
         output: { format: 'cjs' }
       }
     }

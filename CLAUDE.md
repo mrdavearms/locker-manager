@@ -290,6 +290,15 @@ All data reads and writes from the window go through ONE channel, `rpc`:
 
 ## Gotchas
 
+- **Electron's fs treats a `.asar` file as a folder.** A recursive `rm` of a folder holding a
+  downloaded app fails with ENOTEMPTY. 0.11.0 to 0.11.3 hit this on `pending-update`, so
+  every Mac stopped updating after one self-update and needed a manual install (fixed in
+  0.11.4). Deletes in `src/main` go through `removeTree` (`original-fs`); an ESLint rule
+  refuses plain `rm`. Two more guards: a leftover download that will not delete never stops
+  an update (`freshStagingDir`), and the Mac update proof starts from a copy that has
+  already updated itself once (from 0.11.4 on). The rule behind all three: nothing an
+  update leaves on disk may stop the next update.
+
 - End-to-end test windows open in the background (`LOCKER_MANAGER_BACKGROUND=1`, set in
   `tests/e2e/launch.ts`) so they do not take focus while you work.
 

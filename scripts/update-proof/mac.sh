@@ -16,6 +16,22 @@ MNT=$(hdiutil attach "$WORK/Locker-Manager-$PREV-universal.dmg" -nobrowse -reado
 ditto "$MNT/Locker Manager.app" "$WORK/Locker Manager.app"
 hdiutil detach "$MNT" -quiet
 
+# Start from a copy that has already updated itself once: a real Mac keeps the
+# last download (a whole app, app.asar included) and a success note. 0.11.0 to
+# 0.11.3 could not delete that folder, so every Mac stopped updating after one
+# self-update, and a proof from a fresh install never saw it. Older copies than
+# 0.11.4 still have that fault, so the leftover is only planted from 0.11.4 on.
+USER_DATA="$HOME/Library/Application Support/Locker Manager"
+if [ "$(printf '%s\n' "$PREV" 0.11.4 | sort -V | head -1)" = "0.11.4" ]; then
+  mkdir -p "$USER_DATA/pending-update/app"
+  ditto "$WORK/Locker Manager.app" "$USER_DATA/pending-update/app/Locker Manager.app"
+  printf '{"ok":true,"version":"%s","message":"installed"}\n' "$PREV" > "$USER_DATA/update-result.json"
+  LEFTOVER=" after an earlier self-update"
+else
+  LEFTOVER=""
+  echo "::notice::$PREV is older than 0.11.4, so the proof starts from a fresh install"
+fi
+
 rm -f "$LOG"
 "$WORK/Locker Manager.app/Contents/MacOS/Locker Manager" >/dev/null 2>&1 &
 APP=$!
@@ -38,7 +54,7 @@ if grep -q "mac-self-install=yes" "$LOG"; then
   GOT=$(/usr/bin/plutil -extract CFBundleShortVersionString raw "$WORK/Locker Manager.app/Contents/Info.plist")
   [ "$GOT" = "$NEW" ] || { echo "::error::the app on disk is $GOT, not $NEW"; exit 1; }
   /usr/bin/codesign --verify --deep --strict "$WORK/Locker Manager.app"
-  MSG="macOS: unsigned $PREV found, downloaded and installed $NEW by itself, and $NEW starts."
+  MSG="macOS: unsigned $PREV$LEFTOVER found, downloaded and installed $NEW by itself, and $NEW starts."
 else
   kill "$APP" 2>/dev/null || true
   echo "----- app log -----"; cat "$LOG" || true
