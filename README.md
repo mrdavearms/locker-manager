@@ -36,7 +36,7 @@
 </p>
 
 > [!NOTE]
-> **Version 0.11.3, ready to use at a school.** Every release goes to every school straight
+> **Version 0.11.4, ready to use at a school.** Every release goes to every school straight
 > away, and the app updates itself. Version 1.0 follows after the hand checks in
 > [the release checklist](docs/release-checklist.md): real label sheets on a laser printer,
 > letters on paper, a Windows install at a school, and code signing once it is bought.
