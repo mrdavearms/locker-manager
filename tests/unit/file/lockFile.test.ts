@@ -7,11 +7,16 @@ import {
   classifyLock,
   heartbeat,
   lockPathFor,
+  observeLock,
+  QUIET_MS,
+  readLock,
   releaseLock,
   STALE_AFTER_MS,
   takeOverLock,
-  type LockInfo
+  type LockInfo,
+  type LockRead
 } from '../../../src/main/file/lockFile'
+import type { FsPort } from '../../../src/main/file/fsPort'
 import { tempDir } from './tmp'
 
 let n = 0
@@ -59,6 +64,74 @@ describe('classifyLock', () => {
   it('never calls a lock stale because the other computer clock is ahead', () => {
     const future = person('h', 'Hannah', 'OFFICE-PC', '2026-10-06T12:00:00.000Z')
     expect(classifyLock({ kind: 'ok', info: future }, 'me', t0)).toBe('held')
+  })
+})
+
+// docs/audits/2026-10-20-stability-audit.md, finding 10: the heartbeat is written by
+// the editor's clock and compared with this computer's, and the two can differ.
+describe('classifyLock, watched by this computer’s own clock', () => {
+  const at = (ms: number): Date => new Date(t0.getTime() + ms)
+  const beat = (iso: string): LockRead => ({
+    kind: 'ok',
+    info: person('h', 'Hannah', 'OFFICE-PC', iso)
+  })
+
+  it('never takes over a live editor whose clock is slow', () => {
+    // Her clock is 20 minutes behind, but her heartbeat changes every minute.
+    let seen = null
+    for (let minute = 0; minute < 15; minute++) {
+      const read = beat(new Date(t0.getTime() - 20 * 60_000 + minute * 60_000).toISOString())
+      const now = at(minute * 60_000)
+      seen = observeLock(seen, read, now.getTime())
+      expect(classifyLock(read, 'me', now, STALE_AFTER_MS, undefined, seen)).toBe('held')
+    }
+  })
+
+  it('offers takeover once a heartbeat that looks stale has stayed the same here', () => {
+    const read = beat(new Date(t0.getTime() - 15 * 60_000).toISOString())
+    const seen = observeLock(null, read, t0.getTime())
+    expect(classifyLock(read, 'me', t0, STALE_AFTER_MS, undefined, seen)).toBe('held')
+    expect(classifyLock(read, 'me', at(QUIET_MS), STALE_AFTER_MS, undefined, seen)).toBe('stale')
+  })
+
+  it('offers takeover from a stopped editor whose clock ran fast, after 10 minutes', () => {
+    const read = beat('2026-10-06T12:00:00.000Z')
+    const seen = observeLock(null, read, t0.getTime())
+    expect(classifyLock(read, 'me', at(STALE_AFTER_MS - 1), STALE_AFTER_MS, undefined, seen)).toBe(
+      'held'
+    )
+    expect(classifyLock(read, 'me', at(STALE_AFTER_MS), STALE_AFTER_MS, undefined, seen)).toBe(
+      'stale'
+    )
+  })
+
+  it('calls a heartbeat an hour old stale at once', () => {
+    const read = beat(new Date(t0.getTime() - 61 * 60_000).toISOString())
+    const seen = observeLock(null, read, t0.getTime())
+    expect(classifyLock(read, 'me', t0, STALE_AFTER_MS, undefined, seen)).toBe('stale')
+  })
+
+  it('waits before calling an unreadable lock damaged', () => {
+    const read: LockRead = { kind: 'corrupt' }
+    const seen = observeLock(null, read, t0.getTime())
+    expect(classifyLock(read, 'me', t0, STALE_AFTER_MS, undefined, seen)).toBe('held')
+    expect(classifyLock(read, 'me', at(QUIET_MS), STALE_AFTER_MS, undefined, seen)).toBe('stale')
+  })
+})
+
+describe('reading the lock', () => {
+  it('tries again when another program holds the file for a moment', async () => {
+    const lockPath = lockPathFor(join(tempDir(), 'Locker data.lockers'))
+    await acquireLock(deps(lockPath, person('h', 'Hannah', 'OFFICE-PC'), t0))
+    let busy = 2
+    const fs: FsPort = {
+      ...nodeFs,
+      readFile: async (p) => {
+        if (busy-- > 0) throw Object.assign(new Error('busy'), { code: 'EBUSY' })
+        return nodeFs.readFile(p)
+      }
+    }
+    expect(await readLock(fs, lockPath)).toMatchObject({ kind: 'ok', info: { operator: 'Hannah' } })
   })
 })
 

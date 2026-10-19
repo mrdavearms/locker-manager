@@ -133,7 +133,11 @@ than a day are removed the next time the file is opened.
 
 The first person to open the file edits; everyone else is read-only and sees who is
 editing. A lock whose heartbeat is more than 10 minutes old can be taken over, and the
-takeover is recorded in the file's history. OneDrive can take a minute to sync the lock
+takeover is recorded in the file's history. The heartbeat time comes from the editing
+computer's clock, so the app also watches the lock by its own clock: a heartbeat between
+10 and 60 minutes old must also stay unchanged for two and a half minutes on this computer,
+and one that stays unchanged for 10 minutes counts as stopped whatever its time says. A
+lock left by a crash of the same person's copy on the same computer is not waited for. OneDrive can take a minute to sync the lock
 file, so two people who open the file within a minute of each other on different computers
 may both start editing. The hash check then stops the second save from overwriting the
 first and shows that person a comparison; nothing is lost.

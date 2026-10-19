@@ -46,10 +46,12 @@ import {
   readLock,
   releaseLock,
   classifyLock,
+  observeLock,
   processAlive,
   STALE_AFTER_MS,
   takeOverLock,
-  type LockInfo
+  type LockInfo,
+  type LockSeen
 } from './lockFile'
 import { readDataFile, readProblemMessage } from './readDataFile'
 import { BackupRulesSchema, DEFAULT_BACKUP_RULES, fullBackupRules } from '@shared/storage'
@@ -163,6 +165,8 @@ export function backupPolicyFor(db: LockerDb): BackupPolicy {
 
 export class DataFileSession {
   private cur: Open | null = null
+  /** What this computer has seen of the open file's lock, by its own clock (finding 10). */
+  private lockSeen: LockSeen | null = null
   private saveTimer: Timer | null = null
   private tickTimer: Timer | null = null
   private readonly me: LockInfo
@@ -254,7 +258,8 @@ export class DataFileSession {
       me,
       now: this.d.now,
       randomSuffix: this.d.randomSuffix,
-      processAlive: this.d.processAlive ?? processAlive
+      processAlive: this.d.processAlive ?? processAlive,
+      seen: this.lockSeen
     }
   }
 
@@ -375,6 +380,11 @@ export class DataFileSession {
         canStartEditing: false
       }
     } else {
+      this.lockSeen = observeLock(
+        null,
+        await readLock(this.d.fs, lockPathFor(path)),
+        this.d.now().getTime()
+      )
       const lock = await acquireLock(this.lockDeps()).catch(() => null)
       if (lock === null) {
         this.problem(
@@ -1108,12 +1118,16 @@ export class DataFileSession {
         c.readOnly.reason === 'lost_lock')
     ) {
       const lock = await readLock(this.d.fs, lockPathFor(c.path))
+      this.lockSeen = observeLock(this.lockSeen, lock, this.d.now().getTime())
       const deps = this.lockDeps()
-      const cls = classifyLock(lock, this.me.sessionId, this.d.now(), STALE_AFTER_MS, {
-        operator: deps.me.operator,
-        computer: deps.me.computer,
-        processAlive: deps.processAlive
-      })
+      const cls = classifyLock(
+        lock,
+        this.me.sessionId,
+        this.d.now(),
+        STALE_AFTER_MS,
+        { operator: deps.me.operator, computer: deps.me.computer, processAlive: deps.processAlive },
+        this.lockSeen
+      )
       c.readOnly = {
         ...c.readOnly,
         reason:
