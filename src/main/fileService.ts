@@ -138,7 +138,7 @@ export function closeWarningShown(): Promise<unknown> {
 export async function readyToClose(win?: BrowserWindow): Promise<boolean> {
   if (!fileServiceReady() || !session.isOpen) return true
   for (;;) {
-    await session.flush().catch(() => undefined)
+    await session.flush(session.saveWaitMs).catch(() => undefined)
     if (!session.isOpen || !session.hasUnsavedChanges) return true
     const opts = {
       type: 'warning' as const,
@@ -165,7 +165,7 @@ export async function readyToClose(win?: BrowserWindow): Promise<boolean> {
  */
 export async function saveAndCloseForUpdate(): Promise<boolean> {
   if (!fileServiceReady() || !session.isOpen) return true
-  await session.flush().catch(() => undefined)
+  await session.flush(session.saveWaitMs).catch(() => undefined)
   if (session.hasUnsavedChanges) return false
   return (await session.close()) === null
 }

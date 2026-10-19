@@ -66,6 +66,9 @@ import {
 
 type Timer = ReturnType<typeof setTimeout>
 
+const NEWER_FILE_MESSAGE =
+  'This file has been updated by a newer version of Locker Manager. It is open for viewing only. Update Locker Manager on this computer to change it.'
+
 export interface SessionDeps {
   fs: FsPort
   appVersion: string
@@ -89,6 +92,8 @@ export interface SessionDeps {
   heartbeatMs?: number
   pollMs?: number
   saveRetryMs?: number
+  /** How long closing waits for a save (default 20 seconds). */
+  saveWaitMs?: number
   backupPolicy?: BackupPolicy
   timers?: {
     setTimeout: (fn: () => void, ms: number) => Timer
@@ -652,14 +657,38 @@ export class DataFileSession {
     }, holdMs)
   }
 
-  /** Saves now if there is anything to save, and waits for it. */
-  async flush(): Promise<void> {
+  /**
+   * Saves now if there is anything to save, and waits for it, for at most `maxWaitMs`.
+   * False when it stopped waiting: a network share that stops answering must not
+   * stop the app closing (docs/audits/2026-10-20-stability-audit.md, item 12).
+   */
+  async flush(maxWaitMs = Number.POSITIVE_INFINITY): Promise<boolean> {
     if (this.saveTimer) {
       this.timers.clearTimeout(this.saveTimer)
       this.saveTimer = null
     }
-    while (this.cur?.saving) await new Promise((r) => setTimeout(r, 10))
-    if (this.cur?.dirty && this.cur.mode === 'edit' && !this.cur.conflict) await this.save()
+    const until = Date.now() + maxWaitMs
+    while (this.cur?.saving) {
+      if (Date.now() >= until) return false
+      await new Promise((r) => setTimeout(r, 10))
+    }
+    if (!(this.cur?.dirty && this.cur.mode === 'edit' && !this.cur.conflict)) return true
+    if (!Number.isFinite(maxWaitMs)) {
+      await this.save()
+      return true
+    }
+    let timer: Timer | undefined
+    const gaveUp = new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), Math.max(0, until - Date.now()))
+    })
+    const done = await Promise.race([this.save().then(() => true as const), gaveUp])
+    clearTimeout(timer)
+    return done
+  }
+
+  /** How long closing waits for a save before keeping the changes as a backup. */
+  get saveWaitMs(): number {
+    return this.d.saveWaitMs ?? 20_000
   }
 
   /**
@@ -881,8 +910,11 @@ export class DataFileSession {
       .map((i) => c.journal[i])
       .filter((j): j is JournalEntry => j !== undefined && j.replay !== null)
     await this.backupBytes(c.db.export(), 'my unsaved changes')
-    await this.replaceInMemory(diskBytes)
     c.conflict = null
+    if (await this.replaceInMemory(diskBytes)) {
+      this.emit()
+      return { ok: false, message: NEWER_FILE_MESSAGE }
+    }
     const ctx = this.ctx()
     let added = 0
     const skipped: { action: string; message: string }[] = []
@@ -917,11 +949,18 @@ export class DataFileSession {
     return { ok: true, added, skipped }
   }
 
-  private async replaceInMemory(bytes: Uint8Array): Promise<void> {
+  /**
+   * Puts a version from disk or a backup in place of the one in memory. True when
+   * it was made by a newer version of the app: it is then open for viewing only,
+   * and this computer's lock is given back, so older code never writes to it
+   * (docs/audits/2026-10-20-stability-audit.md, item 13).
+   */
+  private async replaceInMemory(bytes: Uint8Array): Promise<boolean> {
     const c = this.cur
-    if (!c) return
+    if (!c) return false
     const next = await LockerDb.fromBytes(bytes)
-    if (schemaState(next).kind === 'older') migrate(next)
+    const schema = schemaState(next)
+    if (schema.kind === 'older') migrate(next)
     c.db.close()
     c.db = next
     c.revision++
@@ -938,6 +977,18 @@ export class DataFileSession {
     } catch {
       // ignore
     }
+    if (schema.kind !== 'newer') return false
+    if (this.saveTimer) this.timers.clearTimeout(this.saveTimer)
+    this.saveTimer = null
+    await releaseLock(this.lockDeps()).catch(() => undefined)
+    c.mode = 'read_only'
+    c.readOnly = {
+      reason: 'newer_version',
+      holder: null,
+      canTakeOver: false,
+      canStartEditing: false
+    }
+    return true
   }
 
   // --------------------------------------------------------- sync copies
@@ -1046,10 +1097,28 @@ export class DataFileSession {
     if (!c?.readOnly?.canTakeOver)
       return { ok: false, message: 'Editing cannot be taken over right now.' }
     const previous = c.readOnly.holder
-    await takeOverLock(this.lockDeps())
+    // The file is read before the lock is taken, and the lock given back if anything
+    // after fails: a failed takeover used to leave a lock nobody refreshed (item 14).
     const r = await readDataFile(this.d.fs, c.path)
     if (!r.ok) return { ok: false, message: readProblemMessage(r.problem) }
-    await this.replaceInMemory(r.bytes)
+    try {
+      await takeOverLock(this.lockDeps())
+    } catch {
+      return {
+        ok: false,
+        message:
+          'The edit lock could not be written beside the file, so editing was not taken over.'
+      }
+    }
+    try {
+      if (await this.replaceInMemory(r.bytes)) {
+        this.emit()
+        return { ok: false, message: NEWER_FILE_MESSAGE }
+      }
+    } catch {
+      await releaseLock(this.lockDeps()).catch(() => undefined)
+      return { ok: false, message: readProblemMessage('not_a_data_file') }
+    }
     c.mode = 'edit'
     c.readOnly = null
     this.write(
@@ -1387,7 +1456,7 @@ export class DataFileSession {
     this.stopTicking()
     let warning: string | null = null
     try {
-      if (c.mode === 'edit' && !c.conflict) await this.flush().catch(() => undefined)
+      if (c.mode === 'edit' && !c.conflict) await this.flush(this.saveWaitMs).catch(() => undefined)
       if (c.mode === 'edit' && c.dirty) {
         let where: string
         try {

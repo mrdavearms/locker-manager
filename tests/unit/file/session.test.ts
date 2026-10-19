@@ -341,6 +341,55 @@ describe('two people, one file (SPEC.md 6.2)', () => {
     expect(openState(dave).mode).toBe('edit')
   })
 
+  // docs/audits/2026-10-20-stability-audit.md, items 13 and 14.
+  it('a takeover that finds a file from a newer version stays read-only and gives the lock back', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const clock = { t: Date.parse('2026-10-06T09:12:00Z') }
+    const hannah = person('Hannah', 'OFFICE-PC', dir, clock)
+    const dave = person('Dave', 'DAVE-MAC', dir, clock)
+    await hannah.session.open(path)
+    await dave.session.open(path)
+    clock.t += 2 * STALE_AFTER_MS
+    await dave.session.tick()
+    clock.t += STALE_AFTER_MS
+    await dave.session.tick()
+    expect(openState(dave).readOnly?.canTakeOver).toBe(true)
+    // Just before Dave takes over, a newer copy of the app migrates the file.
+    const newer = await LockerDb.fromBytes(new Uint8Array(readFileSync(path)))
+    newer.userVersion = newer.userVersion + 1
+    writeFileSync(path, newer.export())
+    newer.close()
+    expect(await dave.session.takeOver()).toMatchObject({ ok: false, message: /newer version/ })
+    expect(openState(dave)).toMatchObject({
+      mode: 'read_only',
+      readOnly: { reason: 'newer_version' }
+    })
+    // Dave holds no lock on a file his copy cannot edit.
+    expect(existsSync(lockPathFor(path))).toBe(false)
+  })
+
+  it('a takeover that cannot write the lock changes nothing', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const clock = { t: Date.parse('2026-10-06T09:12:00Z') }
+    const hannah = person('Hannah', 'OFFICE-PC', dir, clock)
+    await hannah.session.open(path)
+    const dave = person('Dave', 'DAVE-MAC', dir, clock, {
+      fs: faultyFs([{ method: 'rename', match: (p) => p.startsWith(`${lockPathFor(path)}.tmp-`) }])
+    })
+    await dave.session.open(path)
+    clock.t += 2 * STALE_AFTER_MS
+    await dave.session.tick()
+    clock.t += STALE_AFTER_MS
+    await dave.session.tick()
+    expect(await dave.session.takeOver()).toMatchObject({ ok: false, message: /lock/ })
+    expect(openState(dave).mode).toBe('read_only')
+    expect(JSON.parse(readFileSync(lockPathFor(path), 'utf8'))).toMatchObject({
+      operator: 'Hannah'
+    })
+  })
+
   it('offers takeover only after 10 minutes of silence, logs it, and the old editor follows', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)
@@ -905,6 +954,27 @@ describe('closing never throws away unsaved changes', () => {
     }
     return null
   }
+
+  // docs/audits/2026-10-20-stability-audit.md, item 12.
+  it('closing does not wait for ever on a share that stops answering', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const hung = {
+      ...nodeFs,
+      writeNewFileDurable: (p: string, data: Uint8Array) =>
+        p.startsWith(`${path}.tmp-`)
+          ? new Promise<void>(() => undefined)
+          : nodeFs.writeNewFileDurable(p, data)
+    }
+    const dave = person('Dave', 'DAVE-MAC', dir, undefined, { fs: hung, saveWaitMs: 200 })
+    await dave.session.open(path)
+    rename(dave, 'SYNTHETIC Stuck On The Share')
+    const started = Date.now()
+    const warning = await dave.session.close()
+    expect(Date.now() - started).toBeLessThan(5000)
+    expect(warning).toMatch(/could not be saved/)
+    expect(await backupNamed(dir, 'unsaved changes at close')).toBe('SYNTHETIC Stuck On The Share')
+  })
 
   it('keeps a backup and warns when the last save fails', async () => {
     const dir = tempDir()
