@@ -5,7 +5,7 @@ import { brand } from '@shared/brand'
 import { isAllowedExternalUrl } from '@shared/externalUrls'
 import { AppInfoSchema, channels, OpenExternalSchema, type AppInfo } from '@shared/ipc'
 import { buildCommit, buildDate } from '../buildInfo'
-import { fileSession } from '../fileService'
+import { saveAndCloseForUpdate } from '../fileService'
 import { chromiumLicencesPath, noticesPath, type NoticePlaces } from '../notices'
 import {
   checkForUpdates,
@@ -62,7 +62,7 @@ export function registerIpcHandlers(signed: boolean): void {
   ipcMain.handle(channels.updateCheck, async () => {
     await checkForUpdates(true)
   })
-  ipcMain.handle(channels.updateInstall, () => installUpdateNow(() => fileSession().close()))
+  ipcMain.handle(channels.updateInstall, () => installUpdateNow(saveAndCloseForUpdate))
   ipcMain.handle(channels.updateOpenDownloadPage, async () => {
     await openDownloadPage()
   })

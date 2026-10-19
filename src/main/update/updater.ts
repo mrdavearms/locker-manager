@@ -128,7 +128,7 @@ export interface SetupOptions {
   manualReason?: string | undefined
   /** What the last Mac install did, if anything. */
   lastMacResult: MacResult | null
-  /** Saves and closes the data file before a restart. */
+  /** Saves and closes the data file before a restart; false when it could not save. */
   closeFile: () => Promise<unknown>
   /** Windows: a version whose install did not finish on this computer. */
   failedWindowsVersion?: string | null
@@ -344,11 +344,17 @@ export async function installUpdateNow(
   }
   const blocked = installBlockedReason({ ...getBusyState(), unsavedChanges: false })
   if (blocked) return { started: false, reason: blocked }
-  await beforeInstall()
-  if (getBusyState().unsavedChanges) {
+  // beforeInstall answers false when the changes could not be saved. (Checking the
+  // busy flags here never worked: closing the file had already cleared them.)
+  const saved = await beforeInstall().catch((error: unknown) => {
+    log.warn('could not close the file before updating', String(error))
+    return false
+  })
+  if (saved === false) {
     return {
       started: false,
-      reason: 'Your changes could not be saved, so the update has not started.'
+      reason:
+        'Your changes could not be saved to the school’s file yet, so the update has not started. Try again in a moment.'
     }
   }
   if (macSelfInstall) {

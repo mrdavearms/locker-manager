@@ -4,13 +4,16 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import log from 'electron-log/main'
 import { brand } from '@shared/brand'
 import {
+  closeWarningShown,
   fileServiceReady,
   fileSession,
   initFileService,
   openFromOs,
   preferences,
   preferencesIfLoaded,
-  registerFileHandlers
+  readyToClose,
+  registerFileHandlers,
+  saveAndCloseForUpdate
 } from './fileService'
 import { GPU_OFF_MARKER, noteStartAttempt, noteStarted, showRecovery } from './recovery'
 import { openLockerLink } from './links'
@@ -188,7 +191,7 @@ if (!app.requestSingleInstanceLock()) {
     })
     // The updater starts as early as it can, so even a copy that fails later can
     // install a fixed release.
-    startUpdater(updatePrefs(), () => fileSession().close())
+    startUpdater(updatePrefs(), saveAndCloseForUpdate)
 
     // Fonts for labels and letters: beside the app when packaged, in the project in development.
     setFontDir(
@@ -218,6 +221,7 @@ if (!app.requestSingleInstanceLock()) {
       )
     })
     const win = createMainWindow()
+    guardClose(win)
     ready = true
     win.webContents.once('did-finish-load', () => {
       const file = pendingFiles.pop()
@@ -267,8 +271,23 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.on('activate', () => {
-    if (ready && BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    if (ready && BrowserWindow.getAllWindows().length === 0) guardClose(createMainWindow())
   })
+
+  // Closing the window with changes that cannot be saved asks first (finding 6).
+  let quitting = false
+  function guardClose(win: BrowserWindow): void {
+    let allowed = false
+    win.on('close', (event) => {
+      if (allowed || quitting || !fileServiceReady() || !fileSession().hasUnsavedChanges) return
+      event.preventDefault()
+      void readyToClose(win).then((ok) => {
+        if (!ok || win.isDestroyed()) return
+        allowed = true
+        win.close()
+      })
+    })
+  }
 
   // Closing the window closes the file: saved, and the edit lock released, so a
   // Mac app left running without a window never blocks anyone else.
@@ -279,22 +298,38 @@ if (!app.requestSingleInstanceLock()) {
     }
     void fileSession()
       .close()
+      .catch((error: unknown) => log.error('close failed', error))
+      .then(() => closeWarningShown())
       .finally(() => {
         if (process.platform !== 'darwin') app.quit()
       })
   })
 
-  // Never quit with unsaved changes or a held lock (SPEC.md 6.2, 9.3).
+  // Never quit with unsaved changes or a held lock (SPEC.md 6.2, 9.3). If the changes
+  // cannot be saved the person chooses; any message about them is read before quitting.
   let closedForQuit = false
+  let askingToQuit = false
   app.on('before-quit', (event) => {
-    if (closedForQuit || !fileServiceReady() || !fileSession().isOpen) return
+    if (closedForQuit || !fileServiceReady() || !fileSession().isOpen) {
+      quitting = true
+      return
+    }
     event.preventDefault()
-    void fileSession()
-      .close()
-      .catch((error: unknown) => log.error('close on quit failed', error))
-      .finally(() => {
+    if (askingToQuit) return
+    askingToQuit = true
+    void readyToClose()
+      .then(async (ok) => {
+        if (!ok) return
+        await fileSession()
+          .close()
+          .catch((error: unknown) => log.error('close on quit failed', error))
+        await closeWarningShown()
         closedForQuit = true
+        quitting = true
         app.quit()
+      })
+      .finally(() => {
+        askingToQuit = false
       })
   })
 }
