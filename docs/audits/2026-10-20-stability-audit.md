@@ -92,7 +92,7 @@ A realistic trigger: preferences.json is written at every start (`noteStartAttem
 
 **How bad.** High. Until the computer restarts or someone ends the process in Task Manager or Activity Monitor, the app cannot be opened. If the cause is permanent, the copy is stranded.
 
-**Evidence.** `startup-error-repro.js` in Electron 44.5.1: a throw in the same promise chain prints only a console warning, and three seconds later the process is alive with `windows=0 lock=true`. A read-only and a full preferences folder were both shown to make the write throw. Details in `startup-findings-detail.md` (F1).
+**Evidence.** `startup-error-repro.js.txt` (rename to `.js` and run with `npx electron` to repeat it) in Electron 44.5.1: a throw in the same promise chain prints only a console warning, and three seconds later the process is alive with `windows=0 lock=true`. A read-only and a full preferences folder were both shown to make the write throw. Details in `startup-findings-detail.md` (F1).
 
 **Suggested fix.** Small.
 1. Wrap start-up in try and catch. On failure, log it, show `dialog.showErrorBox` with what to do, then open the recovery page or call `app.exit(1)`.
