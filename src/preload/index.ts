@@ -76,6 +76,7 @@ const api = {
   forgetRecent: (path: string): Promise<void> =>
     ipcRenderer.invoke(channels.fileForgetRecent, { path }),
   openFileDialog: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileOpenDialog),
+  openBackupFile: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileOpenBackup),
   openFilePath: (path: string): Promise<ActionResult> =>
     ipcRenderer.invoke(channels.fileOpenPath, { path }),
   newFile: (schoolName: string): Promise<ActionResult> =>

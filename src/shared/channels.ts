@@ -18,6 +18,7 @@ export const channels = {
   fileRecent: 'file:recent',
   fileForgetRecent: 'file:forgetRecent',
   fileOpenDialog: 'file:openDialog',
+  fileOpenBackup: 'file:openBackup',
   fileOpenPath: 'file:openPath',
   fileNew: 'file:new',
   fileOpenDemo: 'file:openDemo',

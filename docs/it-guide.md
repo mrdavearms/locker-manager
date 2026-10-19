@@ -163,7 +163,9 @@ Each save keeps the version it replaced in two places:
 Backups are compressed with gzip and end in `.lockers.gz` (in versions after 0.11.0; older
 backups are plain `.lockers` copies and still work). A real data file compresses to about a
 third of its size (a 22.5 MB file gives a 7.9 MB backup). Restore them through the app's
-**Backups** button, not by double-clicking. To open one outside the app, unzip it first
+**Backups** button, not by double-clicking. When the data file itself will not open, use
+**Open a backup…** on the first screen: it reads a compressed backup, checks it, keeps the
+file it replaces as a backup, and opens it. To open one outside the app, unzip it first
 (macOS Archive Utility, or 7-Zip on Windows) to get a `.lockers` file.
 
 Retention by default: everything from the last day, the newest of each hour to 7 days, the

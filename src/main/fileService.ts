@@ -47,7 +47,8 @@ import {
   type BackupReachView,
   type StorageView
 } from '@shared/storage'
-import { backupReach } from './file/backups'
+import { backupReach, sharedBackupDir } from './file/backups'
+import { originalFor, restoreBackupFile } from './file/restoreBackupFile'
 import { backupPolicyFor, DataFileSession } from './file/session'
 import { machineName, Preferences, suggestedOperatorName } from './prefs/preferences'
 import { savedMappings, setSavedMappingsReader } from './rpc/studentHandlers'
@@ -285,6 +286,45 @@ export function registerFileHandlers(): void {
     const path = pick.filePaths[0]
     if (pick.canceled || !path) return { ok: false, cancelled: true, message: '' }
     return afterOpen(await session.open(path))
+  })
+
+  // The school's file will not open: choose a backup, put it where the file was (the
+  // file there is kept as a backup first), and open it (stability audit, finding 5).
+  ipcMain.handle(channels.fileOpenBackup, async (): Promise<ActionResult> => {
+    const win = focusedWindow()
+    const recent = prefs.get().recentFiles[0]?.path
+    const pickOpts = {
+      title: 'Choose a backup to open',
+      properties: ['openFile' as const],
+      filters: [{ name: `${brand.name} backups`, extensions: ['gz', brand.fileExtension] }],
+      ...(recent ? { defaultPath: sharedBackupDir(recent) } : {})
+    }
+    const pick = win
+      ? await dialog.showOpenDialog(win, pickOpts)
+      : await dialog.showOpenDialog(pickOpts)
+    const backup = pick.filePaths[0]
+    if (pick.canceled || !backup) return { ok: false, cancelled: true, message: '' }
+    const saveOpts = {
+      title: 'Where should the restored file go?',
+      buttonLabel: 'Put it here',
+      defaultPath:
+        originalFor(backup) ?? join(app.getPath('documents'), 'Restored locker data.lockers'),
+      filters: FILTERS
+    }
+    const place = win
+      ? await dialog.showSaveDialog(win, saveOpts)
+      : await dialog.showSaveDialog(saveOpts)
+    if (place.canceled || !place.filePath) return { ok: false, cancelled: true, message: '' }
+    const target = /\.lockers$/i.test(place.filePath) ? place.filePath : `${place.filePath}.lockers`
+    if (session.isOpen) await session.close()
+    const restored = await restoreBackupFile(nodeFs, backup, target, {
+      now: () => new Date(),
+      randomSuffix: () => randomBytes(6).toString('hex'),
+      sessionId: 'restoring'
+    })
+    log.info('backup restore', restored.ok ? 'done' : 'refused')
+    if (!restored.ok) return restored
+    return afterOpen(await session.open(target))
   })
 
   ipcMain.handle(channels.fileOpenPath, async (_e, raw: unknown): Promise<ActionResult> => {

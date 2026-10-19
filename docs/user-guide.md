@@ -192,6 +192,18 @@ Every save keeps the version it replaced.
 The version you had before restoring is kept as a backup too, so you can change your mind.
 Only the person editing the file can restore.
 
+### If the school's file will not open
+
+If Locker Manager says the file is damaged, use a backup instead.
+
+1. Close the file if it is open, so you are on the first screen.
+2. Click **Open a backup…**.
+3. Choose a backup from the "Locker Manager backups" folder beside the school's file. The
+   newest is at the bottom.
+4. Locker Manager suggests putting it in place of the school's file. Click **Put it here**.
+
+The damaged file is kept in the backups folder first, so nothing is thrown away.
+
 ## Change how long backups are kept
 
 Go to **Settings**, then **Storage**. It shows where the data file is, and how many backups

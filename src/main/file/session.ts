@@ -338,7 +338,7 @@ export class DataFileSession {
       db.close()
       return {
         ok: false,
-        message: `This file is damaged (${problems[0] ?? 'integrity check failed'}). Open a backup from the "${BACKUP_FOLDER_NAME}" folder beside it.`
+        message: `This file is damaged (${problems[0] ?? 'integrity check failed'}). Choose Open a backup… on the first screen to use one from the "${BACKUP_FOLDER_NAME}" folder beside it.`
       }
     }
 
