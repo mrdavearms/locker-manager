@@ -2,6 +2,8 @@
 // bundles this file and cannot load node_modules at runtime.
 export const channels = {
   appGetInfo: 'app:getInfo',
+  /** The window's code has drawn the app: the start counts as good (recovery.ts). */
+  appMounted: 'app:mounted',
   updateGetStatus: 'update:getStatus',
   updateCheck: 'update:check',
   updateInstall: 'update:install',

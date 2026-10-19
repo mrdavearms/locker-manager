@@ -7,7 +7,7 @@ import type {
   FileState,
   ReadOnlyView
 } from '@shared/fileState'
-import { LockerDb } from '../db/db'
+import { loadSqlJs, LockerDb } from '../db/db'
 import { appendAudit, getMeta, type AuditEntry, type OperatorContext } from '../db/context'
 import { migrate, schemaState } from '../db/migrate'
 import { historyOnlyIn, summarise } from '../db/summary'
@@ -290,6 +290,16 @@ export class DataFileSession {
     const read = await readDataFile(this.d.fs, path)
     if (!read.ok) return { ok: false, message: readProblemMessage(read.problem) }
 
+    // The database engine failing to start is not the file's fault: say so, so
+    // nobody restores a backup they did not need (stability audit, start-up F10).
+    try {
+      await loadSqlJs()
+    } catch (error) {
+      return {
+        ok: false,
+        message: `Locker Manager could not start its database engine (${error instanceof Error ? error.message : String(error)}). Your file has not been touched. Close Locker Manager and open it again.`
+      }
+    }
     let db: LockerDb
     try {
       db = await LockerDb.fromBytes(read.bytes)

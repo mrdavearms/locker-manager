@@ -19,7 +19,13 @@ export interface Launched {
  * previous launch on the same userData left behind.
  */
 export async function launchApp(
-  opts: { operator?: string | null; userData?: string; tour?: boolean; keepPrefs?: boolean } = {}
+  opts: {
+    operator?: string | null
+    userData?: string
+    tour?: boolean
+    keepPrefs?: boolean
+    env?: Record<string, string>
+  } = {}
 ): Promise<Launched> {
   const userData = opts.userData ?? mkdtempSync(join(tmpdir(), 'lockers-e2e-ud-'))
   const operator = opts.operator === undefined ? 'Test Operator' : opts.operator
@@ -38,7 +44,7 @@ export async function launchApp(
   }
   const app = await electron.launch({
     args: [resolve('.'), `--user-data-dir=${userData}`],
-    env: { ...process.env, CI: '1', LOCKER_MANAGER_BACKGROUND: '1' }
+    env: { ...process.env, CI: '1', LOCKER_MANAGER_BACKGROUND: '1', ...opts.env }
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')

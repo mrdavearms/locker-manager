@@ -38,6 +38,7 @@ function subscribe<T>(channel: string, listener: (value: T) => void): () => void
 const api = {
   // app and updates
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke(channels.appGetInfo),
+  appMounted: (): void => ipcRenderer.send(channels.appMounted),
   getUpdateStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke(channels.updateGetStatus),
   checkForUpdates: (): Promise<void> => ipcRenderer.invoke(channels.updateCheck),
   installUpdate: (): Promise<InstallResult> => ipcRenderer.invoke(channels.updateInstall),

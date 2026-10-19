@@ -1,10 +1,17 @@
 import initSqlJs, { type BindParams, type Database, type SqlJsStatic, type SqlValue } from 'sql.js'
 
 // sql.js loads its WebAssembly file from beside its own script, which also works
-// inside the packaged app's asar. Load it once per process.
+// inside the packaged app's asar. Load it once per process; a load that fails is
+// tried again next time instead of failing every file for the rest of the session.
 let sqlJs: Promise<SqlJsStatic> | null = null
 export function loadSqlJs(): Promise<SqlJsStatic> {
-  sqlJs ??= initSqlJs()
+  if (!sqlJs) {
+    const loading = initSqlJs()
+    sqlJs = loading
+    loading.catch(() => {
+      if (sqlJs === loading) sqlJs = null
+    })
+  }
   return sqlJs
 }
 

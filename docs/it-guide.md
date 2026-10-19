@@ -282,7 +282,17 @@ the data file.
 
 If a version fails to reach a working window twice in a row, the app shows a plain recovery
 page (no scripts) with links to try again, download the previous version, and open the local
-backups folder. The count is kept in `preferences.json` (`failedStarts`).
+backups folder. The count is kept in `preferences.json` (`failedStarts`). A start counts as
+working once the window has drawn the app, not merely loaded. If start-up stops with an error,
+the same page shows at once with the error, and the app still checks for a fixed version.
+
+### Graphics problems
+
+On some remote-desktop and virtual-desktop computers, and with old graphics drivers, Chromium's
+graphics process fails. The first time it does, the app writes a file called `gpu-off` in its
+data folder, and every later start draws without the graphics card. Delete the file to try the
+graphics card again. To turn the graphics card off from the first start, add `--disable-gpu`
+to the shortcut that starts Locker Manager.
 
 ## Other files on each computer
 

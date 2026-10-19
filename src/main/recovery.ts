@@ -29,10 +29,17 @@ export async function noteStarted(prefs: Preferences): Promise<void> {
   if (prefs.get().failedStarts !== 0) await prefs.update((x) => ({ ...x, failedStarts: 0 }))
 }
 
+/** A file in the app's data folder: while it exists, the app does not use the graphics card. */
+export const GPU_OFF_MARKER = 'gpu-off'
+
 const esc = (s: string): string =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
-export function showRecovery(prefs: Preferences): BrowserWindow {
+/**
+ * The recovery screen. With `problem`, start-up has just failed with that error;
+ * without it, this version has failed to start twice in a row.
+ */
+export function showRecovery(prefs: Preferences | undefined, problem?: string): BrowserWindow {
   const logs = join(app.getPath('logs'))
   const backups = join(app.getPath('userData'), 'backups')
   const html = `<!doctype html><html lang="en-AU"><head><meta charset="utf-8">
@@ -47,7 +54,11 @@ a{color:#0e4a57;font-weight:700}
 code{background:#ece6da;padding:2px 6px;border-radius:4px;font-size:14px}
 </style></head><body><main>
 <h1>${brand.name} did not start properly</h1>
-<p>Version ${esc(app.getVersion())} stopped before it opened, twice in a row. Your school’s file is safe:
+<p>${
+    problem === undefined
+      ? `Version ${esc(app.getVersion())} stopped before it opened, twice in a row.`
+      : `Version ${esc(app.getVersion())} could not start: ${esc(problem)}`
+  } Your school’s file is safe:
 the app only changes it while it is working, and backups are kept.</p>
 <ol>
 <li><a href="lmrecovery:retry" target="_blank">Try again</a>.</li>
@@ -71,8 +82,8 @@ such as 7-Zip on Windows) to get a <code>.lockers</code> file you can open.</li>
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url === 'lmrecovery:retry') {
-      void prefs
-        .update((x) => ({ ...x, failedStarts: 0 }))
+      void (prefs ? prefs.update((x) => ({ ...x, failedStarts: 0 })) : Promise.resolve())
+        .catch(() => undefined)
         .finally(() => {
           app.relaunch()
           app.exit(0)
@@ -83,5 +94,7 @@ such as 7-Zip on Windows) to get a <code>.lockers</code> file you can open.</li>
   })
   win.webContents.on('will-navigate', (e) => e.preventDefault())
   void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+  // Nothing else is open: closing this window ends the app, on a Mac too.
+  win.on('closed', () => app.quit())
   return win
 }

@@ -124,6 +124,16 @@ export function preferences(): Preferences {
   return prefs
 }
 
+/** The preferences, or undefined when start-up failed before they were read. */
+export function preferencesIfLoaded(): Preferences | undefined {
+  return prefs as Preferences | undefined
+}
+
+/** False when start-up failed before the data-file service existed. */
+export function fileServiceReady(): boolean {
+  return (session as DataFileSession | undefined) !== undefined
+}
+
 export function fileSession(): DataFileSession {
   return session
 }

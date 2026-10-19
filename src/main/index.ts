@@ -1,15 +1,18 @@
-import { join } from 'node:path'
-import { app, BrowserWindow } from 'electron'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import log from 'electron-log/main'
 import { brand } from '@shared/brand'
 import {
+  fileServiceReady,
   fileSession,
   initFileService,
   openFromOs,
   preferences,
+  preferencesIfLoaded,
   registerFileHandlers
 } from './fileService'
-import { noteStartAttempt, noteStarted, showRecovery } from './recovery'
+import { GPU_OFF_MARKER, noteStartAttempt, noteStarted, showRecovery } from './recovery'
 import { openLockerLink } from './links'
 import { registerIpcHandlers } from './ipc/handlers'
 import { handlers as rpcHandlers } from './rpc/handlers'
@@ -22,8 +25,16 @@ import { buildMenu } from './menu'
 import { detectDeveloperIdSignature, detectWindowsSignature } from './signing'
 import { buildCommit } from './buildInfo'
 import { macBlocker, updateMode } from './update/policy'
-import { bundleWritable, readLastMacResult, runningBundle } from './update/macInstaller'
-import { setupUpdater } from './update/updater'
+import {
+  bundleWritable,
+  readLastMacResult,
+  runningBundle,
+  type MacResult
+} from './update/macInstaller'
+import { setupUpdater, type UpdatePrefs } from './update/updater'
+import { readManaged } from './managed'
+import { channels } from '@shared/channels'
+import type { UpdateMode } from '@shared/ipc'
 import { initComputer, registerComputerHandlers, updatePrefs } from './computerService'
 import { createMainWindow, installContentSecurityPolicy } from './window'
 
@@ -34,6 +45,29 @@ log.transports.file.level = 'info'
 log.transports.console.level = app.isPackaged ? false : 'debug'
 
 app.setName(brand.name)
+
+// Unhandled errors are logged instead of showing Electron's own error box over a
+// working window (docs/audits/2026-10-20-stability-audit.md, finding 3).
+log.errorHandler.startCatching({ showDialog: false })
+
+// Some remote-desktop and virtual-desktop computers, and old graphics drivers, crash
+// Chromium's graphics process. After it fails once, later starts draw without the
+// graphics card. IT can also start the app with --disable-gpu (docs/it-guide.md).
+const gpuOff = join(app.getPath('userData'), GPU_OFF_MARKER)
+if (existsSync(gpuOff)) app.disableHardwareAcceleration()
+app.on('child-process-gone', (_event, details) => {
+  if (details.type !== 'GPU' || details.reason === 'clean-exit' || details.reason === 'killed')
+    return
+  log.warn(
+    `graphics process stopped (${details.reason}); later starts will not use the graphics card`
+  )
+  try {
+    mkdirSync(dirname(gpuOff), { recursive: true })
+    writeFileSync(gpuOff, `${details.reason} ${new Date().toISOString()}\n`)
+  } catch (error) {
+    log.warn('could not record the graphics failure', String(error))
+  }
+})
 
 // One copy of the app per computer (SPEC.md 8.2).
 if (!app.requestSingleInstanceLock()) {
@@ -52,10 +86,17 @@ if (!app.requestSingleInstanceLock()) {
       if (win.isMinimized()) win.restore()
       win.focus()
     }
+    // Until start-up has finished, files and links wait like those given at launch.
     const file = argv.slice(1).find((a) => /\.lockers$/i.test(a))
-    if (file) void openFromOs(file)
+    if (file) {
+      if (ready) void openFromOs(file)
+      else pendingFiles.push(file)
+    }
     const link = argv.slice(1).find((a) => a.startsWith(`${brand.protocol}://`))
-    if (link) openLockerLink(link)
+    if (link) {
+      if (ready) openLockerLink(link)
+      else pendingLinks.push(link)
+    }
   })
 
   if (app.isPackaged) {
@@ -75,7 +116,28 @@ if (!app.requestSingleInstanceLock()) {
     else pendingLinks.push(url)
   })
 
-  void app.whenReady().then(async () => {
+  // Everything before the first window is one step: an error anywhere in it used to
+  // leave a copy running with no window, holding the single-instance lock, so every
+  // later launch quit at once and the updater never started
+  // (docs/audits/2026-10-20-stability-audit.md, finding 3).
+  let mode: UpdateMode = 'disabled'
+  let unsignedMac = false
+  let blocker: string | null = null
+  let updaterStarted = false
+
+  function startUpdater(prefs: UpdatePrefs, closeFile: () => Promise<unknown>): void {
+    if (updaterStarted) return
+    updaterStarted = true
+    setupUpdater(mode, prefs, {
+      macSelfInstall: unsignedMac && blocker === null,
+      manualReason: blocker ?? undefined,
+      lastMacResult: lastMacResult,
+      closeFile
+    })
+  }
+  let lastMacResult: MacResult | null = null
+
+  async function start(): Promise<void> {
     const signed = !app.isPackaged
       ? false
       : process.platform === 'darwin'
@@ -84,19 +146,34 @@ if (!app.requestSingleInstanceLock()) {
           ? await detectWindowsSignature(process.execPath)
           : false
     // An unsigned Mac copy replaces its own app bundle when macOS allows it (update/macInstaller.ts).
-    const unsignedMac = app.isPackaged && process.platform === 'darwin' && !signed
+    unsignedMac = app.isPackaged && process.platform === 'darwin' && !signed
     const bundle = unsignedMac ? runningBundle() : ''
-    const blocker = unsignedMac ? macBlocker(bundle, await bundleWritable(bundle)) : null
-    const mode = updateMode({
+    blocker = unsignedMac ? macBlocker(bundle, await bundleWritable(bundle)) : null
+    mode = updateMode({
       platform: process.platform,
       packaged: app.isPackaged,
       signed,
       macBlocker: blocker
     })
+    lastMacResult = unsignedMac ? await readLastMacResult() : null
     log.info(
       `${brand.name} ${app.getVersion()} starting; build=${buildCommit} platform=${process.platform} signed=${signed} updates=${mode}` +
         (unsignedMac ? ` mac-self-install=${blocker === null ? 'yes' : 'no'}` : '')
     )
+
+    // For the end-to-end test of a failed start only; an installed copy ignores it.
+    if (!app.isPackaged && process.env['LOCKER_MANAGER_FAIL_START'] === '1')
+      throw new Error('a start-up test failure')
+    await initFileService()
+    // Counted first, so a start that fails anywhere after this is seen (SPEC.md 9.3).
+    // Writing the count must never stop the app starting.
+    const recover = await noteStartAttempt(preferences()).catch((error: unknown) => {
+      log.warn('could not record the start attempt', String(error))
+      return false
+    })
+    // The updater starts as early as it can, so even a copy that fails later can
+    // install a fixed release.
+    startUpdater(updatePrefs(), () => fileSession().close())
 
     // Fonts for labels and letters: beside the app when packaged, in the project in development.
     setFontDir(
@@ -106,7 +183,6 @@ if (!app.requestSingleInstanceLock()) {
     )
     installContentSecurityPolicy()
     void sweepRenderTemp()
-    await initFileService()
     registerIpcHandlers(signed)
     registerFileHandlers()
     registerRpc(fileSession, rpcHandlers)
@@ -114,35 +190,78 @@ if (!app.requestSingleInstanceLock()) {
     registerDocumentHandlers()
     initComputer()
     registerComputerHandlers()
-    setupUpdater(mode, updatePrefs(), {
-      macSelfInstall: unsignedMac && blocker === null,
-      manualReason: blocker ?? undefined,
-      lastMacResult: unsignedMac ? await readLastMacResult() : null,
-      closeFile: () => fileSession().close()
-    })
     buildMenu()
-    if (await noteStartAttempt(preferences())) {
+    if (recover) {
       showRecovery(preferences())
       return
     }
+    // The start counts as good once the window's code has drawn the app, not when
+    // the page loads: a page whose code fails still finishes loading.
+    ipcMain.once(channels.appMounted, () => {
+      void noteStarted(preferences()).catch((error: unknown) =>
+        log.warn('could not record the start', String(error))
+      )
+    })
     const win = createMainWindow()
     ready = true
     win.webContents.once('did-finish-load', () => {
-      void noteStarted(preferences())
       const file = pendingFiles.pop()
       if (file) void openFromOs(file)
       const link = pendingLinks.pop()
       if (link) setTimeout(() => openLockerLink(link), 1500)
     })
+  }
 
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
-    })
+  /** Start-up failed: say so in a window, and keep the updater able to fix it. */
+  function startFailed(error: unknown): void {
+    log.error('start-up failed', error)
+    const problem = error instanceof Error ? error.message : String(error)
+    if (mode !== 'disabled') {
+      try {
+        // No preferences may be readable here; IT's managed settings still apply.
+        startUpdater(
+          {
+            autoInstall: true,
+            channel: 'stable',
+            autoCheck: readManaged().managed.autoUpdate !== false
+          },
+          async () => undefined
+        )
+      } catch (e) {
+        log.error('updater could not start either', e)
+      }
+    }
+    try {
+      showRecovery(preferencesIfLoaded(), problem)
+    } catch (e) {
+      log.error('recovery page failed', e)
+      dialog.showErrorBox(
+        `${brand.name} could not start`,
+        `${problem}\n\nYour school's file has not been changed. Try again, or restart the computer. If it keeps happening, tell your IT team.`
+      )
+      app.exit(1)
+    }
+  }
+
+  void app.whenReady().then(async () => {
+    try {
+      await start()
+    } catch (error) {
+      startFailed(error)
+    }
+  })
+
+  app.on('activate', () => {
+    if (ready && BrowserWindow.getAllWindows().length === 0) createMainWindow()
   })
 
   // Closing the window closes the file: saved, and the edit lock released, so a
   // Mac app left running without a window never blocks anyone else.
   app.on('window-all-closed', () => {
+    if (!fileServiceReady()) {
+      app.quit()
+      return
+    }
     void fileSession()
       .close()
       .finally(() => {
@@ -153,7 +272,7 @@ if (!app.requestSingleInstanceLock()) {
   // Never quit with unsaved changes or a held lock (SPEC.md 6.2, 9.3).
   let closedForQuit = false
   app.on('before-quit', (event) => {
-    if (closedForQuit || !fileSession().isOpen) return
+    if (closedForQuit || !fileServiceReady() || !fileSession().isOpen) return
     event.preventDefault()
     void fileSession()
       .close()
