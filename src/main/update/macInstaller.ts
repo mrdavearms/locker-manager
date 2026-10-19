@@ -166,7 +166,9 @@ export function installMacUpdate(input: {
       input.newApp,
       input.relaunch ? '1' : '0',
       resultFile,
-      input.version
+      input.version,
+      // A copy started with its own data folder (the update proofs) reopens with it.
+      ...process.argv.filter((a) => a.startsWith('--user-data-dir='))
     ],
     { detached: true, stdio: 'ignore' }
   )

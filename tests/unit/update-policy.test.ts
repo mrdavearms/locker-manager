@@ -193,6 +193,16 @@ describe('macZipFile', () => {
 })
 
 describe('releaseFileUrl', () => {
+  it('takes the release checks’ local feed as it is, and nothing else over plain http', () => {
+    const repo = 'https://github.com/mrdavearms/locker-manager'
+    expect(releaseFileUrl(repo, '1.0.1', 'http://127.0.0.1:8765/next.zip')).toBe(
+      'http://127.0.0.1:8765/next.zip'
+    )
+    expect(releaseFileUrl(repo, '1.0.1', 'http://example.com/next.zip')).toMatch(
+      /^https:\/\/github\.com\//
+    )
+  })
+
   it('builds the download address from the file name', () => {
     expect(
       releaseFileUrl(

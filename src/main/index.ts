@@ -25,6 +25,7 @@ import { setFontDir } from './render/fonts'
 import { sweepRenderTemp } from './render/pdf'
 import { registerRpc } from './rpc/registry'
 import { buildMenu } from './menu'
+import { runSelfTest, SELF_TEST_FLAG } from './selfTest'
 import { shutdownNoteMessage, takeShutdownNote, writeShutdownNote } from './shutdownNote'
 import { detectDeveloperIdSignature, detectWindowsSignature } from './signing'
 import { buildCommit } from './buildInfo'
@@ -42,6 +43,13 @@ import { channels } from '@shared/channels'
 import type { UpdateMode } from '@shared/ipc'
 import { initComputer, registerComputerHandlers, updatePrefs } from './computerService'
 import { createMainWindow, installContentSecurityPolicy } from './window'
+
+// A copy started with its own data folder (tests, update proofs) keeps its log there too,
+// so it never writes to the log of the copy staff use.
+if (process.argv.some((a) => a.startsWith('--user-data-dir='))) {
+  app.setAppLogsPath(join(app.getPath('userData'), 'logs'))
+  log.transports.file.resolvePathFn = () => join(app.getPath('userData'), 'logs', 'main.log')
+}
 
 // Logs go to the app data folder, rotated. Never log names or codes (SPEC.md 8.1).
 log.initialize()
@@ -74,8 +82,20 @@ app.on('child-process-gone', (_event, details) => {
   }
 })
 
-// One copy of the app per computer (SPEC.md 8.2).
-if (!app.requestSingleInstanceLock()) {
+if (process.argv.includes(SELF_TEST_FLAG)) {
+  // The release checks run this on every build: no window, no file, no updater.
+  void app
+    .whenReady()
+    .then(runSelfTest)
+    .then(
+      (code) => app.exit(code),
+      (error: unknown) => {
+        log.error('self-test could not run', error)
+        app.exit(1)
+      }
+    )
+} else if (!app.requestSingleInstanceLock()) {
+  // One copy of the app per computer (SPEC.md 8.2).
   app.quit()
 } else {
   // Files double-clicked before the app is ready wait here.

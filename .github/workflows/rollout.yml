@@ -4,7 +4,9 @@ name: Rollout percentage
 # raise the share. Run from the Actions page: choose the release tag and a percentage.
 # 100 offers it to everyone. electron-updater reads `stagingPercentage` from the
 # release's latest.yml (Windows) and latest-mac.yml (Mac); each computer keeps a fixed
-# random number, so the same computers stay in or out as the share rises.
+# random number, so the same computers stay in or out as the share rises. 0 withdraws a
+# release that turns out to be bad: no computer takes it, and copies that already have
+# it are unaffected (stability audit, finding 4).
 
 on:
   workflow_dispatch:
@@ -13,7 +15,7 @@ on:
         description: 'Release tag, for example v1.0.1'
         required: true
       percentage:
-        description: 'Share of computers offered the update (1 to 100)'
+        description: 'Share of computers offered the update (0 to 100; 0 withdraws it)'
         required: true
         default: '20'
 
@@ -41,7 +43,7 @@ jobs:
       - name: Check the inputs
         run: |
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { echo "Bad tag: $TAG"; exit 1; }
-          [[ "$PCT" =~ ^[0-9]+$ ]] && (( PCT >= 1 && PCT <= 100 )) || { echo "Bad percentage: $PCT"; exit 1; }
+          [[ "$PCT" =~ ^[0-9]+$ ]] && (( PCT >= 0 && PCT <= 100 )) || { echo "Bad percentage: $PCT"; exit 1; }
       - name: Set the share in the update files
         run: |
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p latest.yml -p latest-mac.yml

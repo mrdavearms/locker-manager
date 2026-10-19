@@ -101,6 +101,8 @@ export function macZipFile<T extends { url: string }>(files: readonly T[]): T | 
  */
 export function releaseFileUrl(repoUrl: string, version: string, file: string): string {
   if (/^https:\/\//i.test(file)) return file
+  // The release checks' own feed on the build machine (scripts/update-proof/onward-*).
+  if (/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(file)) return file
   return `${repoUrl.replace(/\/$/, '')}/releases/download/v${version}/${encodeURIComponent(file)}`
 }
 

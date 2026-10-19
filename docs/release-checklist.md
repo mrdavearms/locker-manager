@@ -87,6 +87,20 @@ Each computer keeps the same random number, so a computer that already has the u
 it, and raising the share only adds computers. Run it with `100` straight away to undo a
 mistake. The automatic update test runs before you set a share, so it is not affected.
 
+**To withdraw a bad release**, run it with `0`: no computer that does not have it yet will
+take it. Then fix the fault and publish a higher version, which every copy takes as usual.
+This works only while immutable releases are off (docs/signing.md); with them on, the only
+remedy is a higher version.
+
+## What the release checks prove
+
+Before anything is published, each build runs `--self-test` on the built app (database
+engine, demo school, window files and fonts inside the package) and an onward update proof
+(`scripts/update-proof/onward-mac.sh`, `onward-windows.ps1`): the built app, starting as a
+copy that has already updated once, updates itself to the same commit built as the next
+version, served from the build machine itself, and passes its self-test. After publishing,
+the update proof shows the previous release updating to this one.
+
 ## Hand checks before 1.0
 
 Automated tests cannot do these. Each needs a person, real paper or a real computer.
