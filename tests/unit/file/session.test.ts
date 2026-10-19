@@ -876,6 +876,20 @@ describe('closing never throws away unsaved changes', () => {
     expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC High School')
   })
 
+  // docs/audits/2026-10-20-stability-audit.md, finding 9.
+  it('a save that keeps failing backs up the version on disk once, not at every retry', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const dave = person('Dave', 'DAVE-MAC', dir, undefined, {
+      fs: faultyFs([{ method: 'writeNewFileDurable', match: (p) => p.startsWith(`${path}.tmp-`) }])
+    })
+    await dave.session.open(path)
+    rename(dave, 'SYNTHETIC Not Yet Saved')
+    for (let i = 0; i < 5; i++) await dave.session.flush()
+    expect(dave.session.hasUnsavedChanges).toBe(true)
+    expect(readdirSync(join(dir, BACKUP_FOLDER_NAME, 'Locker data'))).toHaveLength(1)
+  })
+
   it('keeps a backup when the last save finds the file changed by someone else', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)

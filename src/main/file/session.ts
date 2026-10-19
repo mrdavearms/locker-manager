@@ -126,6 +126,9 @@ interface Open {
   saveAgain: boolean
   lastSavedAt: string | null
   lastBackupAt: string | null
+  /** Hash of the version last backed up on save: a save retried after a failure
+   * backs up the same version only once (stability audit, finding 9). */
+  lastBackupHash: string | null
   problems: FileProblemView[]
   conflict: (ConflictView & { diskBytes: Uint8Array | null; diskHash: string | null }) | null
   conflictCopies: string[]
@@ -349,6 +352,7 @@ export class DataFileSession {
       saveAgain: false,
       lastSavedAt: null,
       lastBackupAt: null,
+      lastBackupHash: null,
       problems: [],
       conflict: null,
       conflictCopies: [],
@@ -692,7 +696,10 @@ export class DataFileSession {
         expectedHash: c.hash,
         randomSuffix: this.d.randomSuffix,
         backupPrevious: async (prev) => {
+          const hash = sha256(prev)
+          if (hash === c.lastBackupHash) return
           partialBackupWarning = await this.backupBytes(prev)
+          c.lastBackupHash = hash
         }
       })
       if (this.cur !== c) return

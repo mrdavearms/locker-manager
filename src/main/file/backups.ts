@@ -119,7 +119,8 @@ function weekKey(d: Date): number {
  * older than the promise go (oldest first); the last day is thinned to one per 10
  * minutes; the hourly week to one per 3, 6, 12 then 24 hours; the last day to one
  * an hour; the daily stage to one per 2, 4, 8... days. Only then the oldest
- * unnamed, then the oldest named. The last hour and the newest backup are kept.
+ * unnamed, then the oldest named. The newest backup is always kept; the last hour
+ * is thinned to one per 10 minutes only when the last day's thinning was not enough.
  */
 export function planPrune(
   entries: readonly BackupEntry[],
@@ -160,22 +161,30 @@ export function planPrune(
   }
   // Keeps the newest kept backup in each slot of one age range, dropping the rest,
   // newest slots first, until under the cap. The last hour is never thinned.
-  const thin = (fromMs: number, toMs: number, slot: (e: BackupEntry) => number): void => {
+  const thin = (
+    fromMs: number,
+    toMs: number,
+    slot: (e: BackupEntry) => number,
+    lastHourToo = false
+  ): void => {
     if (total <= policy.maxBytes) return
     const seen = new Set<number>()
     for (const e of sorted) {
       if (total <= policy.maxBytes) break
       if (!keep.has(e.name) || e.label !== null || e.name === newest) continue
       const age = now.getTime() - e.at.getTime()
-      if (age < Math.max(HOUR, fromMs) || age >= toMs) continue
+      if (age < (lastHourToo ? fromMs : Math.max(HOUR, fromMs)) || age >= toMs) continue
       if (!firstIn(seen, slot(e))) drop(e)
     }
   }
   const lastDay = [0, policy.keepAllDays * DAY] as const
   const hourly = [policy.keepAllDays * DAY, policy.hourlyDays * DAY] as const
   const daily = [policy.hourlyDays * DAY, policy.dailyDays * DAY] as const
-  // A busy day never pushes out weeks of history.
+  // A busy day never pushes out weeks of history. Nor does a crowded last hour: a run
+  // of saves that kept failing once filled it and pushed out every daily backup
+  // (stability audit, finding 9), so it is thinned the same way if still over the cap.
   thin(...lastDay, (e) => Math.floor(e.at.getTime() / (10 * 60 * 1000)))
+  thin(0, HOUR, (e) => Math.floor(e.at.getTime() / (10 * 60 * 1000)), true)
   for (const hours of [3, 6, 12, 24])
     thin(...hourly, (e) => Math.floor(e.at.getTime() / (hours * HOUR)))
   thin(...lastDay, (e) => Math.floor(e.at.getTime() / HOUR))
