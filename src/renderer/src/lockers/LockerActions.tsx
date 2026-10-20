@@ -71,6 +71,95 @@ export function IssuedDialog({
   )
 }
 
+/**
+ * A fixed-code padlock's code comes with it (SPEC.md 4.5), so a new code means a new
+ * padlock: staff type in its code and serial. Typing a code in is not recorded as
+ * showing it, but the school's PIN still applies.
+ */
+export function RecordPadlockDialog({
+  lockerId,
+  lockerNumber,
+  replacing,
+  onClose
+}: {
+  lockerId: string
+  lockerNumber: string
+  /** True when the locker already has a padlock with a code recorded. */
+  replacing: boolean
+  onClose: () => void
+}): React.JSX.Element {
+  const terms = useTerms()
+  const act = useAction()
+  const notify = useNotify()
+  const gate = useCodeGate()
+  const [code, setCode] = useState('')
+  const [serial, setSerial] = useState('')
+  const locker = terms.locker.one.toLowerCase()
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={
+        replacing
+          ? `Record the new padlock for ${locker} ${lockerNumber}`
+          : `Record the padlock’s code for ${locker} ${lockerNumber}`
+      }
+      description={
+        replacing
+          ? 'This padlock’s code cannot change. Put a different padlock on, then type its code and serial here. The old code stays in the history.'
+          : 'This padlock’s code comes with it. Type the code and serial from its tag or box.'
+      }
+      testId="record-padlock"
+    >
+      <div className="grid gap-4">
+        <Field label="Code" hint="The numbers on the padlock’s tag." htmlFor="padlock-code">
+          <TextInput
+            id="padlock-code"
+            autoFocus
+            autoComplete="off"
+            inputMode="numeric"
+            value={code}
+            maxLength={20}
+            onChange={(e) => setCode(e.target.value)}
+          />
+        </Field>
+        <Field label="Serial (optional)" htmlFor="padlock-serial">
+          <TextInput
+            id="padlock-serial"
+            autoComplete="off"
+            value={serial}
+            maxLength={60}
+            onChange={(e) => setSerial(e.target.value)}
+          />
+        </Field>
+      </div>
+      <div className="mt-6 flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          disabled={code.trim().length === 0}
+          data-testid="confirm-record-padlock"
+          onClick={() =>
+            void act(async () => {
+              if (!(await gate())) return
+              await call('codes.setFixed', {
+                lockerId,
+                code,
+                serial: serial.trim() || null
+              })
+              onClose()
+              notify(`New padlock recorded for ${locker} ${lockerNumber}.`)
+            })
+          }
+        >
+          {replacing ? 'Record the new padlock' : 'Record the code'}
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
 /** Chooses a free locker: the suggested one first, then any other. */
 function LockerChooser({
   studentId,
@@ -133,8 +222,11 @@ export function StudentLockerCard({
   const notify = useNotify()
   const { data: allLockers } = useRpc('lockers.list', {})
   // Show code only where the lock can hold a code (not keyed, no lock, or a lock-free locker).
-  const lockType = allLockers?.find((l) => l.id === s.locker?.id)?.lockType ?? null
+  const lockerRow = allLockers?.find((l) => l.id === s.locker?.id)
+  const lockType = lockerRow?.lockType ?? null
   const lockHasCode = lockType !== null && LOCK_TYPE_INFO[lockType].hasCode
+  // A fixed-code padlock cannot be given a new code: New code records a new padlock.
+  const fixedPadlock = lockHasCode && !LOCK_TYPE_INFO[lockType!].codeSettable
   const [dialog, setDialog] = useState<LockerIntent>(intent)
   const [lockerId, setLockerId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
@@ -384,7 +476,15 @@ export function StudentLockerCard({
           </div>
         </Modal>
       )}
-      {dialog === 'recode' && s.locker && (
+      {dialog === 'recode' && s.locker && fixedPadlock && (
+        <RecordPadlockDialog
+          lockerId={s.locker.id}
+          lockerNumber={s.locker.number}
+          replacing={lockerRow?.codeStatus !== 'reset_no_code'}
+          onClose={close}
+        />
+      )}
+      {dialog === 'recode' && s.locker && !fixedPadlock && (
         <Modal
           open
           onOpenChange={(o) => !o && close()}

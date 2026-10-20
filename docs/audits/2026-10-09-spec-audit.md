@@ -30,7 +30,7 @@ The "close behind these" list, as of 18 October 2026:
 | Year-level exclusion typed as "Year 12" | Fixed for new exclusions: stored as "12". Test in students.test.ts. One typed before this still matches nothing; remove it and add it again |
 | Failed migration or backup inside `open()` | Fixed: the edit lock is given back and the file is closed. Test in session.test.ts |
 | Ctrl+Z after printing loses the print record | Fixed: undo keeps `print_job` rows like history. Test in session.test.ts |
-| Fixed-code padlocks cannot be recorded from a screen | Open: `codes.setFixed` still has no caller in the window |
+| Fixed-code padlocks cannot be recorded from a screen | Fixed 18 Oct: New code on a fixed padlock, and the Lockers screen panel, open Record the new padlock (`RecordPadlockDialog`). Not a reveal; the PIN applies (Dave). Tests: fixedPadlock.test.ts, e2e fixed-padlock.spec |
 | Release notes fetched but never shown | Open |
 | Sync-copy comparison open at close | Data safe (kept as a backup); the changes do not reach the school file |
 

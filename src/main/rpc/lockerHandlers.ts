@@ -167,7 +167,14 @@ export const lockerHandlers: Pick<Handlers, Keys> = {
       after: { serial: p.serial }
     }),
     run: (db, ctx, p) => {
-      setFixedCode(db, ctx, requireLock(db, p.lockerId), p.code, p.serial)
+      const lockId = requireLock(db, p.lockerId)
+      const info = LOCK_TYPE_INFO[lockForLocker(db, p.lockerId)!.type]
+      if (!info.hasCode || info.codeSettable)
+        throw new Error('Only a fixed-code padlock has its code typed in. Use New code instead.')
+      // Typing a code in shows nothing, so it is not a reveal; the PIN still applies
+      // because it replaces the code staff will later show and print (Dave, 18 Oct 2026).
+      assertCodesAllowed(db)
+      setFixedCode(db, ctx, lockId, p.code, p.serial)
       return null
     }
   },
