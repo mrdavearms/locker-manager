@@ -22,10 +22,12 @@
     "electron.vite.config.ts",
     "playwright.config.ts",
     "vitest.config.ts",
+    "vitest.electron.config.ts",
     "src/main/**/*.ts",
     "src/preload/**/*.ts",
     "src/shared/**/*.ts",
     "tests/unit/**/*.ts",
-    "tests/e2e/**/*.ts"
+    "tests/e2e/**/*.ts",
+    "tests/electron/**/*.ts"
   ]
 }

@@ -317,6 +317,9 @@ All data reads and writes from the window go through ONE channel, `rpc`:
   an update (`freshStagingDir`), and the Mac update proof starts from a copy that has
   already updated itself once (from 0.11.4 on). The rule behind all three: nothing an
   update leaves on disk may stop the next update.
+- Vitest runs on plain Node, which has no asar patch, so update folder code is also tested in a
+  real Electron main process (`npm run test:electron`, tests/electron/). Only a real asar archive
+  shows the fault (a text file named .asar deletes fine), and only async `rm` fails, not `rmSync`.
 
 - A copy started with `--user-data-dir` logs into that folder (`resolvePathFn` in
   index.ts): electron-log ignores `app.setAppLogsPath`. The Mac install script passes that

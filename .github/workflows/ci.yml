@@ -62,6 +62,10 @@ jobs:
       # data-file tests run here as well as on Linux.
       - name: Unit, file-safety and crash tests
         run: npm test
+      # Electron's own fs treats a .asar file as a folder; Node's does not. These
+      # run the update folder code in a real Electron main process (0.11.x fault).
+      - name: Update folder tests inside Electron
+        run: npm run test:electron
       - run: npm run build
       - name: End-to-end tests against the built app
         run: npm run test:e2e
