@@ -12,7 +12,8 @@ their feature wording describes this version before releasing.
 `scripts/release.sh 0.8.0` does the steps below in order: sets the version, commits, pushes,
 waits for CI on that commit, then tags it. It always pushes to `main`. It commits only
 package.json, package-lock.json, README.md and site/index.html, so commit any
-`docs/release-highlights/vX.Y.Z.md` first, or the release notes will not find it. It stops
+`docs/release-highlights/vX.Y.Z.md` first, or the release notes will not find it. On a Mac it
+first runs `npm run proof:mac` (below) and stops, before pushing, if that fails. It stops
 if CI fails, and can be run again with the same number once the fault is fixed. The Update proof workflow then runs by itself.
 
 ## Before tagging
@@ -98,7 +99,10 @@ Before anything is published, each build runs `--self-test` on the built app (da
 engine, demo school, window files and fonts inside the package) and an onward update proof
 (`scripts/update-proof/onward-mac.sh`, `onward-windows.ps1`): the built app, starting as a
 copy that has already updated once, updates itself to the same commit built as the next
-version, served from the build machine itself, and passes its self-test. After publishing,
+version, served from the build machine itself, and passes its self-test.
+`npm run proof:mac` does more on your own Mac before anything is pushed: it builds the app
+and proves a fresh copy updates itself twice in a row (N to N+1, then N+1 to N+2), each
+update passing its self-test. Run it by hand after any change to the updater. After publishing,
 the update proof shows the previous release updating to this one.
 
 ## Hand checks before 1.0
