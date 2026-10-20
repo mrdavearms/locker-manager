@@ -82,6 +82,7 @@ export function ReportsScreen({
   const [saved, setSaved] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [exportCodes, setExportCodes] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const info = REPORTS[id]
   const request: ReportRequest = {
@@ -317,10 +318,24 @@ export function ReportsScreen({
                 variant="secondary"
                 disabled={busy || (exportCodes && !canEdit)}
                 data-testid="export-all"
-                onClick={() => run(() => window.api.exportAll(exportCodes), exportCodes)}
+                onClick={() =>
+                  run(async () => {
+                    setExporting(true)
+                    try {
+                      return await window.api.exportAll(exportCodes)
+                    } finally {
+                      setExporting(false)
+                    }
+                  }, exportCodes)
+                }
               >
                 <Archive size={17} aria-hidden /> Export the whole file…
               </Button>
+              {exporting && (
+                <p role="status" className="mt-2 text-sm text-ink-muted" data-testid="export-busy">
+                  Making the workbook… this can take a minute.
+                </p>
+              )}
             </div>
           </SectionCard>
         </div>

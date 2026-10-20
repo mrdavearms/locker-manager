@@ -483,6 +483,26 @@ export function registerFileHandlers(): void {
           const locked = session.read((db) => codesLocked(db))
           if (locked) return { ok: false, message: locked }
         }
+        // Where to save is asked first: a large school's workbook takes up to a minute
+        // to make, and that wait should come after the choice, not before it.
+        const path = await pickOutputPath(
+          `${includeCodes ? 'CONFIDENTIAL ' : ''}${st.summary.schoolName} portable export ${stampDate()}.xlsx`,
+          { name: 'Excel workbook', extension: 'xlsx' }
+        )
+        if (!path) return { ok: false, cancelled: true, message: '' }
+        // Another file can be opened while the dialog is up (from Finder or Explorer).
+        // Never write one school's data where the operator chose to save another's.
+        const now = session.state
+        if (now.status !== 'open' || now.path !== st.path || now.openedAt !== st.openedAt)
+          return {
+            ok: false,
+            message: 'A different file was opened while you chose where to save. Nothing was saved.'
+          }
+        if (includeCodes) {
+          // The PIN can time out while the save dialog is open.
+          const locked = session.read((db) => codesLocked(db))
+          if (locked) return { ok: false, message: `${locked} Nothing was saved.` }
+        }
         // Which lockers' codes the workbook will hold: current, past and next year's.
         // Worked out before the export runs, while nothing else can change the file.
         const lockerIds = includeCodes ? session.read((db) => lockersWithAnyCode(db)) : []
@@ -495,11 +515,6 @@ export function registerFileHandlers(): void {
             now: new Date()
           })
         )
-        const path = await pickOutputPath(
-          `${includeCodes ? 'CONFIDENTIAL ' : ''}${st.summary.schoolName} portable export ${stampDate()}.xlsx`,
-          { name: 'Excel workbook', extension: 'xlsx' }
-        )
-        if (!path) return { ok: false, cancelled: true, message: '' }
         // Recorded before the file is written: no code leaves the app unrecorded.
         try {
           if (

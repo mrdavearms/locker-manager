@@ -10,7 +10,7 @@ import type { LockerDb } from '../db/db'
 import { newId, stamp, type OperatorContext } from '../db/context'
 import { allocate, orderLockers, type EngineLocker, type EngineStudent } from '../allocate/engine'
 import { displayGroup } from '../import/groups'
-import { activeYearId, issueCode, lockForLocker, markNeedsNewCode } from './codes'
+import { activeYearId, CodeCache, issueCode, lockForLocker, markNeedsNewCode } from './codes'
 import { getSetting, setSetting } from './settings'
 import { groupMap, sortLastGroups } from './students'
 
@@ -80,9 +80,14 @@ function endAssignment(
   )
 }
 
-function issueFor(db: LockerDb, ctx: OperatorContext, lockerId: string): string | null {
+function issueFor(
+  db: LockerDb,
+  ctx: OperatorContext,
+  lockerId: string,
+  cache?: CodeCache
+): string | null {
   const lock = lockForLocker(db, lockerId)
-  return lock ? issueCode(db, ctx, lock.id, 'issued') : null
+  return lock ? issueCode(db, ctx, lock.id, 'issued', undefined, cache) : null
 }
 
 function flagOld(db: LockerDb, ctx: OperatorContext, lockerId: string): void {
@@ -302,6 +307,8 @@ export function commitDraft(
 ): { assigned: number; codes: number } {
   const seen = new Set<string>()
   let codes = 0
+  // Codes in use are worked out once for the whole allocation, not once per lock.
+  const cache = new CodeCache(db)
   for (const a of assignments) {
     if (seen.has(a.studentId)) throw new Error('A student appears twice in the allocation.')
     seen.add(a.studentId)
@@ -310,7 +317,7 @@ export function commitDraft(
         `${studentName(db, a.studentId)} already has a locker. Make the allocation again.`
       )
     insertAssignment(db, ctx, a.studentId, a.lockerId)
-    if (opts.issueCodes && issueFor(db, ctx, a.lockerId) !== null) codes++
+    if (opts.issueCodes && issueFor(db, ctx, a.lockerId, cache) !== null) codes++
   }
   return { assigned: assignments.length, codes }
 }

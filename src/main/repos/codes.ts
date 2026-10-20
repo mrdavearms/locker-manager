@@ -136,6 +136,114 @@ function codesInOtherSets(db: LockerDb): Set<string> {
   return out
 }
 
+/** Adds `n` to a code's count, dropping it at zero. */
+function bump(counts: Map<string, number>, code: string, n: number): void {
+  const next = (counts.get(code) ?? 0) + n
+  if (next > 0) counts.set(code, next)
+  else counts.delete(code)
+}
+
+interface CachedLock {
+  code: string
+  areaId: string | null
+  active: boolean
+}
+
+/**
+ * The codes on locks and in code sets, decrypted once for a job that issues many
+ * codes (giving out lockers to a whole school), then kept current as each code is
+ * written. It answers exactly as `takenCodes` and `codesOnLocks` would. Only valid
+ * while nothing but `issueCode` changes locks and code sets.
+ */
+export class CodeCache {
+  private loaded = false
+  private readonly locks = new Map<string, CachedLock>()
+  private readonly onLocks = new Map<string, number>()
+  private readonly active = new Map<string, number>()
+  private readonly byArea = new Map<string, Map<string, number>>()
+  private readonly inSets = new Map<string, number>()
+
+  constructor(private readonly db: LockerDb) {}
+
+  private load(): void {
+    if (this.loaded) return
+    this.loaded = true
+    const key = codeKey(this.db)
+    for (const r of this.db.all<{
+      id: string
+      code_cipher: Uint8Array
+      status: string
+      area_id: string | null
+    }>(
+      `SELECT k.id, k.code_cipher, k.status, b.area_id FROM lock k
+         LEFT JOIN locker l ON l.id = k.locker_id LEFT JOIN bank b ON b.id = l.bank_id
+        WHERE k.code_cipher IS NOT NULL`
+    )) {
+      const code = decryptCode(key, r.code_cipher)
+      if (code)
+        this.addLock(r.id, {
+          code,
+          areaId: r.area_id,
+          active: r.status === 'in_use' || r.status === 'spare'
+        })
+    }
+    for (const r of this.db.all<{ code_cipher: Uint8Array }>(
+      "SELECT code_cipher FROM code_set_entry WHERE status IN ('available','assigned')"
+    )) {
+      const code = decryptCode(key, r.code_cipher)
+      if (code) bump(this.inSets, code, 1)
+    }
+  }
+
+  private addLock(id: string, l: CachedLock, n: 1 | -1 = 1): void {
+    if (n === 1) this.locks.set(id, l)
+    else this.locks.delete(id)
+    bump(this.onLocks, l.code, n)
+    if (!l.active) return
+    bump(this.active, l.code, n)
+    if (l.areaId) {
+      let area = this.byArea.get(l.areaId)
+      if (!area) this.byArea.set(l.areaId, (area = new Map()))
+      bump(area, l.code, n)
+    }
+  }
+
+  /** Same answer as `takenCodes(db, scope, areaId)`. */
+  taken(scope: CodeRules['uniqueness'], areaId?: string | null): { has(code: string): boolean } {
+    if (scope === 'none') return new Set<string>()
+    this.load()
+    const locks = scope === 'area' && areaId ? this.byArea.get(areaId) : this.active
+    return { has: (c) => this.inSets.has(c) || (locks?.has(c) ?? false) }
+  }
+
+  /** Same answer as `codesOnLocks(db)`. */
+  codesOnLocks(): { has(code: string): boolean } {
+    this.load()
+    return this.onLocks
+  }
+
+  /** Keeps the cache current after `writeCode` gives a lock a code. */
+  written(lockId: string, code: string, entryId: string | null): void {
+    if (!this.loaded) return
+    const old = this.locks.get(lockId)
+    if (old) this.addLock(lockId, old, -1)
+    const r = this.db.get<{ status: string; area_id: string | null }>(
+      `SELECT k.status, b.area_id FROM lock k
+         LEFT JOIN locker l ON l.id = k.locker_id LEFT JOIN bank b ON b.id = l.bank_id
+        WHERE k.id = $id`,
+      { $id: lockId }
+    )
+    if (r)
+      this.addLock(lockId, {
+        code,
+        areaId: r.area_id,
+        active: r.status === 'in_use' || r.status === 'spare'
+      })
+    // The entry was 'available' and is now 'used', so it no longer counts as in a set.
+    if (entryId) bump(this.inSets, code, -1)
+  }
+}
+
 /** Codes this lock must not get again (its own history within the rule's years). */
 export function previousCodes(db: LockerDb, lockId: string, years: number, now: Date): Set<string> {
   const key = codeKey(db)
@@ -171,7 +279,8 @@ function nextCodeFor(
   db: LockerDb,
   ctx: OperatorContext,
   lock: LockRow,
-  source: IntSource
+  source: IntSource,
+  cache?: CodeCache
 ): { code: string; entryId: string | null } {
   const key = codeKey(db)
   const rules = rulesFor(db, lock)
@@ -200,13 +309,15 @@ function nextCodeFor(
   )
   // A spare that matches a code on any lock is skipped: whoever got it would know a
   // classmate's code. Older files can hold such spares.
-  const onLocks = spares.length > 0 ? codesOnLocks(db) : new Set<string>()
+  const onLocks =
+    spares.length === 0 ? new Set<string>() : (cache?.codesOnLocks() ?? codesOnLocks(db))
   for (const sp of spares) {
     const c = decryptCode(key, sp.code_cipher)
     if (fits(c) && !onLocks.has(c)) return { code: c, entryId: sp.id }
   }
+  const area = areaOfLock(db, lock.id)
   const [code] = generateCodes(1, rules, source, {
-    taken: takenCodes(db, rules.uniqueness, areaOfLock(db, lock.id)),
+    taken: cache?.taken(rules.uniqueness, area) ?? takenCodes(db, rules.uniqueness, area),
     avoidPerSlot: [avoid]
   })
   return { code: code!, entryId: null }
@@ -273,7 +384,8 @@ export function issueCode(
   ctx: OperatorContext,
   lockId: string,
   reason: 'issued' | 'compromised' | 'year_rollover',
-  source: IntSource = secureSource
+  source: IntSource = secureSource,
+  cache?: CodeCache
 ): string | null {
   const lock = lockRow(db, lockId)
   const info = LOCK_TYPE_INFO[lock.type]
@@ -289,7 +401,7 @@ export function issueCode(
     const existing = decryptCode(codeKey(db), lock.code_cipher)
     if (existing) return existing
   }
-  const { code, entryId } = nextCodeFor(db, ctx, lock, source)
+  const { code, entryId } = nextCodeFor(db, ctx, lock, source, cache)
   const status: CodeStatus =
     lock.code_status === 'reset_no_code' ? 'set' : 'awaiting_physical_reset'
   writeCode(
@@ -301,6 +413,7 @@ export function issueCode(
     reason === 'issued' && lock.code_status !== 'reset_no_code' ? 'reset' : reason,
     entryId
   )
+  cache?.written(lock.id, code, entryId)
   return code
 }
 
