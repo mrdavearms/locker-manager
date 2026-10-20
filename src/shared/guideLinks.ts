@@ -10,6 +10,7 @@ export const SHOW_ME: Record<string, Screen> = {
   'add-lockers': 'settings',
   'mark-a-locker-out-of-service-reserve-it-or-change-it': 'lockers',
   'renumber-a-locker': 'lockers',
+  'remove-a-locker': 'lockers',
   'change-the-kind-of-lock': 'settings',
   'set-up-your-school': 'setup',
   'add-your-school-s-logo': 'settings',
@@ -19,6 +20,11 @@ export const SHOW_ME: Record<string, Screen> = {
   'students-who-never-get-a-locker': 'students',
   'allocate-lockers-for-the-whole-year': 'allocate',
   'lock-codes-and-their-rules': 'settings-codes',
+  'add-a-student-by-hand': 'students',
+  'change-a-student-s-year-level-or-group': 'students',
+  'a-new-student-arrives': 'home',
+  'a-student-has-left': 'home',
+  'move-or-swap-students': 'home',
   'locks-to-reset': 'home',
   'undo-a-mistake': 'history',
   'print-locker-labels': 'print',
@@ -35,7 +41,10 @@ export const SHOW_ME: Record<string, Screen> = {
   keys: 'lockers',
   'protect-codes-with-a-pin': 'settings-privacy',
   'change-how-long-backups-are-kept': 'settings-storage',
-  'text-size-dark-mode-and-high-contrast': 'settings-computer'
+  'text-size-dark-mode-and-high-contrast': 'settings-computer',
+  'the-message-strip-and-undo': 'history',
+  'practise-on-a-copy': 'home',
+  'share-your-set-up-with-another-school': 'settings'
 }
 
 /** The guide section that helps with each screen: the Guide opens there. */
@@ -50,6 +59,7 @@ export const FOR_SCREEN: Record<Screen, string> = {
   reports: 'lists-and-reports',
   history: 'undo-a-mistake',
   settings: 'find-a-setting',
+  'settings-groups': 'change-a-student-s-year-level-or-group',
   'settings-labels': 'choose-and-measure-your-label-sheets',
   'settings-letters': 'change-the-letter',
   'settings-codes': 'lock-codes-and-their-rules',

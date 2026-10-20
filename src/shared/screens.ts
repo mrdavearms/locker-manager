@@ -12,6 +12,7 @@ export type Screen =
   | 'settings'
   | 'settings-labels'
   | 'settings-letters'
+  | 'settings-groups'
   | 'settings-codes'
   | 'settings-privacy'
   | 'settings-storage'

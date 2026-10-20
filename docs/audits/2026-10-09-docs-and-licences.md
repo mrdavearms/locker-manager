@@ -15,10 +15,13 @@ and landing page notes; letters without codes printing read-only; the PIN wait a
 PIN in the user guide. Spell check is now off in the window (B.9), so Windows never fetches
 dictionaries.
 
-Still open: deleting a student who has left (B.3, Dave's decision); the remaining "not
-mentioned" topics in the user guide (O7 in the 18 October check: remove a locker, the
-student's accessible tick box, Letters paper and colour, History search, the allocation
-advice); "Show me" links for eight guide sections and a screen id for the Year levels tab.
+Also fixed on 18 October: the user guide now covers removing a locker, the student's
+accessible tick box, when Quick start shows, Letters paper and colour, History search, the
+allocation advice and **Back to the draft as made**, the Help menu's download page, installing
+updates by hand, and IT's default file and hidden demo. The eight guide sections have "Show
+me" links, and the Year levels tab has its own screen id, so the Guide opens there.
+
+Still open: deleting a student who has left (B.3, Dave's decision).
 
 ## Summary, most important first (for promoting to other schools)
 
