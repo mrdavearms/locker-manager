@@ -38,6 +38,7 @@ function subscribe<T>(channel: string, listener: (value: T) => void): () => void
 const api = {
   // app and updates
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke(channels.appGetInfo),
+  appMounted: (): void => ipcRenderer.send(channels.appMounted),
   getUpdateStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke(channels.updateGetStatus),
   checkForUpdates: (): Promise<void> => ipcRenderer.invoke(channels.updateCheck),
   installUpdate: (): Promise<InstallResult> => ipcRenderer.invoke(channels.updateInstall),
@@ -75,6 +76,7 @@ const api = {
   forgetRecent: (path: string): Promise<void> =>
     ipcRenderer.invoke(channels.fileForgetRecent, { path }),
   openFileDialog: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileOpenDialog),
+  openBackupFile: (): Promise<ActionResult> => ipcRenderer.invoke(channels.fileOpenBackup),
   openFilePath: (path: string): Promise<ActionResult> =>
     ipcRenderer.invoke(channels.fileOpenPath, { path }),
   newFile: (schoolName: string): Promise<ActionResult> =>

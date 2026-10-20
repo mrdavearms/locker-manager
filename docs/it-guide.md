@@ -49,6 +49,14 @@ signature is in place the prompt disappears.
   found later downloads in the background and installs when the user restarts or closes
   the app. The app never restarts during a save, print or import.
 - Windows: the installed copy is replaced in place by the NSIS installer; data is untouched.
+  A copy installed for everyone (`/allusers`, in Program Files) cannot be changed by a
+  standard account, so for those accounts the app reports the new version and opens the
+  download page instead of trying, and asking for an administrator password. Deploy updates
+  yourself for those computers, and set `autoUpdate` to `false`.
+- Windows: before installing, the app writes the version to `update-attempt.json` in its data
+  folder. If the next start is still the old version, the install did not finish (a security
+  policy blocked the installer, or an administrator prompt was cancelled). The app then offers
+  that version on the download page instead of trying again; a newer version is tried as usual.
 - macOS: Squirrel.Mac (the usual Electron Mac updater) refuses unsigned builds, so the app
   installs its own updates. It downloads the universal ZIP, checks its SHA-512 against
   `latest-mac.yml`, unpacks it with `ditto`, checks the bundle identifier, version and code
@@ -58,6 +66,10 @@ signature is in place the prompt disappears.
   a translocated copy, the app reports the new version and opens the download page instead.
   On managed Macs, either give users write access to the app, or deploy updates yourself
   and set `autoUpdate` to `false`.
+- macOS: if the power goes off in the instant the app swaps its bundle, Applications may
+  have no Locker Manager. The previous version is then in Applications as the hidden
+  `.Locker Manager.app.previous`: in Terminal, `mv "/Applications/.Locker Manager.app.previous"
+  "/Applications/Locker Manager.app"` puts it back. A shut-down or log-out puts it back by itself.
 - macOS, versions 0.11.0 to 0.11.3: after one self-update these stop updating and report
   `ENOTEMPTY` (they cannot delete the previous download in
   `~/Library/Application Support/Locker Manager/pending-update`). Install 0.11.4 or later by
@@ -125,7 +137,11 @@ than a day are removed the next time the file is opened.
 
 The first person to open the file edits; everyone else is read-only and sees who is
 editing. A lock whose heartbeat is more than 10 minutes old can be taken over, and the
-takeover is recorded in the file's history. OneDrive can take a minute to sync the lock
+takeover is recorded in the file's history. The heartbeat time comes from the editing
+computer's clock, so the app also watches the lock by its own clock: a heartbeat between
+10 and 60 minutes old must also stay unchanged for two and a half minutes on this computer,
+and one that stays unchanged for 10 minutes counts as stopped whatever its time says. A
+lock left by a crash of the same person's copy on the same computer is not waited for. OneDrive can take a minute to sync the lock
 file, so two people who open the file within a minute of each other on different computers
 may both start editing. The hash check then stops the second save from overwriting the
 first and shows that person a comparison; nothing is lost.
@@ -151,7 +167,9 @@ Each save keeps the version it replaced in two places:
 Backups are compressed with gzip and end in `.lockers.gz` (in versions after 0.11.0; older
 backups are plain `.lockers` copies and still work). A real data file compresses to about a
 third of its size (a 22.5 MB file gives a 7.9 MB backup). Restore them through the app's
-**Backups** button, not by double-clicking. To open one outside the app, unzip it first
+**Backups** button, not by double-clicking. When the data file itself will not open, use
+**Open a backup…** on the first screen: it reads a compressed backup, checks it, keeps the
+file it replaces as a backup, and opens it. To open one outside the app, unzip it first
 (macOS Archive Utility, or 7-Zip on Windows) to get a `.lockers` file.
 
 Retention by default: everything from the last day, the newest of each hour to 7 days, the
@@ -282,7 +300,17 @@ the data file.
 
 If a version fails to reach a working window twice in a row, the app shows a plain recovery
 page (no scripts) with links to try again, download the previous version, and open the local
-backups folder. The count is kept in `preferences.json` (`failedStarts`).
+backups folder. The count is kept in `preferences.json` (`failedStarts`). A start counts as
+working once the window has drawn the app, not merely loaded. If start-up stops with an error,
+the same page shows at once with the error, and the app still checks for a fixed version.
+
+### Graphics problems
+
+On some remote-desktop and virtual-desktop computers, and with old graphics drivers, Chromium's
+graphics process fails. The first time it does, the app writes a file called `gpu-off` in its
+data folder, and every later start draws without the graphics card. Delete the file to try the
+graphics card again. To turn the graphics card off from the first start, add `--disable-gpu`
+to the shortcut that starts Locker Manager.
 
 ## Other files on each computer
 

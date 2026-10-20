@@ -54,6 +54,12 @@ if grep -q "mac-self-install=yes" "$LOG"; then
   GOT=$(/usr/bin/plutil -extract CFBundleShortVersionString raw "$WORK/Locker Manager.app/Contents/Info.plist")
   [ "$GOT" = "$NEW" ] || { echo "::error::the app on disk is $GOT, not $NEW"; exit 1; }
   /usr/bin/codesign --verify --deep --strict "$WORK/Locker Manager.app"
+  # "Starting" is logged before most of start-up; the self-test proves the copy works
+  # (stability audit, finding 4). Releases before the self-test existed skip it.
+  if grep -aq "self-test passed" "$WORK/Locker Manager.app/Contents/Resources/app.asar"; then
+    "$WORK/Locker Manager.app/Contents/MacOS/Locker Manager" --self-test --user-data-dir="$WORK/self-test" ||
+      { echo "::error::$NEW failed its self-test after updating"; exit 1; }
+  fi
   MSG="macOS: unsigned $PREV$LEFTOVER found, downloaded and installed $NEW by itself, and $NEW starts."
 else
   kill "$APP" 2>/dev/null || true

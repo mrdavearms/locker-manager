@@ -62,7 +62,7 @@ export function readProblemMessage(problem: ReadProblem): string {
     case 'incomplete':
       return 'This file has not finished syncing to this computer. Wait a minute, then try again. If it keeps happening, open OneDrive (or your sync app) and check it is running.'
     case 'not_a_data_file':
-      return 'This is not a Locker Manager data file, or it is damaged. Try a backup from the "Locker Manager backups" folder beside it.'
+      return 'This is not a Locker Manager data file, or it is damaged. Close it, then choose Open a backup… on the first screen to use one from the "Locker Manager backups" folder beside it.'
     case 'no_permission':
       return 'This computer is not allowed to open that file. Ask whoever manages the shared folder to give you access.'
     case 'unreadable':

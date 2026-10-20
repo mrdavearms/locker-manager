@@ -122,6 +122,56 @@ describe('migrations', () => {
     expect(db.userVersion).toBe(LATEST_SCHEMA_VERSION)
     expect(db.all("SELECT name FROM sqlite_master WHERE name = 'ok_table'")).toHaveLength(0)
   })
+
+  // Undo in 0.11.4 and earlier could leave a reveal line pointing at a student or
+  // locker that no longer existed (docs/audits/2026-10-20-stability-audit.md, 1).
+  function revealToNothing(db: LockerDb): void {
+    db.run('PRAGMA foreign_keys = OFF')
+    db.run(
+      `INSERT INTO code_reveal_log (id, at, operator, machine, student_id, locker_id, revealed_in, created_at, updated_at, updated_by)
+       VALUES ('r1', $c, 'Test', 'PC', 'gone-student', 'gone-locker', 'screen', $c, $c, $by)`,
+      ts
+    )
+    db.run('PRAGMA foreign_keys = ON')
+  }
+
+  it('repair reveal lines that point at nothing, keeping the line (migration 005)', async () => {
+    const db = await LockerDb.create()
+    migrate(db, migrations.slice(0, 4))
+    revealToNothing(db)
+    expect(db.foreignKeyProblems()).toBeGreaterThan(0)
+    expect(() => migrate(db)).not.toThrow()
+    expect(db.foreignKeyProblems()).toBe(0)
+    expect(db.all('SELECT id, student_id, locker_id FROM code_reveal_log')).toEqual([
+      { id: 'r1', student_id: null, locker_id: null }
+    ])
+    // The reveal log is still append-only after the repair.
+    expect(() => db.run("UPDATE code_reveal_log SET operator = 'x'")).toThrow(/cannot be changed/)
+  })
+
+  it('refuse only broken links that a migration itself makes', async () => {
+    const db = await LockerDb.create()
+    migrate(db)
+    revealToNothing(db)
+    const harmless = [
+      ...migrations,
+      { version: LATEST_SCHEMA_VERSION + 1, name: 'x', sql: 'CREATE TABLE x (y);' }
+    ]
+    expect(() => migrate(db, harmless)).not.toThrow()
+    const breaking = [
+      ...harmless,
+      {
+        version: LATEST_SCHEMA_VERSION + 2,
+        name: 'y',
+        // Links are only checked at the end, as a table rebuild would leave them.
+        sql: `PRAGMA defer_foreign_keys = ON;
+              INSERT INTO code_reveal_log (id, at, operator, machine, locker_id, revealed_in, created_at, updated_at, updated_by)
+              VALUES ('r2', 'x', 'T', 'P', 'also-gone', 'screen', 'x', 'x', 'T');`
+      }
+    ]
+    expect(() => migrate(db, breaking)).toThrow()
+    expect(db.userVersion).toBe(LATEST_SCHEMA_VERSION + 1)
+  })
 })
 
 describe('a new data file', () => {

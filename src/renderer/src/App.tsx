@@ -482,6 +482,7 @@ export function App(): React.JSX.Element {
           state={open}
           onBackups={() => setBackupsOpen(true)}
           onClose={() => void window.api.closeFile()}
+          onCopies={() => setScreen('home')}
         />
       )}
 

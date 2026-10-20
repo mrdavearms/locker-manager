@@ -115,6 +115,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          REQUIRE_SIGNING: ${{ vars.REQUIRE_SIGNING }}
         run: |
           # Unset any secret that is not configured, so electron-builder never
           # sees an empty string and tries to use it.
@@ -122,6 +123,11 @@ jobs:
             if [ -z "${!v}" ]; then unset "$v"; fi
           done
           EXTRA=()
+          # Once signed releases exist, every installed copy refuses an unsigned one, so a
+          # release built without the certificate must stop here (stability audit, item 21).
+          if [ "${REQUIRE_SIGNING:-}" = "true" ] && [ -z "${CSC_LINK:-}" ]; then
+            echo "::error::REQUIRE_SIGNING is set but the Developer ID certificate is missing."; exit 1
+          fi
           if [ -z "${CSC_LINK:-}" ]; then
             echo "No Developer ID certificate: ad-hoc signing (Apple silicon would otherwise call the app damaged)."
             EXTRA+=("-c.mac.identity=-")
@@ -146,6 +152,7 @@ jobs:
           AZURE_CODE_SIGNING_NAME: ${{ secrets.AZURE_CODE_SIGNING_NAME }}
           AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
           AZURE_PUBLISHER_NAME: ${{ secrets.AZURE_PUBLISHER_NAME }}
+          REQUIRE_SIGNING: ${{ vars.REQUIRE_SIGNING }}
         run: |
           foreach ($v in 'WIN_CSC_LINK','WIN_CSC_KEY_PASSWORD','AZURE_TENANT_ID','AZURE_CLIENT_ID','AZURE_CLIENT_SECRET','AZURE_ENDPOINT','AZURE_CODE_SIGNING_NAME','AZURE_CERT_PROFILE_NAME','AZURE_PUBLISHER_NAME') {
             if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($v))) { Remove-Item "Env:$v" -ErrorAction SilentlyContinue }
@@ -160,10 +167,36 @@ jobs:
           } elseif ($env:WIN_CSC_LINK) {
             Write-Host "Certificate file found (WIN_CSC_LINK): signing the installer."
           } else {
+            # Signed copies refuse an unsigned update (stability audit, item 21).
+            if ($env:REQUIRE_SIGNING -eq 'true') { Write-Host "::error::REQUIRE_SIGNING is set but no Windows signing secrets were found."; exit 1 }
             Write-Host "No Windows signing secrets: the installer is unsigned (SmartScreen shows a warning on first run)."
           }
           # --publish never still writes latest.yml beside the installer.
           npx electron-builder --win --publish never @extra
+
+      # Nothing is published until the built app passes these (stability audit, finding
+      # 4): its self-test (database engine, demo school, window files and fonts inside
+      # the package), and a proof that it updates ITSELF to a later version, starting
+      # from a copy that has already updated once. 0.11.0 to 0.11.3 shipped able to
+      # install but not to update onward.
+      - name: Self-test and onward update proof (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          APP="release/mac-universal/Locker Manager.app"
+          "$APP/Contents/MacOS/Locker Manager" --self-test --user-data-dir="$RUNNER_TEMP/self-test"
+          ./scripts/update-proof/onward-mac.sh "$APP"
+      - name: Self-test and onward update proof (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -Wait -PassThru -FilePath 'release\win-unpacked\Locker Manager.exe' -ArgumentList '--self-test', "--user-data-dir=$env:RUNNER_TEMP\self-test"
+          if ($p.ExitCode -ne 0) { Get-Content "$env:RUNNER_TEMP\self-test\logs\main.log" -ErrorAction SilentlyContinue; throw 'The built app failed its self-test.' }
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $parts = $version.Split('.')
+          $next = "$($parts[0]).$($parts[1]).$([int]$parts[2] + 1)"
+          # The same commit as the next version, x64 only, kept out of release/ so it is never published.
+          npx electron-builder --win --x64 --publish never "-c.extraMetadata.version=$next" "-c.directories.output=release-next"
+          ./scripts/update-proof/onward-windows.ps1 -NewInstaller "release\Locker-Manager-Setup-$version.exe" -NextInstaller "release-next\Locker-Manager-Setup-$next.exe"
 
       # Exactly the files the release carries (scripts/verify-release-assets.mjs
       # checks the list again after upload). Kept 90 days because the update proof

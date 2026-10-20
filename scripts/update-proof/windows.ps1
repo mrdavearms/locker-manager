@@ -54,6 +54,15 @@ Remove-Item $log -ErrorAction SilentlyContinue
 Start-Process -FilePath $exe
 Wait-For { (Test-Path $log) -and (Select-String -Path $log -Pattern "Locker Manager $new starting" -Quiet) } 120 "$new to start"
 taskkill /IM "Locker Manager.exe" | Out-Null
+Wait-For { -not (Get-Process -Name 'Locker Manager' -ErrorAction SilentlyContinue) } 60 'the app to close'
+
+# "Starting" is logged before most of start-up; the self-test proves the copy works
+# (stability audit, finding 4). Releases before the self-test existed skip it.
+$asar = Join-Path (Split-Path $exe) 'resources\app.asar'
+if (Select-String -Path $asar -Pattern 'self-test passed' -SimpleMatch -Quiet) {
+  $test = Start-Process -Wait -PassThru -FilePath $exe -ArgumentList '--self-test'
+  if ($test.ExitCode -ne 0) { Show-Log; throw "$new failed its self-test after updating" }
+}
 
 $msg = "Windows: $prev found, downloaded and installed $new by itself, and $new starts."
 Write-Host $msg

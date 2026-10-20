@@ -2,13 +2,20 @@
 // Kept apart from macInstaller.ts, which needs Electron, so a unit test can run it.
 //
 // Arguments: pid of the app, app to replace, new app, 1 to open afterwards,
-// result file, version. Everything is quoted; nothing is built from strings.
+// result file, version, then any arguments to open the app with. Everything is
+// quoted; nothing is built from strings.
 export const macInstallScript = `#!/bin/bash
-PID="$1"; TARGET="$2"; NEW="$3"; RELAUNCH="$4"; RESULT="$5"; VERSION="$6"
+PID="$1"; TARGET="$2"; NEW="$3"; RELAUNCH="$4"; RESULT="$5"; VERSION="$6"; shift 6; ARGS=("$@")
 DIR=$(dirname "$TARGET"); BASE=$(basename "$TARGET")
 TMP="$DIR/.$BASE.updating"; OLD="$DIR/.$BASE.previous"
+# Stopped part way (shut down, log out) between the two renames: put the old app back,
+# or Applications would have no Locker Manager at all (stability audit, item 19).
+trap 'if [ ! -e "$TARGET" ] && [ -e "$OLD" ]; then mv "$OLD" "$TARGET"; fi; exit 1' TERM INT HUP
 result() { printf '{"ok":%s,"version":"%s","message":"%s"}' "$1" "$VERSION" "$2" > "$RESULT"; }
-reopen() { if [ "$RELAUNCH" = 1 ]; then /usr/bin/open "$TARGET"; fi; }
+reopen() {
+  if [ "$RELAUNCH" != 1 ]; then return; fi
+  if [ \${#ARGS[@]} -gt 0 ]; then /usr/bin/open -n "$TARGET" --args "\${ARGS[@]}"; else /usr/bin/open "$TARGET"; fi
+}
 for _ in $(seq 1 300); do kill -0 "$PID" 2>/dev/null || break; sleep 0.2; done
 if kill -0 "$PID" 2>/dev/null; then result false "the app did not quit"; exit 1; fi
 rm -rf "$TMP" "$OLD"

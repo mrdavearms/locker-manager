@@ -257,6 +257,63 @@ describe('two people, one file (SPEC.md 6.2)', () => {
     expect(() => rename(dave, 'nope')).toThrow(/read-only/)
   })
 
+  // docs/audits/2026-10-20-stability-audit.md, finding 7.
+  it('after a crash, the same person on the same computer carries on editing at once', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const before = person('Hannah', 'OFFICE-PC', dir)
+    await before.session.open(path)
+    expect(openState(before).mode).toBe('edit')
+    // That copy stops without closing; its lock is left behind, still fresh.
+    const stopped = { processAlive: () => false }
+    const again = person('Hannah', 'OFFICE-PC', dir, undefined, stopped)
+    await again.session.open(path)
+    expect(openState(again).mode).toBe('edit')
+    // Anyone else still waits for the lock to go stale.
+    const other = person('Sam', 'OFFICE-PC', dir, undefined, stopped)
+    await other.session.open(path)
+    expect(openState(other)).toMatchObject({ mode: 'read_only', readOnly: { reason: 'locked' } })
+  })
+
+  it('at a Windows shutdown, saves at once, keeps a backup and releases the lock', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const hannah = person('Hannah', 'OFFICE-PC', dir)
+    await hannah.session.open(path)
+    rename(hannah, 'SYNTHETIC Shutdown College')
+    const r = hannah.session.emergencyStop()
+    expect(r).toMatchObject({ unsaved: false, path })
+    expect(r.backup).toMatch(/unsaved changes at shutdown\.lockers\.gz$/)
+    expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC Shutdown College')
+    expect(existsSync(lockPathFor(path))).toBe(false)
+    const local = readdirSync(join(dir, 'local-backups-OFFICE-PC'), { recursive: true })
+    expect(local.map(String).some((f) => f.endsWith(r.backup ?? 'none'))).toBe(true)
+  })
+
+  it('at a shutdown, never writes over a version saved by someone else', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const hannah = person('Hannah', 'OFFICE-PC', dir)
+    await hannah.session.open(path)
+    rename(hannah, 'SYNTHETIC Mine')
+    const other = await newSchoolFile(tempDir())
+    writeFileSync(path, readFileSync(other))
+    const r = hannah.session.emergencyStop()
+    expect(r.unsaved).toBe(true)
+    expect(r.backup).not.toBeNull()
+    expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC High School')
+  })
+
+  it('a lock from a copy still running on this computer is respected', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const first = person('Hannah', 'OFFICE-PC', dir)
+    await first.session.open(path)
+    const second = person('Hannah', 'OFFICE-PC', dir, undefined, { processAlive: () => true })
+    await second.session.open(path)
+    expect(openState(second).mode).toBe('read_only')
+  })
+
   it('the read-only copy reloads when the editor saves', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)
@@ -282,6 +339,55 @@ describe('two people, one file (SPEC.md 6.2)', () => {
     expect(openState(dave).readOnly?.canStartEditing).toBe(true)
     expect(await dave.session.startEditing()).toEqual({ ok: true })
     expect(openState(dave).mode).toBe('edit')
+  })
+
+  // docs/audits/2026-10-20-stability-audit.md, items 13 and 14.
+  it('a takeover that finds a file from a newer version stays read-only and gives the lock back', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const clock = { t: Date.parse('2026-10-06T09:12:00Z') }
+    const hannah = person('Hannah', 'OFFICE-PC', dir, clock)
+    const dave = person('Dave', 'DAVE-MAC', dir, clock)
+    await hannah.session.open(path)
+    await dave.session.open(path)
+    clock.t += 2 * STALE_AFTER_MS
+    await dave.session.tick()
+    clock.t += STALE_AFTER_MS
+    await dave.session.tick()
+    expect(openState(dave).readOnly?.canTakeOver).toBe(true)
+    // Just before Dave takes over, a newer copy of the app migrates the file.
+    const newer = await LockerDb.fromBytes(new Uint8Array(readFileSync(path)))
+    newer.userVersion = newer.userVersion + 1
+    writeFileSync(path, newer.export())
+    newer.close()
+    expect(await dave.session.takeOver()).toMatchObject({ ok: false, message: /newer version/ })
+    expect(openState(dave)).toMatchObject({
+      mode: 'read_only',
+      readOnly: { reason: 'newer_version' }
+    })
+    // Dave holds no lock on a file his copy cannot edit.
+    expect(existsSync(lockPathFor(path))).toBe(false)
+  })
+
+  it('a takeover that cannot write the lock changes nothing', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const clock = { t: Date.parse('2026-10-06T09:12:00Z') }
+    const hannah = person('Hannah', 'OFFICE-PC', dir, clock)
+    await hannah.session.open(path)
+    const dave = person('Dave', 'DAVE-MAC', dir, clock, {
+      fs: faultyFs([{ method: 'rename', match: (p) => p.startsWith(`${lockPathFor(path)}.tmp-`) }])
+    })
+    await dave.session.open(path)
+    clock.t += 2 * STALE_AFTER_MS
+    await dave.session.tick()
+    clock.t += STALE_AFTER_MS
+    await dave.session.tick()
+    expect(await dave.session.takeOver()).toMatchObject({ ok: false, message: /lock/ })
+    expect(openState(dave).mode).toBe('read_only')
+    expect(JSON.parse(readFileSync(lockPathFor(path), 'utf8'))).toMatchObject({
+      operator: 'Hannah'
+    })
   })
 
   it('offers takeover only after 10 minutes of silence, logs it, and the old editor follows', async () => {
@@ -448,13 +554,26 @@ describe('conflicts (SPEC.md 6.4)', () => {
     )
     expect(await dave.session.undo()).toEqual({ ok: true })
     expect(await dave.session.undo()).toEqual({ ok: true })
-    // The locker is gone; the reveal line is kept, as history always is.
+    // The locker is gone; the reveal line is kept, as history always is, but no
+    // longer points at a locker the file does not have. A broken link made every
+    // later migration refuse the file (docs/audits/2026-10-20-stability-audit.md, 1).
     expect(dave.session.read((db) => db.all('SELECT id FROM locker'))).toEqual([])
     expect(
-      dave.session
-        .read((db) => db.all<{ id: string }>('SELECT id FROM code_reveal_log'))
-        .map((r) => r.id)
-    ).toEqual(['r1'])
+      dave.session.read((db) =>
+        db.all<{ id: string; locker_id: string | null }>(
+          'SELECT id, locker_id FROM code_reveal_log'
+        )
+      )
+    ).toEqual([{ id: 'r1', locker_id: null }])
+    expect(dave.session.read((db) => db.foreignKeyProblems())).toBe(0)
+    // Redo brings the locker back, and the reveal line points at it again.
+    expect(await dave.session.redo()).toEqual({ ok: true })
+    expect(await dave.session.redo()).toEqual({ ok: true })
+    expect(
+      dave.session.read((db) =>
+        db.all<{ locker_id: string | null }>('SELECT locker_id FROM code_reveal_log')
+      )
+    ).toEqual([{ locker_id: 'l1' }])
   })
 
   it('undo keeps the record of what was printed (SPEC.md 5.6)', async () => {
@@ -592,15 +711,62 @@ describe('sync copies beside the file (SPEC.md 6.3)', () => {
     expect(existsSync(join(dir, 'Something else.lockers'))).toBe(true)
   })
 
-  it('can be ignored when the operator says it is not a copy', async () => {
+  it('can be ignored when the operator says it is not a copy, until a new copy appears', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)
-    writeFileSync(join(dir, 'Locker data (1).lockers'), readFileSync(path))
-    const dave = person('Dave', 'DAVE-MAC', dir, undefined, {
-      ignoredCopies: () => ['Locker data (1).lockers']
-    })
+    const copy = join(dir, 'Locker data (1).lockers')
+    writeFileSync(copy, readFileSync(path))
+    const ignored: string[] = []
+    const dave = person('Dave', 'DAVE-MAC', dir, undefined, { ignoredCopies: () => ignored })
+    await dave.session.open(path)
+    const key = await dave.session.ignoreKey('Locker data (1).lockers')
+    expect(key).toMatch(/^Locker data \(1\)\.lockers\|\d+\|\d+$/)
+    ignored.push(key!)
     await dave.session.open(path)
     expect(openState(dave).conflictCopies).toEqual([])
+    // A later copy with the same name (finding 8 of the stability audit) shows again.
+    writeFileSync(copy, new Uint8Array([...readFileSync(path), 0]))
+    utimesSync(copy, new Date(), new Date(Date.now() + 5000))
+    await dave.session.tick()
+    expect(openState(dave).conflictCopies).toEqual(['Locker data (1).lockers'])
+  })
+
+  it('a copy made while the file is open is found at the next check', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    await dave.session.open(path)
+    expect(openState(dave).conflictCopies).toEqual([])
+    writeFileSync(join(dir, 'Locker data-OFFICE-PC.lockers'), readFileSync(path))
+    await dave.session.tick()
+    expect(openState(dave).conflictCopies).toEqual(['Locker data-OFFICE-PC.lockers'])
+  })
+
+  it('after waking from sleep, waits and checks the lock before saving', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const clock = { t: Date.parse('2026-10-06T09:12:00Z') }
+    const fired: Array<() => void> = []
+    const dave = person('Dave', 'DAVE-MAC', dir, clock, {
+      timers: {
+        setTimeout: (fn: () => void) => {
+          fired.push(fn)
+          return fired.length as unknown as ReturnType<typeof setTimeout>
+        },
+        clearTimeout: () => undefined
+      }
+    })
+    await dave.session.open(path)
+    fired.length = 0
+    rename(dave, 'SYNTHETIC After Sleep')
+    dave.session.afterWake(60_000)
+    const [debouncedSave, afterHold] = fired
+    debouncedSave!()
+    await new Promise((r) => setTimeout(r, 50))
+    expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC High School')
+    clock.t += 60_000
+    afterHold!()
+    await expect.poll(() => schoolNameOnDisk(path)).toBe('SYNTHETIC After Sleep')
   })
 })
 
@@ -789,6 +955,27 @@ describe('closing never throws away unsaved changes', () => {
     return null
   }
 
+  // docs/audits/2026-10-20-stability-audit.md, item 12.
+  it('closing does not wait for ever on a share that stops answering', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const hung = {
+      ...nodeFs,
+      writeNewFileDurable: (p: string, data: Uint8Array) =>
+        p.startsWith(`${path}.tmp-`)
+          ? new Promise<void>(() => undefined)
+          : nodeFs.writeNewFileDurable(p, data)
+    }
+    const dave = person('Dave', 'DAVE-MAC', dir, undefined, { fs: hung, saveWaitMs: 200 })
+    await dave.session.open(path)
+    rename(dave, 'SYNTHETIC Stuck On The Share')
+    const started = Date.now()
+    const warning = await dave.session.close()
+    expect(Date.now() - started).toBeLessThan(5000)
+    expect(warning).toMatch(/could not be saved/)
+    expect(await backupNamed(dir, 'unsaved changes at close')).toBe('SYNTHETIC Stuck On The Share')
+  })
+
   it('keeps a backup and warns when the last save fails', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)
@@ -804,6 +991,20 @@ describe('closing never throws away unsaved changes', () => {
     expect(warning).toMatch(/could not be saved/)
     expect(warnings).toEqual([warning])
     expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC High School')
+  })
+
+  // docs/audits/2026-10-20-stability-audit.md, finding 9.
+  it('a save that keeps failing backs up the version on disk once, not at every retry', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const dave = person('Dave', 'DAVE-MAC', dir, undefined, {
+      fs: faultyFs([{ method: 'writeNewFileDurable', match: (p) => p.startsWith(`${path}.tmp-`) }])
+    })
+    await dave.session.open(path)
+    rename(dave, 'SYNTHETIC Not Yet Saved')
+    for (let i = 0; i < 5; i++) await dave.session.flush()
+    expect(dave.session.hasUnsavedChanges).toBe(true)
+    expect(readdirSync(join(dir, BACKUP_FOLDER_NAME, 'Locker data'))).toHaveLength(1)
   })
 
   it('keeps a backup when the last save finds the file changed by someone else', async () => {

@@ -47,7 +47,8 @@ import {
   type BackupReachView,
   type StorageView
 } from '@shared/storage'
-import { backupReach } from './file/backups'
+import { backupReach, sharedBackupDir } from './file/backups'
+import { originalFor, restoreBackupFile } from './file/restoreBackupFile'
 import { backupPolicyFor, DataFileSession } from './file/session'
 import { machineName, Preferences, suggestedOperatorName } from './prefs/preferences'
 import { savedMappings, setSavedMappingsReader } from './rpc/studentHandlers'
@@ -108,9 +109,10 @@ export async function initFileService(): Promise<void> {
     ignoredCopies: (p) => prefs.get().ignoredCopies[p] ?? [],
     onChange: broadcast,
     // Closing could not save: the changes are in a backup. Say so, even with no window.
+    // Quitting waits for this message (closeWarningShown), or it vanished with the app.
     onCloseWarning: (message) => {
       log.warn('closed with unsaved changes kept as a backup')
-      void dialog.showMessageBox({
+      warningShown = dialog.showMessageBox({
         type: 'warning',
         title: brand.name,
         message: 'Your last changes were not saved to the school’s file',
@@ -120,8 +122,66 @@ export async function initFileService(): Promise<void> {
   })
 }
 
+let warningShown: Promise<unknown> = Promise.resolve()
+
+/** Resolves once the last "changes were not saved" message has been closed. */
+export function closeWarningShown(): Promise<unknown> {
+  return warningShown
+}
+
+/**
+ * Before the window closes, the app quits or an update installs: saves now, and if
+ * the changes still cannot be saved, asks whether to try again, close anyway (they
+ * are kept as a backup on this computer) or cancel. True to go ahead
+ * (docs/audits/2026-10-20-stability-audit.md, finding 6).
+ */
+export async function readyToClose(win?: BrowserWindow): Promise<boolean> {
+  if (!fileServiceReady() || !session.isOpen) return true
+  for (;;) {
+    await session.flush(session.saveWaitMs).catch(() => undefined)
+    if (!session.isOpen || !session.hasUnsavedChanges) return true
+    const opts = {
+      type: 'warning' as const,
+      title: brand.name,
+      buttons: ['Try again', 'Close anyway', 'Cancel'],
+      defaultId: 0,
+      cancelId: 2,
+      message: 'Your last changes have not been saved to the school’s file yet',
+      detail:
+        'Locker Manager could not save to the file just now. Another program, the sync service or the network may be holding it, or a version from another computer needs a decision first. Try again in a moment.\n\nIf you close anyway, your changes are kept as a backup on this computer, and you can get them back from Backups.'
+    }
+    const target = win && !win.isDestroyed() ? win : focusedWindow()
+    const { response } = target
+      ? await dialog.showMessageBox(target, opts)
+      : await dialog.showMessageBox(opts)
+    if (response === 1) return true
+    if (response !== 0) return false
+  }
+}
+
+/**
+ * For an update: saves and closes the file. False, with the file still open, when
+ * the changes could not be saved, so the update does not start.
+ */
+export async function saveAndCloseForUpdate(): Promise<boolean> {
+  if (!fileServiceReady() || !session.isOpen) return true
+  await session.flush(session.saveWaitMs).catch(() => undefined)
+  if (session.hasUnsavedChanges) return false
+  return (await session.close()) === null
+}
+
 export function preferences(): Preferences {
   return prefs
+}
+
+/** The preferences, or undefined when start-up failed before they were read. */
+export function preferencesIfLoaded(): Preferences | undefined {
+  return prefs as Preferences | undefined
+}
+
+/** False when start-up failed before the data-file service existed. */
+export function fileServiceReady(): boolean {
+  return (session as DataFileSession | undefined) !== undefined
 }
 
 export function fileSession(): DataFileSession {
@@ -226,6 +286,45 @@ export function registerFileHandlers(): void {
     const path = pick.filePaths[0]
     if (pick.canceled || !path) return { ok: false, cancelled: true, message: '' }
     return afterOpen(await session.open(path))
+  })
+
+  // The school's file will not open: choose a backup, put it where the file was (the
+  // file there is kept as a backup first), and open it (stability audit, finding 5).
+  ipcMain.handle(channels.fileOpenBackup, async (): Promise<ActionResult> => {
+    const win = focusedWindow()
+    const recent = prefs.get().recentFiles[0]?.path
+    const pickOpts = {
+      title: 'Choose a backup to open',
+      properties: ['openFile' as const],
+      filters: [{ name: `${brand.name} backups`, extensions: ['gz', brand.fileExtension] }],
+      ...(recent ? { defaultPath: sharedBackupDir(recent) } : {})
+    }
+    const pick = win
+      ? await dialog.showOpenDialog(win, pickOpts)
+      : await dialog.showOpenDialog(pickOpts)
+    const backup = pick.filePaths[0]
+    if (pick.canceled || !backup) return { ok: false, cancelled: true, message: '' }
+    const saveOpts = {
+      title: 'Where should the restored file go?',
+      buttonLabel: 'Put it here',
+      defaultPath:
+        originalFor(backup) ?? join(app.getPath('documents'), 'Restored locker data.lockers'),
+      filters: FILTERS
+    }
+    const place = win
+      ? await dialog.showSaveDialog(win, saveOpts)
+      : await dialog.showSaveDialog(saveOpts)
+    if (place.canceled || !place.filePath) return { ok: false, cancelled: true, message: '' }
+    const target = /\.lockers$/i.test(place.filePath) ? place.filePath : `${place.filePath}.lockers`
+    if (session.isOpen) await session.close()
+    const restored = await restoreBackupFile(nodeFs, backup, target, {
+      now: () => new Date(),
+      randomSuffix: () => randomBytes(6).toString('hex'),
+      sessionId: 'restoring'
+    })
+    log.info('backup restore', restored.ok ? 'done' : 'refused')
+    if (!restored.ok) return restored
+    return afterOpen(await session.open(target))
   })
 
   ipcMain.handle(channels.fileOpenPath, async (_e, raw: unknown): Promise<ActionResult> => {
@@ -591,7 +690,8 @@ export function registerFileHandlers(): void {
     const { name, choice } = ResolveCopySchema.parse(raw)
     const s = session.state
     if (choice === 'ignore') {
-      if (s.status === 'open') await prefs.ignoreCopy(s.path, name)
+      const key = await session.ignoreKey(name)
+      if (s.status === 'open' && key) await prefs.ignoreCopy(s.path, key)
       session.closeComparison()
       if (s.status === 'open') await session.open(s.path)
       return { ok: true }

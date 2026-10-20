@@ -125,6 +125,23 @@ describe('planPrune (SPEC.md 6.5)', () => {
     expect(older.length).toBeLessThanOrEqual(24)
   })
 
+  it('thins a crowded last hour before giving up any daily history (stability audit, 9)', () => {
+    const size = 1.5 * 1024 * 1024
+    const entries: BackupEntry[] = []
+    for (let d = 8; d < 98; d++)
+      entries.push({ name: `daily-${d}`, at: new Date(now.getTime() - d * DAY), label: null, size })
+    for (let i = 0; i < 360; i++)
+      entries.push({
+        name: `retry-${i}`,
+        at: new Date(now.getTime() - i * 10_000),
+        label: null,
+        size
+      })
+    const doomed = new Set(planPrune(entries, now))
+    expect(entries.filter((e) => e.name.startsWith('daily-') && doomed.has(e.name))).toEqual([])
+    expect(doomed.has('retry-0')).toBe(false)
+  })
+
   it('never prunes a named backup for age', () => {
     const old: BackupEntry = {
       name: 'named',

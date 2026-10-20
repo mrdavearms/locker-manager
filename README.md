@@ -151,7 +151,9 @@ as a shared drive, OneDrive or SharePoint. It holds:
 - Backups of the file are kept in a `Locker Manager backups` folder beside it, compressed
   (`.lockers.gz`). They hold everything the data file holds, including codes. Every save
   is kept for a day, then one an hour for a week, then one a day for 99 days, within a
-  500 MB limit; Settings, Storage shows how far back they really reach.
+  500 MB limit; Settings, Storage shows how far back they really reach. If the data file
+  itself will not open, **Open a backup…** on the first screen puts a backup in its place
+  (the file it replaces is kept as a backup too).
 - While someone is editing, `<name>.lockers.lock` holds their name, computer name and app
   version. It is removed when they close the file.
 
@@ -162,7 +164,12 @@ In the app's folder (Windows `%AppData%\Locker Manager\`, Mac
 
 - `backups`: more compressed backups of the file, kept on each computer that has edited it.
   They hold codes. If the app ever closes without being able to save, the unsaved changes
-  are kept as a backup named "unsaved changes at close", here and beside the data file.
+  are kept as a backup named "unsaved changes at close" (or "unsaved changes at shutdown"
+  when Windows shut down first), here and beside the data file.
+- `update-attempt.json` (Windows): the version the app last started to install, so an
+  install that did not finish is not tried again at every start.
+- `gpu-off`: present after Chromium's graphics process failed; the app then draws without
+  the graphics card. Delete it to try the graphics card again.
 - `Practice`: a copy of the school's file, if someone used **Practise on a copy**. A copy
   made on the computer that is editing holds the codes; a copy made on any other computer
   has every code removed. It is replaced the next time practice starts.

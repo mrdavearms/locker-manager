@@ -8,6 +8,7 @@ import {
   releasePageUrl,
   updateMode,
   macBlocker,
+  windowsBlocker,
   macZipFile,
   releaseFileUrl,
   installAtStartup
@@ -99,6 +100,21 @@ describe('updateMode', () => {
   it('installs on Windows even unsigned', () => {
     expect(updateMode({ platform: 'win32', packaged: true, signed: false })).toBe('auto')
   })
+  it('only notifies on Windows when this account cannot change the installed app', () => {
+    expect(
+      updateMode({ platform: 'win32', packaged: true, signed: false, windowsBlocker: 'no' })
+    ).toBe('manual-download')
+    expect(
+      updateMode({ platform: 'win32', packaged: true, signed: false, windowsBlocker: null })
+    ).toBe('auto')
+  })
+})
+
+describe('windowsBlocker', () => {
+  it('allows a copy this account can change, and explains one it cannot', () => {
+    expect(windowsBlocker(true)).toBeNull()
+    expect(windowsBlocker(false)).toMatch(/installed for everyone on this computer/)
+  })
 })
 
 describe('releasePageUrl', () => {
@@ -177,6 +193,16 @@ describe('macZipFile', () => {
 })
 
 describe('releaseFileUrl', () => {
+  it('takes the release checks’ local feed as it is, and nothing else over plain http', () => {
+    const repo = 'https://github.com/mrdavearms/locker-manager'
+    expect(releaseFileUrl(repo, '1.0.1', 'http://127.0.0.1:8765/next.zip')).toBe(
+      'http://127.0.0.1:8765/next.zip'
+    )
+    expect(releaseFileUrl(repo, '1.0.1', 'http://example.com/next.zip')).toMatch(
+      /^https:\/\/github\.com\//
+    )
+  })
+
   it('builds the download address from the file name', () => {
     expect(
       releaseFileUrl(

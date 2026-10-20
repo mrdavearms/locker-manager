@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, session, shell } from 'electron'
+import log from 'electron-log/main'
 import { brand } from '@shared/brand'
 import { isAllowedExternalUrl } from '@shared/externalUrls'
 
@@ -74,7 +75,36 @@ export function createMainWindow(): BrowserWindow {
     }
   })
 
-  win.once('ready-to-show', () => (quiet ? win.showInactive() : win.show()))
+  const show = (): void => {
+    if (win.isDestroyed() || win.isVisible()) return
+    if (quiet) win.showInactive()
+    else win.show()
+  }
+  win.once('ready-to-show', show)
+  // A window whose code never draws must still appear, so the person sees something.
+  const fallback = setTimeout(show, 15_000)
+  win.on('closed', () => clearTimeout(fallback))
+
+  // The window's code crashed or was stopped: reload it. The school's file lives in
+  // the main process, so nothing is lost. A window that keeps crashing is not
+  // reloaded for ever (docs/audits/2026-10-20-stability-audit.md, start-up F3).
+  const crashes: number[] = []
+  win.webContents.on('render-process-gone', (_event, details) => {
+    log.error('window process stopped', details.reason, details.exitCode)
+    if (details.reason === 'clean-exit' || win.isDestroyed()) return
+    const now = Date.now()
+    crashes.push(now)
+    while (crashes.length > 0 && (crashes[0] ?? now) < now - 60_000) crashes.shift()
+    show()
+    if (crashes.length <= 3) {
+      win.webContents.reload()
+      return
+    }
+    dialog.showErrorBox(
+      `${brand.name} keeps stopping`,
+      'The window stopped several times in a minute. Your school’s file is safe. Close Locker Manager and open it again; if it keeps happening, tell your IT team.'
+    )
+  })
 
   // Links open in the operator's browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {

@@ -189,6 +189,20 @@ the authority provides a cloud signing service that can export a `.pfx`, in whic
 `WIN_CSC_LINK` (base64 of the `.pfx`, made the same way as Part C for the Mac) and
 `WIN_CSC_KEY_PASSWORD`. The workflow prefers Azure when both are present.
 
+## After the first signed release: require signing
+
+Once schools have a signed copy, a release built without the certificate (a secret that
+expired or was removed) would be refused by every signed copy, and no school would update
+until the next signed release. So after the first signed release, make a missing
+certificate stop the release instead:
+
+1. GitHub, the repository, **Settings**, **Secrets and variables**, **Actions**, the
+   **Variables** tab.
+2. **New repository variable**: name `REQUIRE_SIGNING`, value `true`.
+
+From then on the build fails within a minute if the Mac certificate or the Windows signing
+secrets are missing (docs/audits/2026-10-20-stability-audit.md, item 21).
+
 ## GitHub settings only Dave can switch on
 
 _Written 9 October 2026, after the security review (finding H1) and v0.11.0._

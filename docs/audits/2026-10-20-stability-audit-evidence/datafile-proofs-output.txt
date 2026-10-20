@@ -1,0 +1,38 @@
+
+ RUN  v5.0.3 /Users/davidarmstrong/Antigravity/LockerManager/.claude/worktrees/stability-audit-eacf01
+
+stdout | tests/unit/file/zz-audit-datafile.test.ts > AUDIT: undo leaves broken links that a later migration refuses > add student, assign + show code, undo twice, save; next version cannot open the file
+foreign key problems after two undos: 1
+
+stdout | tests/unit/file/zz-audit-datafile.test.ts > AUDIT: undo leaves broken links that a later migration refuses > add student, assign + show code, undo twice, save; next version cannot open the file
+open by later version: {"ok":false,"message":"This file could not be updated for this version of the app (Foreign key check failed after migrating.). The file was not changed."}
+
+ ✓ tests/unit/file/zz-audit-datafile.test.ts > AUDIT: undo leaves broken links that a later migration refuses > add student, assign + show code, undo twice, save; next version cannot open the file 99ms
+stdout | tests/unit/file/zz-audit-datafile.test.ts > AUDIT: a save that keeps failing writes a backup on every retry > rename held by another program: five save attempts, five identical backups
+shared backups after 5 failed saves: 5 [
+  'Locker data 2026-10-20 093152.lockers.gz',
+  'Locker data 2026-10-20 093154.lockers.gz',
+  'Locker data 2026-10-20 093156.lockers.gz',
+  'Locker data 2026-10-20 093159.lockers.gz',
+  'Locker data 2026-10-20 093201.lockers.gz'
+]
+local backup entries: 6
+dirty: true
+
+stdout | tests/unit/file/zz-audit-datafile.test.ts > AUDIT: size cap with a burst of backups in the last hour wipes all history > measures the demo file and plans the prune
+demo file bytes: 503808 gzip bytes: 84992
+history backups kept: [ 'named-rollover', 'named-update' ]
+retry backups kept: 347
+
+stdout | tests/unit/file/zz-audit-datafile.test.ts > AUDIT: compressed backups cannot be opened when the main file will not open > session.open on a .lockers.gz backup is refused
+open .lockers.gz: {"ok":false,"message":"This is not a Locker Manager data file, or it is damaged. Try a backup from the \"Locker Manager backups\" folder beside it."}
+
+ ✓ tests/unit/file/zz-audit-datafile.test.ts > AUDIT: a save that keeps failing writes a backup on every retry > rename held by another program: five save attempts, five identical backups 13791ms
+ ✓ tests/unit/file/zz-audit-datafile.test.ts > AUDIT: size cap with a burst of backups in the last hour wipes all history > measures the demo file and plans the prune 37ms
+ ✓ tests/unit/file/zz-audit-datafile.test.ts > AUDIT: compressed backups cannot be opened when the main file will not open > session.open on a .lockers.gz backup is refused 24ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  09:31:51
+   Duration  14.22s (tests 99%, transform 1%)
+

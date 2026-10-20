@@ -136,6 +136,21 @@ export function WelcomeScreen({ onNew, onError, managed }: Props): React.JSX.Ele
       </ul>
 
       <p className="mt-5 text-sm text-ink-muted">
+        Your school’s file will not open?{' '}
+        <button
+          type="button"
+          disabled={busy}
+          className="font-semibold text-brand underline-offset-2 hover:underline"
+          data-testid="open-backup"
+          onClick={() => void act(() => window.api.openBackupFile())}
+        >
+          Open a backup…
+        </button>{' '}
+        Choose one from the “Locker Manager backups” folder beside the file. The file it replaces is
+        kept as a backup too.
+      </p>
+
+      <p className="mt-2 text-sm text-ink-muted">
         Have a portable export from Locker Manager?{' '}
         <button
           type="button"

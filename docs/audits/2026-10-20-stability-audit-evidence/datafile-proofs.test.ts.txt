@@ -1,0 +1,194 @@
+// AUDIT SCRATCH TEST - not part of the repo. Copied in temporarily, then deleted.
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+
+// A future release with one more migration (any migration at all).
+vi.mock('../../../src/main/db/migrate', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('../../../src/main/db/migrate')>()
+  const next = [
+    ...orig.migrations,
+    { version: orig.migrations.length + 1, name: '999_future', sql: 'CREATE TABLE future_x (id TEXT);' }
+  ]
+  const on = { value: false }
+  ;(globalThis as Record<string, unknown>).__futureMigration = on
+  return {
+    ...orig,
+    migrate: (db: Parameters<typeof orig.migrate>[0]) =>
+      orig.migrate(db, on.value ? next : orig.migrations),
+    schemaState: (db: Parameters<typeof orig.schemaState>[0]) =>
+      orig.schemaState(db, on.value ? next : orig.migrations)
+  }
+})
+
+import { LockerDb } from '../../../src/main/db/db'
+import { createDemoDatabase } from '../../../src/main/demo/demoSchool'
+import { createStudent } from '../../../src/main/repos/students'
+import { assignStudent } from '../../../src/main/repos/assignments'
+import { logReveal } from '../../../src/main/repos/codes'
+import { nodeFs } from '../../../src/main/file/fsPort'
+import {
+  BACKUP_FOLDER_NAME,
+  compressBackup,
+  planPrune,
+  DEFAULT_POLICY,
+  type BackupEntry
+} from '../../../src/main/file/backups'
+import { DataFileSession, type SessionDeps } from '../../../src/main/file/session'
+import { faultyFs } from './faultyFs'
+import { tempDir } from './tmp'
+
+let n = 0
+const suffix = (): string => `a${++n}`
+
+function deps(root: string, extra: Partial<SessionDeps> = {}): SessionDeps {
+  const pending = new Set<{ fn: () => void }>()
+  return {
+    fs: nodeFs,
+    appVersion: '0.11.4',
+    operator: () => ({ operator: 'Dave', machine: 'OFFICE-PC' }),
+    now: () => new Date(),
+    randomSuffix: suffix,
+    localBackupRoot: join(root, 'local-backups'),
+    sessionId: `s-${suffix()}`,
+    pid: 1,
+    env: { home: join(root, 'home'), tmpDir: join(root, 'not-tmp'), platform: 'win32' },
+    timers: {
+      setTimeout: (fn: () => void) => {
+        const t = { fn }
+        pending.add(t)
+        return t as unknown as ReturnType<typeof setTimeout>
+      },
+      clearTimeout: (t) => {
+        pending.delete(t as unknown as { fn: () => void })
+      }
+    },
+    ...extra
+  }
+}
+
+async function demoFile(dir: string): Promise<string> {
+  const path = join(dir, 'Locker data.lockers')
+  const db = await createDemoDatabase(
+    { operator: 'Setup', machine: 'SETUP-PC', now: () => new Date() },
+    '0.11.4'
+  )
+  writeFileSync(path, db.export())
+  db.close()
+  return path
+}
+
+describe('AUDIT: undo leaves broken links that a later migration refuses', () => {
+  it('add student, assign + show code, undo twice, save; next version cannot open the file', async () => {
+    const dir = tempDir()
+    const path = await demoFile(dir)
+    const s = new DataFileSession(deps(dir))
+    expect(await s.open(path)).toEqual({ ok: true })
+
+    const studentId = s.write({ action: 'student.created', entity: 'student' }, (db, ctx) =>
+      createStudent(db, ctx, {
+        externalId: 'SYN99999',
+        firstName: 'Test',
+        lastName: 'Synthetic',
+        preferredName: null,
+        yearLevel: '7',
+        groupCode: null
+      })
+    )
+    s.write({ action: 'assignment.created', entity: 'assignment' }, (db, ctx) => {
+      const locker = db.get<{ id: string }>(
+        `SELECT id FROM locker WHERE id NOT IN (SELECT locker_id FROM assignment WHERE status = 'current')
+         AND status = 'in_service' LIMIT 1`
+      )
+      if (!locker) throw new Error('no spare locker in demo')
+      assignStudent(db, ctx, studentId, locker.id)
+      // what shownCode() does when the code is returned to the screen
+      logReveal(db, ctx, locker.id, 'screen')
+    })
+    expect((await s.undo()).ok).toBe(true)
+    expect((await s.undo()).ok).toBe(true)
+
+    const fkProblems = s.read((db) => db.foreignKeyProblems())
+    console.log('foreign key problems after two undos:', fkProblems)
+    await s.flush()
+    await s.close()
+
+    // Same file, opened by a later app version that has one more migration.
+    ;((globalThis as Record<string, unknown>).__futureMigration as { value: boolean }).value = true
+    const later = new DataFileSession(deps(dir))
+    const result = await later.open(path)
+    console.log('open by later version:', JSON.stringify(result))
+    ;((globalThis as Record<string, unknown>).__futureMigration as { value: boolean }).value = false
+    expect(fkProblems).toBeGreaterThan(0)
+    expect(result.ok).toBe(false)
+  })
+})
+
+describe('AUDIT: a save that keeps failing writes a backup on every retry', () => {
+  it('rename held by another program: five save attempts, five identical backups', async () => {
+    const dir = tempDir()
+    const path = await demoFile(dir)
+    const fs = faultyFs([
+      { method: 'rename', match: (p) => p.startsWith(`${path}.tmp-`), code: 'EPERM' }
+    ])
+    const s = new DataFileSession(deps(dir, { fs }))
+    expect(await s.open(path)).toEqual({ ok: true })
+    s.write({ action: 'school.renamed', entity: 'school' }, (db) => {
+      db.run("UPDATE school SET name = 'Renamed'")
+    })
+    for (let i = 0; i < 5; i++) await s.flush() // each flush = one save attempt (10 renames x 250 ms)
+    const shared = readdirSync(join(dir, BACKUP_FOLDER_NAME, 'Locker data'))
+    const local = readdirSync(join(dir, 'local-backups'), { recursive: true }) as string[]
+    console.log('shared backups after 5 failed saves:', shared.length, shared)
+    console.log('local backup entries:', local.length)
+    const state = s.state
+    console.log('dirty:', state.status === 'open' && state.dirty)
+    expect(shared.length).toBe(5)
+    await s.close()
+  }, 60_000)
+})
+
+describe('AUDIT: size cap with a burst of backups in the last hour wipes all history', () => {
+  it('measures the demo file and plans the prune', async () => {
+    const db = await createDemoDatabase(
+      { operator: 'Setup', machine: 'SETUP-PC', now: () => new Date() },
+      '0.11.4'
+    )
+    const raw = db.export()
+    db.close()
+    const gz = await compressBackup(raw)
+    console.log('demo file bytes:', raw.byteLength, 'gzip bytes:', gz.byteLength)
+
+    const now = new Date('2026-10-20T15:00:00')
+    const entries: BackupEntry[] = []
+    const size = 1_500_000 // a mid-size school file after a year of history, compressed
+    // 90 days of daily history plus two named backups
+    for (let d = 1; d <= 90; d++)
+      entries.push({ name: `daily-${d}`, at: new Date(now.getTime() - d * 86_400_000), label: null, size })
+    entries.push({ name: 'named-rollover', at: new Date(now.getTime() - 40 * 86_400_000), label: 'before START 2026', size })
+    entries.push({ name: 'named-update', at: new Date(now.getTime() - 10 * 86_400_000), label: 'before update to 0.11.0', size })
+    // a rename that failed for 1 hour: one backup every 10 s (save retry), all the same version
+    for (let i = 0; i < 360; i++)
+      entries.push({ name: `retry-${i}`, at: new Date(now.getTime() - i * 10_000), label: null, size })
+    const doomed = new Set(planPrune(entries, now, DEFAULT_POLICY))
+    const keptOld = entries.filter((e) => !e.name.startsWith('retry-') && !doomed.has(e.name))
+    console.log('history backups kept:', keptOld.map((e) => e.name))
+    console.log('retry backups kept:', entries.filter((e) => e.name.startsWith('retry-') && !doomed.has(e.name)).length)
+    expect(keptOld.filter((e) => e.label === null).length).toBe(0)
+  })
+})
+
+describe('AUDIT: compressed backups cannot be opened when the main file will not open', () => {
+  it('session.open on a .lockers.gz backup is refused', async () => {
+    const dir = tempDir()
+    const path = await demoFile(dir)
+    const gzPath = join(dir, 'Locker data 2026-10-20 090000.lockers.gz')
+    writeFileSync(gzPath, await compressBackup(new Uint8Array(readFileSync(path))))
+    const s = new DataFileSession(deps(dir))
+    const r = await s.open(gzPath)
+    console.log('open .lockers.gz:', JSON.stringify(r))
+    expect(r.ok).toBe(false)
+    expect(await s.listAllBackups()).toEqual([])
+    void LockerDb
+  })
+})

@@ -7,13 +7,14 @@ import type {
   FileState,
   ReadOnlyView
 } from '@shared/fileState'
-import { LockerDb } from '../db/db'
+import { loadSqlJs, LockerDb } from '../db/db'
 import { appendAudit, getMeta, type AuditEntry, type OperatorContext } from '../db/context'
 import { migrate, schemaState } from '../db/migrate'
 import { historyOnlyIn, summarise } from '../db/summary'
 import { saveAtomically, SaveFailedError } from './atomicSave'
 import {
   BACKUP_FOLDER_NAME,
+  backupFileName,
   backupStem,
   compressBackup,
   listBackups,
@@ -22,6 +23,19 @@ import {
   writeBackup,
   type BackupPolicy
 } from './backups'
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+  writeSync
+} from 'node:fs'
+import { gzipSync } from 'node:zlib'
 import { errorCode, type FsPort } from './fsPort'
 import { sha256 } from './hash'
 import {
@@ -32,8 +46,12 @@ import {
   readLock,
   releaseLock,
   classifyLock,
+  observeLock,
+  processAlive,
+  STALE_AFTER_MS,
   takeOverLock,
-  type LockInfo
+  type LockInfo,
+  type LockSeen
 } from './lockFile'
 import { readDataFile, readProblemMessage } from './readDataFile'
 import { BackupRulesSchema, DEFAULT_BACKUP_RULES, fullBackupRules } from '@shared/storage'
@@ -48,6 +66,9 @@ import {
 
 type Timer = ReturnType<typeof setTimeout>
 
+const NEWER_FILE_MESSAGE =
+  'This file has been updated by a newer version of Locker Manager. It is open for viewing only. Update Locker Manager on this computer to change it.'
+
 export interface SessionDeps {
   fs: FsPort
   appVersion: string
@@ -59,6 +80,8 @@ export interface SessionDeps {
   localBackupRoot: string
   sessionId: string
   pid: number
+  /** Whether a process runs on this computer; defaults to asking the system. */
+  processAlive?: (pid: number) => boolean
   env: { home: string; tmpDir: string; platform: NodeJS.Platform }
   /** Sync copies the operator has said are not copies. */
   ignoredCopies?: (dataPath: string) => string[]
@@ -69,6 +92,8 @@ export interface SessionDeps {
   heartbeatMs?: number
   pollMs?: number
   saveRetryMs?: number
+  /** How long closing waits for a save (default 20 seconds). */
+  saveWaitMs?: number
   backupPolicy?: BackupPolicy
   timers?: {
     setTimeout: (fn: () => void, ms: number) => Timer
@@ -108,6 +133,9 @@ interface Open {
   saveAgain: boolean
   lastSavedAt: string | null
   lastBackupAt: string | null
+  /** Hash of the version last backed up on save: a save retried after a failure
+   * backs up the same version only once (stability audit, finding 9). */
+  lastBackupHash: string | null
   problems: FileProblemView[]
   conflict: (ConflictView & { diskBytes: Uint8Array | null; diskHash: string | null }) | null
   conflictCopies: string[]
@@ -142,6 +170,8 @@ export function backupPolicyFor(db: LockerDb): BackupPolicy {
 
 export class DataFileSession {
   private cur: Open | null = null
+  /** What this computer has seen of the open file's lock, by its own clock (finding 10). */
+  private lockSeen: LockSeen | null = null
   private saveTimer: Timer | null = null
   private tickTimer: Timer | null = null
   private readonly me: LockInfo
@@ -232,7 +262,9 @@ export class DataFileSession {
       lockPath: lockPathFor(this.cur?.path ?? ''),
       me,
       now: this.d.now,
-      randomSuffix: this.d.randomSuffix
+      randomSuffix: this.d.randomSuffix,
+      processAlive: this.d.processAlive ?? processAlive,
+      seen: this.lockSeen
     }
   }
 
@@ -290,6 +322,16 @@ export class DataFileSession {
     const read = await readDataFile(this.d.fs, path)
     if (!read.ok) return { ok: false, message: readProblemMessage(read.problem) }
 
+    // The database engine failing to start is not the file's fault: say so, so
+    // nobody restores a backup they did not need (stability audit, start-up F10).
+    try {
+      await loadSqlJs()
+    } catch (error) {
+      return {
+        ok: false,
+        message: `Locker Manager could not start its database engine (${error instanceof Error ? error.message : String(error)}). Your file has not been touched. Close Locker Manager and open it again.`
+      }
+    }
     let db: LockerDb
     try {
       db = await LockerDb.fromBytes(read.bytes)
@@ -301,7 +343,7 @@ export class DataFileSession {
       db.close()
       return {
         ok: false,
-        message: `This file is damaged (${problems[0] ?? 'integrity check failed'}). Open a backup from the "${BACKUP_FOLDER_NAME}" folder beside it.`
+        message: `This file is damaged (${problems[0] ?? 'integrity check failed'}). Choose Open a backup… on the first screen to use one from the "${BACKUP_FOLDER_NAME}" folder beside it.`
       }
     }
 
@@ -320,6 +362,7 @@ export class DataFileSession {
       saveAgain: false,
       lastSavedAt: null,
       lastBackupAt: null,
+      lastBackupHash: null,
       problems: [],
       conflict: null,
       conflictCopies: [],
@@ -342,6 +385,11 @@ export class DataFileSession {
         canStartEditing: false
       }
     } else {
+      this.lockSeen = observeLock(
+        null,
+        await readLock(this.d.fs, lockPathFor(path)),
+        this.d.now().getTime()
+      )
       const lock = await acquireLock(this.lockDeps()).catch(() => null)
       if (lock === null) {
         this.problem(
@@ -413,8 +461,15 @@ export class DataFileSession {
     } catch {
       return
     }
+    // An ignored copy is remembered with its size and time, so a later copy with the
+    // same name (OneDrive names them after the computer) is shown again (finding 8).
     const ignored = new Set(this.d.ignoredCopies?.(c.path) ?? [])
-    c.conflictCopies = findConflictCopies(name, siblings).filter((n) => !ignored.has(n))
+    const shown: string[] = []
+    for (const copy of findConflictCopies(name, siblings)) {
+      const key = await this.copyKey(join(folder, copy), copy)
+      if (key === null || !ignored.has(key)) shown.push(copy)
+    }
+    c.conflictCopies = shown
     // Leftovers older than a day are tidied (SPEC.md 6.3). Younger ones may be
     // another computer's save in progress.
     for (const leftover of leftoverTempFiles(name, siblings)) {
@@ -501,7 +556,12 @@ export class DataFileSession {
     const next = await LockerDb.fromBytes(step.bytes)
     try {
       // History, reveal and print records may point at students or lockers the older snapshot does not
-      // have yet; history is kept whole, so the link check is off while copying.
+      // have yet; history is kept whole, so the link check is off while copying. A reveal line's
+      // student or locker is cleared when the snapshot lacks it: a link to nothing made every later
+      // migration refuse the file (docs/audits/2026-10-20-stability-audit.md, finding 1).
+      const has = (table: 'student' | 'locker', id: unknown): boolean =>
+        typeof id === 'string' &&
+        next.get(`SELECT 1 AS x FROM ${table} WHERE id = $id`, { $id: id }) !== undefined
       next.run('PRAGMA foreign_keys = OFF')
       next.transaction(() => {
         for (const table of ['audit_log', 'code_reveal_log', 'print_job']) {
@@ -511,6 +571,10 @@ export class DataFileSession {
             `SELECT * FROM ${table}`
           )) {
             if (have.has(String(row.id))) continue
+            if (table === 'code_reveal_log') {
+              if (row.student_id != null && !has('student', row.student_id)) row.student_id = null
+              if (row.locker_id != null && !has('locker', row.locker_id)) row.locker_id = null
+            }
             next.run(
               `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((col) => `$${col}`).join(', ')})`,
               Object.fromEntries(cols.map((col) => [`$${col}`, row[col] ?? null]))
@@ -561,18 +625,70 @@ export class DataFileSession {
     if (this.saveTimer) this.timers.clearTimeout(this.saveTimer)
     this.saveTimer = this.timers.setTimeout(() => {
       this.saveTimer = null
-      void this.save()
+      this.saveUnlessHeld()
     }, this.d.saveDelayMs ?? 2000)
   }
 
-  /** Saves now if there is anything to save, and waits for it. */
-  async flush(): Promise<void> {
+  /** Until then, saves made by the timers wait (afterWake). */
+  private savesHeldUntil = 0
+
+  private saveUnlessHeld(): void {
+    if (this.d.now().getTime() < this.savesHeldUntil) return
+    void this.save()
+  }
+
+  /**
+   * The computer has woken from sleep. While it slept someone else may have taken
+   * over and saved, and the sync service has not caught up yet, so this copy's lock
+   * and file look unchanged: saving now would set the other person's work aside as
+   * a sync copy (docs/audits/2026-10-20-stability-audit.md, finding 8). Saves wait,
+   * then the lock and file are checked, then any changes are saved.
+   */
+  afterWake(holdMs = 60_000): void {
+    const c = this.cur
+    if (!c || c.mode !== 'edit') return
+    this.savesHeldUntil = this.d.now().getTime() + holdMs
+    this.timers.setTimeout(() => {
+      this.savesHeldUntil = 0
+      void this.tick().then(() => {
+        const now = this.cur
+        if (now && now.mode === 'edit' && now.dirty && !now.conflict) void this.save()
+      })
+    }, holdMs)
+  }
+
+  /**
+   * Saves now if there is anything to save, and waits for it, for at most `maxWaitMs`.
+   * False when it stopped waiting: a network share that stops answering must not
+   * stop the app closing (docs/audits/2026-10-20-stability-audit.md, item 12).
+   */
+  async flush(maxWaitMs = Number.POSITIVE_INFINITY): Promise<boolean> {
     if (this.saveTimer) {
       this.timers.clearTimeout(this.saveTimer)
       this.saveTimer = null
     }
-    while (this.cur?.saving) await new Promise((r) => setTimeout(r, 10))
-    if (this.cur?.dirty && this.cur.mode === 'edit' && !this.cur.conflict) await this.save()
+    const until = Date.now() + maxWaitMs
+    while (this.cur?.saving) {
+      if (Date.now() >= until) return false
+      await new Promise((r) => setTimeout(r, 10))
+    }
+    if (!(this.cur?.dirty && this.cur.mode === 'edit' && !this.cur.conflict)) return true
+    if (!Number.isFinite(maxWaitMs)) {
+      await this.save()
+      return true
+    }
+    let timer: Timer | undefined
+    const gaveUp = new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), Math.max(0, until - Date.now()))
+    })
+    const done = await Promise.race([this.save().then(() => true as const), gaveUp])
+    clearTimeout(timer)
+    return done
+  }
+
+  /** How long closing waits for a save before keeping the changes as a backup. */
+  get saveWaitMs(): number {
+    return this.d.saveWaitMs ?? 20_000
   }
 
   /**
@@ -654,7 +770,10 @@ export class DataFileSession {
         expectedHash: c.hash,
         randomSuffix: this.d.randomSuffix,
         backupPrevious: async (prev) => {
+          const hash = sha256(prev)
+          if (hash === c.lastBackupHash) return
           partialBackupWarning = await this.backupBytes(prev)
+          c.lastBackupHash = hash
         }
       })
       if (this.cur !== c) return
@@ -682,7 +801,7 @@ export class DataFileSession {
       )
       this.saveTimer = this.timers.setTimeout(() => {
         this.saveTimer = null
-        void this.save()
+        this.saveUnlessHeld()
       }, this.d.saveRetryMs ?? 10_000)
     } finally {
       if (this.cur === c) {
@@ -791,8 +910,11 @@ export class DataFileSession {
       .map((i) => c.journal[i])
       .filter((j): j is JournalEntry => j !== undefined && j.replay !== null)
     await this.backupBytes(c.db.export(), 'my unsaved changes')
-    await this.replaceInMemory(diskBytes)
     c.conflict = null
+    if (await this.replaceInMemory(diskBytes)) {
+      this.emit()
+      return { ok: false, message: NEWER_FILE_MESSAGE }
+    }
     const ctx = this.ctx()
     let added = 0
     const skipped: { action: string; message: string }[] = []
@@ -827,11 +949,18 @@ export class DataFileSession {
     return { ok: true, added, skipped }
   }
 
-  private async replaceInMemory(bytes: Uint8Array): Promise<void> {
+  /**
+   * Puts a version from disk or a backup in place of the one in memory. True when
+   * it was made by a newer version of the app: it is then open for viewing only,
+   * and this computer's lock is given back, so older code never writes to it
+   * (docs/audits/2026-10-20-stability-audit.md, item 13).
+   */
+  private async replaceInMemory(bytes: Uint8Array): Promise<boolean> {
     const c = this.cur
-    if (!c) return
+    if (!c) return false
     const next = await LockerDb.fromBytes(bytes)
-    if (schemaState(next).kind === 'older') migrate(next)
+    const schema = schemaState(next)
+    if (schema.kind === 'older') migrate(next)
     c.db.close()
     c.db = next
     c.revision++
@@ -848,9 +977,38 @@ export class DataFileSession {
     } catch {
       // ignore
     }
+    if (schema.kind !== 'newer') return false
+    if (this.saveTimer) this.timers.clearTimeout(this.saveTimer)
+    this.saveTimer = null
+    await releaseLock(this.lockDeps()).catch(() => undefined)
+    c.mode = 'read_only'
+    c.readOnly = {
+      reason: 'newer_version',
+      holder: null,
+      canTakeOver: false,
+      canStartEditing: false
+    }
+    return true
   }
 
   // --------------------------------------------------------- sync copies
+
+  /** How an ignored copy is remembered: its name, size and modified time. */
+  private async copyKey(path: string, name: string): Promise<string | null> {
+    try {
+      const s = await this.d.fs.stat(path)
+      return `${name}|${s.size}|${Math.round(s.mtimeMs)}`
+    } catch {
+      return null
+    }
+  }
+
+  /** The key to remember when the operator says a copy is not a copy. */
+  async ignoreKey(copyName: string): Promise<string | null> {
+    const c = this.cur
+    if (!c) return null
+    return this.copyKey(join(dirname(c.path), copyName), copyName)
+  }
 
   async compareCopy(copyName: string): Promise<OpenResult> {
     const c = this.cur
@@ -939,10 +1097,28 @@ export class DataFileSession {
     if (!c?.readOnly?.canTakeOver)
       return { ok: false, message: 'Editing cannot be taken over right now.' }
     const previous = c.readOnly.holder
-    await takeOverLock(this.lockDeps())
+    // The file is read before the lock is taken, and the lock given back if anything
+    // after fails: a failed takeover used to leave a lock nobody refreshed (item 14).
     const r = await readDataFile(this.d.fs, c.path)
     if (!r.ok) return { ok: false, message: readProblemMessage(r.problem) }
-    await this.replaceInMemory(r.bytes)
+    try {
+      await takeOverLock(this.lockDeps())
+    } catch {
+      return {
+        ok: false,
+        message:
+          'The edit lock could not be written beside the file, so editing was not taken over.'
+      }
+    }
+    try {
+      if (await this.replaceInMemory(r.bytes)) {
+        this.emit()
+        return { ok: false, message: NEWER_FILE_MESSAGE }
+      }
+    } catch {
+      await releaseLock(this.lockDeps()).catch(() => undefined)
+      return { ok: false, message: readProblemMessage('not_a_data_file') }
+    }
     c.mode = 'edit'
     c.readOnly = null
     this.write(
@@ -1050,12 +1226,16 @@ export class DataFileSession {
       const d = await this.diskChanged(c)
       if (d.changed) await this.enterConflict(d.missing ? 'missing' : 'changed_on_disk')
     }
+    // A sync service can make a copy while the file is open, when two people edited at
+    // once; it used to be noticed only at the next open (finding 8).
+    if (this.cur === c) await this.scanSiblings()
     this.emit()
   }
 
   private async readOnlyTick(c: Open): Promise<void> {
     const d = await this.diskChanged(c)
     if (d.changed && d.bytes) await this.replaceInMemory(d.bytes)
+    if (this.cur === c) await this.scanSiblings()
     if (
       c.readOnly &&
       (c.readOnly.reason === 'locked' ||
@@ -1063,7 +1243,16 @@ export class DataFileSession {
         c.readOnly.reason === 'lost_lock')
     ) {
       const lock = await readLock(this.d.fs, lockPathFor(c.path))
-      const cls = classifyLock(lock, this.me.sessionId, this.d.now())
+      this.lockSeen = observeLock(this.lockSeen, lock, this.d.now().getTime())
+      const deps = this.lockDeps()
+      const cls = classifyLock(
+        lock,
+        this.me.sessionId,
+        this.d.now(),
+        STALE_AFTER_MS,
+        { operator: deps.me.operator, computer: deps.me.computer, processAlive: deps.processAlive },
+        this.lockSeen
+      )
       c.readOnly = {
         ...c.readOnly,
         reason:
@@ -1178,6 +1367,81 @@ export class DataFileSession {
     return { ok: true }
   }
 
+  // ------------------------------------------------------------ shutdown
+
+  /**
+   * Windows is shutting down or logging off, and the app gets no quit events and a few
+   * seconds at most (docs/audits/2026-10-20-stability-audit.md, finding 7). Everything
+   * here is synchronous. Unsaved changes are kept as a backup on this computer first,
+   * then saved to the file if it has not changed on disk; the lock is released either
+   * way. Returns whether anything was left unsaved, and the backup's name.
+   */
+  emergencyStop(): { unsaved: boolean; backup: string | null; path: string | null } {
+    const c = this.cur
+    if (!c || c.mode !== 'edit') return { unsaved: false, backup: null, path: null }
+    let backup: string | null = null
+    let unsaved = c.dirty
+    if (c.dirty) {
+      let bytes: Uint8Array | null = null
+      try {
+        bytes = c.db.export()
+      } catch {
+        // nothing more can be done in the time left
+      }
+      if (bytes) {
+        try {
+          const dir = this.localBackupDir()
+          mkdirSync(dir, { recursive: true })
+          const name = backupFileName(
+            baseName(basename(c.path)),
+            this.d.now(),
+            'unsaved changes at shutdown'
+          )
+          writeFileSync(join(dir, name), gzipSync(bytes, { level: 1 }), { flag: 'wx' })
+          backup = name
+        } catch {
+          // the save below may still work
+        }
+        if (!c.conflict && this.saveNowSync(c, bytes)) unsaved = false
+      }
+    }
+    try {
+      const lockPath = lockPathFor(c.path)
+      const info = JSON.parse(readFileSync(lockPath, 'utf8')) as { sessionId?: unknown }
+      if (info.sessionId === this.me.sessionId) unlinkSync(lockPath)
+    } catch {
+      // a lock left behind is freed by this person's next start (classifyLock)
+    }
+    return { unsaved, backup, path: c.path }
+  }
+
+  /** A save with no waiting, for shutdown: only if the file on disk is still ours. */
+  private saveNowSync(c: Open, bytes: Uint8Array): boolean {
+    const tmp = `${c.path}.tmp-${this.d.randomSuffix()}`
+    try {
+      const disk = existsSync(c.path) ? new Uint8Array(readFileSync(c.path)) : null
+      if ((disk === null ? null : sha256(disk)) !== c.hash) return false
+      const fd = openSync(tmp, 'wx')
+      try {
+        writeSync(fd, bytes)
+        fsyncSync(fd)
+      } finally {
+        closeSync(fd)
+      }
+      renameSync(tmp, c.path)
+      c.hash = sha256(bytes)
+      c.dirty = false
+      return true
+    } catch {
+      try {
+        unlinkSync(tmp)
+      } catch {
+        // tidied with other leftovers after a day
+      }
+      return false
+    }
+  }
+
   // ---------------------------------------------------------------- close
 
   /**
@@ -1192,7 +1456,7 @@ export class DataFileSession {
     this.stopTicking()
     let warning: string | null = null
     try {
-      if (c.mode === 'edit' && !c.conflict) await this.flush().catch(() => undefined)
+      if (c.mode === 'edit' && !c.conflict) await this.flush(this.saveWaitMs).catch(() => undefined)
       if (c.mode === 'edit' && c.dirty) {
         let where: string
         try {
