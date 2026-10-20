@@ -33,6 +33,7 @@
     "dist:mac": "npm run build && electron-builder --mac --universal -c.mac.identity=-",
     "dist:win": "npm run build && electron-builder --win --x64",
     "dist:dir": "npm run build && electron-builder --dir -c.mac.identity=-",
+    "proof:mac": "npm run dist:dir && bash scripts/update-proof/onward-mac.sh --two-updates",
     "check:no-student-data": "node scripts/check-no-student-data.mjs",
     "verify:release-assets": "node scripts/verify-release-assets.mjs",
     "prepare": "simple-git-hooks"

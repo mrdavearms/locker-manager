@@ -33,6 +33,7 @@ school in a shared folder, no server, no accounts, no internet except for update
 | Package installers locally (unsigned) | `npm run dist:mac`, `npm run dist:win` (x64 only; releases build x64 and arm64 in one installer), or `npm run dist:dir` (unpacked app only, fastest) |
 | Check the repo for student data or secrets | `npm run check:no-student-data` (also runs on every commit) |
 | Check a GitHub Release has every updater file | `npm run verify:release-assets -- v0.0.2` |
+| Prove a Mac build updates itself twice in a row (N to N+1 to N+2, local web server) | `npm run proof:mac` (`scripts/release.sh` runs it before pushing) |
 | Release | bump `version` in `package.json` and `package-lock.json`, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z` |
 
 ## Folder layout
@@ -232,7 +233,9 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     lock from the same person's stopped copy on this computer is free. **Open a backup…**
     on the first screen (`restoreBackupFile.ts`). `--self-test` checks an installed copy;
     every release build runs it and the onward update proof (`scripts/update-proof/onward-*`)
-    before publishing. Rollout accepts 0 to withdraw a release; `REQUIRE_SIGNING` (repo
+    before publishing. On a Mac, `scripts/release.sh` first runs `npm run proof:mac`
+    (`onward-mac.sh --two-updates`): two real self-updates in a row, each passing
+    `--self-test`; GitHub keeps the one-update proof from planted leftovers. Rollout accepts 0 to withdraw a release; `REQUIRE_SIGNING` (repo
     variable) stops an unsigned release once signing exists.
 
 ## Known, accepted
