@@ -42,6 +42,19 @@ export function publicKeys(): KeyObject[] {
   return keys
 }
 
+/**
+ * Throws unless `key` is a base64 SPKI Ed25519 public key. The self-test runs it on an
+ * installed copy, so a release that could not check any key (and would lock every school
+ * out) never ships.
+ */
+export function checkProductionKey(key: string | null): void {
+  if (!key) throw new Error('no registration key is built in (PRODUCTION_PUBLIC_KEY is null)')
+  const parsed = toKey(key)
+  if (!parsed) throw new Error('the built-in registration key does not parse as a public key')
+  if (parsed.asymmetricKeyType !== 'ed25519')
+    throw new Error('the built-in registration key is not an Ed25519 public key')
+}
+
 /** An installed copy always enforces; a development copy only when a test asks. */
 export function enforced(): boolean {
   return installed() || process.env.LOCKER_MANAGER_REGISTRATION === 'enforce'

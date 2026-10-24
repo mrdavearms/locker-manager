@@ -5,6 +5,7 @@ import log from 'electron-log/main'
 import { brand } from '@shared/brand'
 import { createDemoDatabase } from './demo/demoSchool'
 import { loadSqlJs } from './db/db'
+import { checkProductionKey, PRODUCTION_PUBLIC_KEY } from './registration/registration'
 
 // `Locker Manager --self-test`: checks that an installed copy can do its work, then
 // quits with 0 (passed) or 1. The release workflow runs it on every build before
@@ -47,6 +48,14 @@ export async function runSelfTest(): Promise<number> {
         if (!app.isPackaged) return
         if (!existsSync(join(process.resourcesPath, 'fonts')))
           throw new Error('the fonts folder is missing')
+      }
+    ],
+    [
+      'registration key',
+      () => {
+        // Only an installed copy checks keys; a development build has none by design.
+        if (!app.isPackaged) return
+        checkProductionKey(PRODUCTION_PUBLIC_KEY)
       }
     ]
   ]

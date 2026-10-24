@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Register your school - Locker Manager</title>
+    <meta
+      name="description"
+      content="Register your school to use Locker Manager. It is free for schools; we send your registration key by email."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=Big+Shoulders+Stencil+Display:wght@700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --canvas: #f3efe6;
+        --surface: #fffdf8;
+        --ink: #17222b;
+        --muted: #56616b;
+        --line: #ddd5c6;
+        --panel: #0e4a57;
+        --on-panel: #fffdf8;
+        --accent: #c4511c;
+        --soft: #dceae9;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --canvas: #0f1518;
+          --surface: #172026;
+          --ink: #ece7dc;
+          --muted: #a7b0b5;
+          --line: #29363e;
+          --panel: #123b44;
+          --on-panel: #eef4f3;
+          --accent: #f0915c;
+          --soft: #16343a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font:
+          17px/1.55 'Atkinson Hyperlegible Next',
+          system-ui,
+          sans-serif;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+        letter-spacing: -0.01em;
+        line-height: 1.1;
+      }
+      a {
+        color: inherit;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 16px;
+      }
+      header.top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 0;
+      }
+      .mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--panel);
+        display: grid;
+        place-items: center;
+      }
+      .mark span {
+        width: 18px;
+        height: 24px;
+        border-radius: 3px;
+        background: var(--on-panel);
+        position: relative;
+      }
+      .mark span::after {
+        content: '';
+        position: absolute;
+        left: 6px;
+        bottom: 4px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+      .top-download {
+        margin-left: auto;
+        padding: 8px 16px;
+        border-radius: 12px;
+        background: var(--panel);
+        color: var(--on-panel);
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .brand {
+        font-family: 'Bricolage Grotesque', sans-serif;
+        font-weight: 700;
+        font-size: 20px;
+      }
+      .hero {
+        background: var(--panel);
+        color: var(--on-panel);
+        border-radius: 28px;
+        padding: 40px;
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 13px;
+        font-weight: 700;
+        opacity: 0.8;
+        margin: 0;
+      }
+      .hero h1 {
+        font-size: clamp(32px, 6vw, 48px);
+        margin: 12px 0 12px;
+      }
+      .hero p.lead {
+        max-width: 52ch;
+        opacity: 0.9;
+        font-size: 18px;
+        margin: 0;
+      }
+      form.card,
+      .result {
+        margin: 24px 0 64px;
+        max-width: 640px;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin: 18px 0 6px;
+      }
+      .optional {
+        font-weight: 400;
+        color: var(--muted);
+      }
+      input[type='text'],
+      input[type='email'],
+      select {
+        width: 100%;
+        font: inherit;
+        color: var(--ink);
+        background: var(--canvas);
+        border: 2px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+      input:focus-visible,
+      select:focus-visible,
+      button:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .hp {
+        position: absolute;
+        left: -10000px;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+      }
+      .check {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        font-weight: 400;
+        margin-top: 20px;
+      }
+      .check input {
+        width: 22px;
+        height: 22px;
+        margin: 2px 0 0;
+        flex: none;
+      }
+      .note {
+        color: var(--muted);
+        font-size: 15px;
+        margin: 20px 0 0;
+      }
+      button.submit {
+        margin-top: 24px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        border: 0;
+        border-radius: 14px;
+        padding: 14px 24px;
+        background: var(--panel);
+        color: var(--on-panel);
+      }
+      button.submit[disabled] {
+        opacity: 0.6;
+        cursor: wait;
+      }
+      .msg {
+        border-radius: 14px;
+        padding: 16px 18px;
+        margin-top: 20px;
+        background: var(--soft);
+        overflow-wrap: anywhere;
+      }
+      .msg.error {
+        border: 2px solid var(--accent);
+        background: var(--surface);
+      }
+      .msg p {
+        margin: 0 0 8px;
+      }
+      .msg p:last-child {
+        margin: 0;
+      }
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 28px 0 48px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      @media (max-width: 640px) {
+        .hero {
+          padding: 28px 20px;
+          border-radius: 20px;
+        }
+        form.card {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <div class="mark" aria-hidden="true"><span></span></div>
+        <span class="brand">Locker Manager</span>
+        <a class="top-download" href="../">Home</a>
+      </header>
+
+      <main>
+        <div class="hero">
+          <p class="eyebrow">Free for schools. Registration required.</p>
+          <h1>Register your school</h1>
+          <p class="lead">
+            Fill this in once. We email you a registration key, and you paste it into Locker
+            Manager.
+          </p>
+        </div>
+
+        <form class="card" id="form" novalidate>
+          <label for="name">Your name</label>
+          <input id="name" name="name" type="text" autocomplete="name" required />
+
+          <label for="school">School</label>
+          <input id="school" name="school" type="text" autocomplete="organization" required />
+
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" required />
+
+          <label for="state">State or territory</label>
+          <select id="state" name="state" required>
+            <option value="">Choose one</option>
+            <option>ACT</option>
+            <option>NSW</option>
+            <option>NT</option>
+            <option>QLD</option>
+            <option>SA</option>
+            <option>TAS</option>
+            <option>VIC</option>
+            <option>WA</option>
+            <option>Outside Australia</option>
+          </select>
+
+          <label for="role">Your role <span class="optional">(optional)</span></label>
+          <input id="role" name="role" type="text" autocomplete="organization-title" />
+
+          <div class="hp" aria-hidden="true">
+            <label for="website">Leave this empty</label>
+            <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+
+          <label class="check" for="agree">
+            <input id="agree" name="agree" type="checkbox" required />
+            <span>I have read the privacy note below and I agree.</span>
+          </label>
+
+          <p class="note" id="privacy">
+            We collect your name, school, email and role to send your registration key and to
+            contact your school about Locker Manager. It is stored on Google Cloud in Sydney, seen
+            only by Dave Armstrong, and never shared. Email dave@dandsarmstrong.com to have it
+            removed.
+          </p>
+
+          <button class="submit" type="submit" id="send">Register</button>
+          <div id="status" role="status" aria-live="polite"></div>
+        </form>
+      </main>
+
+      <footer>
+        Locker Manager is free and open source (MIT), made for schools.
+        <a href="https://github.com/mrdavearms/locker-manager">Source on GitHub</a>.
+      </footer>
+    </div>
+
+    <script>
+      // Task 11 replaces this with the real address of the registration service.
+      var REGISTRATION_URL = 'https://registration.invalid/register'
+      var DAVE = 'dave@dandsarmstrong.com'
+
+      var form = document.getElementById('form')
+      var statusBox = document.getElementById('status')
+      var button = document.getElementById('send')
+
+      function value(id) {
+        return document.getElementById(id).value.trim()
+      }
+
+      function show(kind, build) {
+        statusBox.textContent = ''
+        var box = document.createElement('div')
+        box.className = 'msg' + (kind === 'error' ? ' error' : '')
+        build(box)
+        statusBox.appendChild(box)
+      }
+
+      function paragraph(box, text) {
+        var p = document.createElement('p')
+        p.textContent = text
+        box.appendChild(p)
+        return p
+      }
+
+      // The same email the app offers: one field per line.
+      function mailto(f) {
+        var lines = [
+          'Name: ' + f.name,
+          'School: ' + f.school,
+          'Email: ' + f.email,
+          'State: ' + f.state
+        ]
+        if (f.role) lines.push('Role: ' + f.role)
+        return (
+          'mailto:' +
+          DAVE +
+          '?subject=' +
+          encodeURIComponent('Locker Manager registration') +
+          '&body=' +
+          encodeURIComponent(lines.join('\n'))
+        )
+      }
+
+      function failure(f, text) {
+        show('error', function (box) {
+          paragraph(box, text)
+          var p = document.createElement('p')
+          var a = document.createElement('a')
+          a.href = mailto(f)
+          a.textContent = 'Send your registration by email instead'
+          p.appendChild(a)
+          box.appendChild(p)
+        })
+      }
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault()
+        var f = {
+          name: value('name'),
+          school: value('school'),
+          email: value('email'),
+          state: document.getElementById('state').value,
+          role: value('role')
+        }
+        var problem = null
+        if (f.name.length < 2) problem = 'Please enter your name.'
+        else if (f.school.length < 3) problem = 'Please enter your school.'
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email))
+          problem = 'Please enter a valid email.'
+        else if (!f.state) problem = 'Please choose your state or territory.'
+        else if (!document.getElementById('agree').checked)
+          problem = 'Please tick the box to agree to the privacy note.'
+        if (problem) {
+          show('error', function (box) {
+            paragraph(box, problem)
+          })
+          return
+        }
+
+        var payload = {
+          name: f.name,
+          school: f.school,
+          email: f.email,
+          state: f.state,
+          privacyAgreed: true,
+          source: 'website',
+          website: document.getElementById('website').value
+        }
+        if (f.role) payload.role = f.role
+
+        button.disabled = true
+        fetch(REGISTRATION_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function (res) {
+            button.disabled = false
+            if (res.ok) {
+              show('ok', function (box) {
+                paragraph(
+                  box,
+                  'Thanks. Dave Armstrong checks each registration by hand, usually within a day. Your key will come to ' +
+                    f.email +
+                    '.'
+                )
+              })
+              form.reset()
+            } else if (res.status === 429) {
+              failure(
+                f,
+                'Too many registrations have come from this network in the last hour. Try again later.'
+              )
+            } else {
+              failure(f, 'The registration did not go through. Please try again in a few minutes.')
+            }
+          })
+          .catch(function () {
+            button.disabled = false
+            failure(
+              f,
+              'We could not reach the registration service. Your school network may be blocking it.'
+            )
+          })
+      })
+    </script>
+  </body>
+</html>
