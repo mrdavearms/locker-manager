@@ -12,6 +12,7 @@ import type { Response } from 'express'
 import {
   handleDecide,
   handleList,
+  handleListForm,
   handleRegister,
   handleReview,
   registrationId,
@@ -61,9 +62,18 @@ function firestoreStore(db: Firestore): Store {
       const snap = await registrations.orderBy('number', 'desc').get()
       return snap.docs.map((d) => d.data() as Registration)
     },
-    async countRecentFrom(ip, sinceMs) {
+    async claimDecision(id, patch) {
+      const ref = registrations.doc(id)
+      return db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref)
+        if (!snap.exists || snap.get('status') !== 'waiting') return false
+        tx.update(ref, patch as UpdateData<Registration>)
+        return true
+      })
+    },
+    async countRecentFromHash(ipHash, sinceMs) {
       // One equality filter needs no extra Firestore index; the time is checked here.
-      const snap = await registrations.where('ip', '==', ip).get()
+      const snap = await registrations.where('ipHash', '==', ipHash).get()
       return snap.docs.filter((d) => Date.parse(String(d.get('createdAt'))) >= sinceMs).length
     },
     async nextNumber() {
@@ -169,14 +179,22 @@ export const decide = onRequest({ secrets }, async (req: Request, res) => {
   }
 })
 
+// GET shows a form asking for the admin token; the form POSTs it, so it never sits in an
+// address, the browser's history or the request logs.
 export const list = onRequest({ secrets }, async (req: Request, res) => {
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     res.status(405).end()
     return
   }
   try {
-    const format = text(req.query.format) === 'csv' ? 'csv' : 'html'
-    const result = await handleList(text(req.query.token), format, deps())
+    if (req.method === 'GET') {
+      sendPage(res, handleListForm(deps()))
+      return
+    }
+    const body: unknown = req.body
+    const form = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {}
+    const format = text(form.format) === 'csv' ? 'csv' : 'html'
+    const result = await handleList(text(form.token), format, deps())
     res.status(result.status).set(PAGE_HEADERS).set('Content-Type', result.contentType)
     if (format === 'csv' && result.status === 200)
       res.set('Content-Disposition', 'attachment; filename="locker-manager-registrations.csv"')

@@ -1,9 +1,10 @@
-import { generateKeyPairSync, type KeyObject } from 'node:crypto'
+import { createHash, generateKeyPairSync, type KeyObject } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { checkKey } from '../src/copied/keyFormat'
 import {
   handleDecide,
   handleList,
+  handleListForm,
   handleRegister,
   handleReview,
   registrationId,
@@ -32,9 +33,16 @@ class MemoryStore implements Store {
   async list(): Promise<Registration[]> {
     return [...this.rows.values()].sort((a, b) => b.number - a.number)
   }
-  async countRecentFrom(ip: string, sinceMs: number): Promise<number> {
-    return [...this.rows.values()].filter((r) => r.ip === ip && Date.parse(r.createdAt) >= sinceMs)
-      .length
+  async claimDecision(id: string, patch: Partial<Registration>): Promise<boolean> {
+    const row = this.rows.get(id)
+    if (!row || row.status !== 'waiting') return false
+    this.rows.set(id, { ...row, ...patch })
+    return true
+  }
+  async countRecentFromHash(ipHash: string, sinceMs: number): Promise<number> {
+    return [...this.rows.values()].filter(
+      (r) => r.ipHash === ipHash && Date.parse(r.createdAt) >= sinceMs
+    ).length
   }
   async nextNumber(): Promise<number> {
     this.counter += 1
@@ -111,11 +119,12 @@ describe('register', () => {
       role: 'Business manager',
       source: 'app',
       appVersion: '0.13.0',
-      ip: '203.0.113.5',
+      ipHash: createHash('sha256').update('admin-token-for-tests:203.0.113.5').digest('hex'),
       status: 'waiting',
       decidedAt: null,
       key: null
     })
+    expect(JSON.stringify(row)).not.toContain('203.0.113.5')
     expect(row?.reviewToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
     expect(mailer.sent).toHaveLength(2)
     const [toDave, toThem] = mailer.sent
@@ -280,6 +289,35 @@ describe('decide', () => {
     expect(res.html).toContain(stored?.key ?? 'missing key')
   })
 
+  it('sends one key when Approve is pressed twice at once', async () => {
+    const row = await registerOne()
+    mailer.sent = []
+    const results = await Promise.all([
+      handleDecide(row.id, row.reviewToken, 'approve', false, deps),
+      handleDecide(row.id, row.reviewToken, 'approve', false, deps)
+    ])
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409])
+    expect(results.find((r) => r.status === 409)?.html).toContain('Already approved on')
+    expect(mailer.sent).toHaveLength(1)
+  })
+
+  it('lets only one of an overlapping approve and reject win', async () => {
+    const row = await registerOne()
+    mailer.sent = []
+    const results = await Promise.all([
+      handleDecide(row.id, row.reviewToken, 'approve', false, deps),
+      handleDecide(row.id, row.reviewToken, 'reject', true, deps)
+    ])
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409])
+    const stored = await store.get(row.id)
+    expect(mailer.sent).toHaveLength(1)
+    expect(mailer.sent[0]?.subject).toBe(
+      stored?.status === 'approved'
+        ? 'Your Locker Manager registration key for Example Secondary College'
+        : 'Your Locker Manager registration'
+    )
+  })
+
   it('refuses a second decision and says when the first was made', async () => {
     const row = await registerOne()
     await handleDecide(row.id, row.reviewToken, 'approve', false, deps)
@@ -339,7 +377,17 @@ describe('list', () => {
     expect((await handleList('', 'html', { ...deps, adminToken: '' })).status).toBe(404)
   })
 
-  it('lists every registration newest first, with a CSV download link', async () => {
+  it('asks for the admin token in a form that posts it, never in the address', () => {
+    const page = handleListForm(deps)
+    expect(page.status).toBe(200)
+    expect(page.html).toContain('<form method="post" action="https://example.invalid/list">')
+    expect(page.html).toContain('type="password" name="token"')
+    expect(page.html).toContain('name="format" value="html"')
+    expect(page.html).toContain('name="format" value="csv"')
+    expect(page.html).not.toContain('admin-token-for-tests')
+  })
+
+  it('lists every registration newest first, without the token or the address', async () => {
     await registerOne()
     await handleRegister({ ...good, school: 'Second School' }, '1.1.1.1', deps)
     const res = await handleList('admin-token-for-tests', 'html', deps)
@@ -348,7 +396,9 @@ describe('list', () => {
     expect(res.body.indexOf('Second School')).toBeLessThan(
       res.body.indexOf('Example Secondary College')
     )
-    expect(res.body).toContain('format=csv')
+    expect(res.body).not.toContain('admin-token-for-tests')
+    expect(res.body).not.toContain('format=csv')
+    expect(res.body).not.toContain('203.0.113.5')
   })
 
   it('gives a CSV with a header row and spreadsheet formulas made harmless', async () => {
@@ -371,5 +421,7 @@ describe('list', () => {
     expect(lines[2]).toContain(`"'+Plus School, ""Quoted"""`)
     expect(lines[2]).toContain(`'-1`)
     expect(lines[3]).toContain('Example Secondary College')
+    expect(res.body).not.toMatch(/[0-9a-f]{64}/)
+    expect(res.body).not.toContain('203.0.113.5')
   })
 })

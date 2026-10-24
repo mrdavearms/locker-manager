@@ -136,7 +136,20 @@ ${detailsTable(row)}`
 }
 
 /** Every registration, newest first. */
-export function listPage(rows: Registration[], csvLink: string): Page {
+export function listFormPage(baseUrl: string): Page {
+  return page(
+    200,
+    'Locker Manager registrations',
+    `<h1>Locker Manager registrations</h1>
+<form method="post" action="${e(`${baseUrl}/list`)}">
+<p><label>Admin token <input type="password" name="token" autocomplete="current-password" required></label></p>
+<button type="submit" name="format" value="html">Show registrations</button>
+<button type="submit" name="format" value="csv">Download CSV</button>
+</form>`
+  )
+}
+
+export function listPage(rows: Registration[]): Page {
   const head = [
     'Number',
     'Received',
@@ -170,7 +183,7 @@ export function listPage(rows: Registration[], csvLink: string): Page {
     200,
     'Locker Manager registrations',
     `<h1>Locker Manager registrations</h1>
-<p>${rows.length} registration${rows.length === 1 ? '' : 's'}. <a href="${e(csvLink)}">Download as CSV</a> (opens in Excel).</p>
+<p>${rows.length} registration${rows.length === 1 ? '' : 's'}. To open them in Excel, go back and choose Download CSV.</p>
 <table>
 <tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr>
 ${body}

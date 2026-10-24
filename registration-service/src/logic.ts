@@ -5,7 +5,15 @@ import { z } from 'zod'
 import { signKey } from './copied/keyFormat'
 import { RegistrationFormSchema, type RegistrationDetails } from './copied/registration'
 import { keyEmail, receivedEmail, rejectEmail, toDaveEmail } from './mail'
-import { decidedPage, listCsv, listPage, notFoundPage, reviewPage, type Page } from './pages'
+import {
+  decidedPage,
+  listCsv,
+  listFormPage,
+  listPage,
+  notFoundPage,
+  reviewPage,
+  type Page
+} from './pages'
 
 export interface Registration {
   id: string
@@ -17,7 +25,8 @@ export interface Registration {
   role: string | null
   source: 'app' | 'website'
   appVersion: string | null
-  ip: string
+  /** SHA-256 of the admin token, ':' and the sender's internet address. The address itself is never kept. */
+  ipHash: string
   createdAt: string
   status: 'waiting' | 'approved' | 'rejected'
   reviewToken: string
@@ -34,7 +43,9 @@ export interface Store {
   update(id: string, patch: Partial<Registration>): Promise<void>
   /** Every registration, newest first. */
   list(): Promise<Registration[]>
-  countRecentFrom(ip: string, sinceMs: number): Promise<number>
+  /** Writes the patch only while the registration is still waiting, in one step. False if it was already decided. */
+  claimDecision(id: string, patch: Partial<Registration>): Promise<boolean>
+  countRecentFromHash(ipHash: string, sinceMs: number): Promise<number>
   nextNumber(): Promise<number>
 }
 
@@ -85,6 +96,11 @@ export function sameSecret(given: string, expected: string): boolean {
   return timingSafeEqual(a, b)
 }
 
+/** Lets the hourly limit recognise a sender without keeping their internet address. */
+export function hashAddress(ip: string, adminToken: string): string {
+  return createHash('sha256').update(`${adminToken}:${ip}`, 'utf8').digest('hex')
+}
+
 function filledHoneypot(body: unknown): boolean {
   if (typeof body !== 'object' || body === null) return false
   const website = (body as { website?: unknown }).website
@@ -101,7 +117,8 @@ export async function handleRegister(
   const parsed = PayloadSchema.safeParse(body)
   if (!parsed.success) return { status: 400, json: { ok: false, error: 'invalid' } }
   const now = deps.now()
-  const recent = await deps.store.countRecentFrom(ip, now.getTime() - HOUR_MS)
+  const ipHash = hashAddress(ip, deps.adminToken)
+  const recent = await deps.store.countRecentFromHash(ipHash, now.getTime() - HOUR_MS)
   if (recent >= PER_HOUR_FROM_ONE_ADDRESS) {
     return { status: 429, json: { ok: false, error: 'too_many' } }
   }
@@ -117,7 +134,7 @@ export async function handleRegister(
     role: form.role ? form.role : null,
     source: form.source,
     appVersion: form.source === 'app' && form.appVersion ? form.appVersion : null,
-    ip,
+    ipHash,
     createdAt: now.toISOString(),
     status: 'waiting',
     reviewToken: randomBytes(32).toString('base64url'),
@@ -159,12 +176,16 @@ export async function handleDecide(
 ): Promise<Page> {
   const row = await findWithToken(id, token, deps)
   if (!row) return notFoundPage()
-  if (row.status !== 'waiting') return { ...reviewPage(row, deps.baseUrl), status: 409 }
+  if (row.status !== 'waiting') return alreadyDecided(row, deps)
   const now = deps.now()
   const decidedAt = now.toISOString()
+  // Claimed in one step, so a double-click or an overlapping Reject can never send a second email.
+  const status = decision === 'approve' ? 'approved' : 'rejected'
+  if (!(await deps.store.claimDecision(row.id, { status, decidedAt }))) {
+    return alreadyDecided((await deps.store.get(row.id)) ?? row, deps)
+  }
 
   if (decision === 'reject') {
-    await deps.store.update(row.id, { status: 'rejected', decidedAt })
     const rejected: Registration = { ...row, status: 'rejected', decidedAt }
     if (!sendRejectEmail) return decidedPage(rejected, 'not_emailed')
     const mail = rejectEmail()
@@ -183,9 +204,13 @@ export async function handleDecide(
   }
   const key = signKey(details, deps.privateKey)
   // Stored first, so a failed email never leaves Dave without the key.
-  await deps.store.update(row.id, { status: 'approved', decidedAt, key })
+  await deps.store.update(row.id, { key })
   const approved: Registration = { ...row, status: 'approved', decidedAt, key }
   return sendThenShow(approved, keyEmail(approved, key), deps)
+}
+
+function alreadyDecided(row: Registration, deps: Deps): Page {
+  return { ...reviewPage(row, deps.baseUrl), status: 409 }
 }
 
 async function sendThenShow(
@@ -201,6 +226,12 @@ async function sendThenShow(
   return decidedPage(row, 'emailed')
 }
 
+/** The page that asks Dave for the admin token. It posts the token, so it never sits in an address or a log. */
+export function handleListForm(deps: Deps): Page {
+  return listFormPage(deps.baseUrl)
+}
+
+/** Answers the form's POST. */
 export async function handleList(
   adminToken: string,
   format: 'html' | 'csv',
@@ -214,7 +245,6 @@ export async function handleList(
   if (format === 'csv') {
     return { status: 200, body: listCsv(rows), contentType: 'text/csv; charset=utf-8' }
   }
-  const csvQuery = new URLSearchParams({ token: adminToken, format: 'csv' })
-  const page = listPage(rows, `${deps.baseUrl}/list?${csvQuery.toString()}`)
+  const page = listPage(rows)
   return { status: 200, body: page.html, contentType: 'text/html; charset=utf-8' }
 }
