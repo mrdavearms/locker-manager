@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Accessibility, Ban, FileInput, Search, SpellCheck, UserPlus, UserX } from 'lucide-react'
 import type { StudentFilter, StudentView } from '@shared/students'
 import { AddStudentDialog } from '@renderer/components/AddStudentDialog'
@@ -551,6 +551,55 @@ function SelectedStudent({
   )
 }
 
+/**
+ * One row of the Students table. Memoised so typing in the search box (state in
+ * the screen) does not redraw every row of a 2,000-student school.
+ */
+const StudentRow = memo(function StudentRow({
+  s,
+  selected,
+  onSelect
+}: {
+  s: StudentView
+  selected: boolean
+  onSelect: (id: string) => void
+}): React.JSX.Element {
+  return (
+    <tr
+      onClick={() => onSelect(s.id)}
+      className={cn(
+        'cursor-pointer border-t border-line hover:bg-surface-muted',
+        selected && 'bg-brand-soft'
+      )}
+    >
+      <td className="px-4 py-2.5">
+        <button className="text-left font-semibold" onClick={() => onSelect(s.id)}>
+          {s.lastName}, {s.preferredName || s.firstName}
+        </button>
+        {s.nameCheck.length > 0 && (
+          <SpellCheck size={14} className="ml-1.5 inline text-warn" aria-label="Name to check" />
+        )}
+        {s.notInImportSince && s.active && (
+          <UserX size={14} className="ml-1.5 inline text-accent" aria-label="Possible leaver" />
+        )}
+        {s.excludedReason && (
+          <Ban
+            size={14}
+            className="ml-1.5 inline text-ink-muted"
+            aria-label="Never gets a locker"
+          />
+        )}
+      </td>
+      <td className="px-4 py-2.5 tabular-nums">{s.yearLevel ?? ''}</td>
+      <td className="px-4 py-2.5">{s.groupDisplay ?? ''}</td>
+      <td className="px-4 py-2.5 tabular-nums">
+        {s.locker?.number ?? <span className="text-ink-muted">none</span>}
+      </td>
+      <td className="px-4 py-2.5 font-mono text-xs text-ink-muted">{s.externalId}</td>
+    </tr>
+  )
+})
+
 export function StudentsScreen({
   onImport,
   focus
@@ -566,9 +615,16 @@ export function StudentsScreen({
   const [intent, setIntent] = useState<LockerIntent>(focus?.intent ?? null)
   const [adding, setAdding] = useState(false)
   const { data: counts } = useRpc('students.counts', {})
+  // Search once typing pauses, not on every key: each search is a database query
+  // and a fresh list for the whole table.
+  const [query, setQuery] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(search), 250)
+    return () => clearTimeout(t)
+  }, [search])
   const { data: students } = useRpc('students.list', {
     filter,
-    ...(search.trim() ? { search } : {})
+    ...(query.trim() ? { search: query } : {})
   })
 
   const filters: {
@@ -708,50 +764,12 @@ export function StudentsScreen({
               </thead>
               <tbody>
                 {students?.map((s) => (
-                  <tr
+                  <StudentRow
                     key={s.id}
-                    onClick={() => setSelectedId(s.id)}
-                    className={cn(
-                      'cursor-pointer border-t border-line hover:bg-surface-muted',
-                      s.id === selectedId && 'bg-brand-soft'
-                    )}
-                  >
-                    <td className="px-4 py-2.5">
-                      <button
-                        className="text-left font-semibold"
-                        onClick={() => setSelectedId(s.id)}
-                      >
-                        {s.lastName}, {s.preferredName || s.firstName}
-                      </button>
-                      {s.nameCheck.length > 0 && (
-                        <SpellCheck
-                          size={14}
-                          className="ml-1.5 inline text-warn"
-                          aria-label="Name to check"
-                        />
-                      )}
-                      {s.notInImportSince && s.active && (
-                        <UserX
-                          size={14}
-                          className="ml-1.5 inline text-accent"
-                          aria-label="Possible leaver"
-                        />
-                      )}
-                      {s.excludedReason && (
-                        <Ban
-                          size={14}
-                          className="ml-1.5 inline text-ink-muted"
-                          aria-label="Never gets a locker"
-                        />
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 tabular-nums">{s.yearLevel ?? ''}</td>
-                    <td className="px-4 py-2.5">{s.groupDisplay ?? ''}</td>
-                    <td className="px-4 py-2.5 tabular-nums">
-                      {s.locker?.number ?? <span className="text-ink-muted">none</span>}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-ink-muted">{s.externalId}</td>
-                  </tr>
+                    s={s}
+                    selected={s.id === selectedId}
+                    onSelect={setSelectedId}
+                  />
                 ))}
               </tbody>
             </table>
