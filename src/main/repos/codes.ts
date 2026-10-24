@@ -82,15 +82,35 @@ function rulesFor(db: LockerDb, lock: LockRow): CodeRules {
   return { ...r, length: lock.dials ?? r.length, positions: lock.positions_per_dial ?? r.positions }
 }
 
-/** Every code currently on a lock or held ready in a code set, for uniqueness. */
-export function takenCodes(
+/**
+ * Codes with how many places hold each, so one can be taken away exactly when a
+ * lock's code changes. `set` holds the codes held at least once.
+ */
+class CodeCount {
+  readonly set = new Set<string>()
+  private readonly counts = new Map<string, number>()
+  add(code: string): void {
+    this.counts.set(code, (this.counts.get(code) ?? 0) + 1)
+    this.set.add(code)
+  }
+  remove(code: string): void {
+    const n = (this.counts.get(code) ?? 0) - 1
+    if (n > 0) this.counts.set(code, n)
+    else {
+      this.counts.delete(code)
+      this.set.delete(code)
+    }
+  }
+}
+
+function countTaken(
   db: LockerDb,
   scope: CodeRules['uniqueness'],
   areaId?: string | null
-): Set<string> {
-  if (scope === 'none') return new Set()
+): CodeCount {
+  const out = new CodeCount()
+  if (scope === 'none') return out
   const key = codeKey(db)
-  const out = new Set<string>()
   const lockRows = db.all<{ code_cipher: Uint8Array | null; area_id: string | null }>(
     `SELECT k.code_cipher, b.area_id FROM lock k
        LEFT JOIN locker l ON l.id = k.locker_id LEFT JOIN bank b ON b.id = l.bank_id
@@ -110,10 +130,18 @@ export function takenCodes(
   return out
 }
 
-/** Every code set on a lock right now, whatever the lock's status or area. */
-function codesOnLocks(db: LockerDb): Set<string> {
+/** Every code currently on a lock or held ready in a code set, for uniqueness. */
+export function takenCodes(
+  db: LockerDb,
+  scope: CodeRules['uniqueness'],
+  areaId?: string | null
+): Set<string> {
+  return countTaken(db, scope, areaId).set
+}
+
+function countOnLocks(db: LockerDb): CodeCount {
   const key = codeKey(db)
-  const out = new Set<string>()
+  const out = new CodeCount()
   for (const r of db.all<{ code_cipher: Uint8Array }>(
     'SELECT code_cipher FROM lock WHERE code_cipher IS NOT NULL'
   )) {
@@ -121,6 +149,84 @@ function codesOnLocks(db: LockerDb): Set<string> {
     if (c) out.add(c)
   }
   return out
+}
+
+/**
+ * While a batch of codes is issued (a whole allocation), the codes already in use
+ * are read and decrypted once instead of once per lock, then kept exact as each
+ * new code is written (writeCode). Without this, 2,000 lockers took 5 to 25
+ * seconds with the window frozen (docs/audits/2026-10-09-large-school.md).
+ */
+interface CodeBatch {
+  db: LockerDb
+  /** By uniqueness scope and area, as takenCodes would work them out. */
+  taken: Map<string, { scope: CodeRules['uniqueness']; areaId: string | null; codes: CodeCount }>
+  onLocks: CodeCount | null
+}
+
+let batch: CodeBatch | null = null
+
+/** Runs `fn` with the batch cache on. Nothing but writeCode may change codes inside it. */
+export function inCodeBatch<T>(db: LockerDb, fn: () => T): T {
+  const outer = batch
+  batch = { db, taken: new Map(), onLocks: null }
+  try {
+    return fn()
+  } finally {
+    batch = outer
+  }
+}
+
+function takenFor(
+  db: LockerDb,
+  scope: CodeRules['uniqueness'],
+  areaId: string | null
+): Set<string> {
+  if (!batch || batch.db !== db) return takenCodes(db, scope, areaId)
+  const k = `${scope}|${areaId ?? ''}`
+  let entry = batch.taken.get(k)
+  if (!entry) {
+    entry = { scope, areaId, codes: countTaken(db, scope, areaId) }
+    batch.taken.set(k, entry)
+  }
+  return entry.codes.set
+}
+
+function codesOnLocks(db: LockerDb): Set<string> {
+  if (!batch || batch.db !== db) return countOnLocks(db).set
+  batch.onLocks ??= countOnLocks(db)
+  return batch.onLocks.set
+}
+
+/** Keeps the batch cache exact when a lock's code changes from `old` to `code`. */
+function noteCodeChange(
+  db: LockerDb,
+  lockId: string,
+  old: string | null,
+  code: string,
+  usedEntry: boolean
+): void {
+  if (!batch || batch.db !== db) return
+  const info = db.get<{ status: string; area_id: string | null }>(
+    `SELECT k.status, b.area_id FROM lock k
+       LEFT JOIN locker l ON l.id = k.locker_id LEFT JOIN bank b ON b.id = l.bank_id
+      WHERE k.id = $id`,
+    { $id: lockId }
+  )
+  const counted = info?.status === 'in_use' || info?.status === 'spare'
+  for (const { scope, areaId, codes } of batch.taken.values()) {
+    if (scope === 'none') continue
+    if (counted && (scope !== 'area' || !areaId || info?.area_id === areaId)) {
+      if (old) codes.remove(old)
+      codes.add(code)
+    }
+    // The code set entry it came from is no longer available.
+    if (usedEntry) codes.remove(code)
+  }
+  if (batch.onLocks) {
+    if (old) batch.onLocks.remove(old)
+    batch.onLocks.add(code)
+  }
 }
 
 /** Codes waiting or handed out in any code set (year sets and spare pools). */
@@ -206,7 +312,7 @@ function nextCodeFor(
     if (fits(c) && !onLocks.has(c)) return { code: c, entryId: sp.id }
   }
   const [code] = generateCodes(1, rules, source, {
-    taken: takenCodes(db, rules.uniqueness, areaOfLock(db, lock.id)),
+    taken: takenFor(db, rules.uniqueness, areaOfLock(db, lock.id)),
     avoidPerSlot: [avoid]
   })
   return { code: code!, entryId: null }
@@ -224,6 +330,7 @@ function writeCode(
   const key = codeKey(db)
   const s = stamp(ctx)
   const cipher = encryptCode(key, code)
+  noteCodeChange(db, lock.id, decryptCode(key, lock.code_cipher), code, entryId !== null)
   db.run('UPDATE code_history SET to_date = $now WHERE lock_id = $id AND to_date IS NULL', {
     $id: lock.id,
     $now: s.created_at
@@ -234,7 +341,7 @@ function writeCode(
     {
       $id: newId(),
       $lock: lock.id,
-      $c: encryptCode(key, code),
+      $c: cipher,
       $now: s.created_at,
       $reason: reason,
       $by: s.updated_by

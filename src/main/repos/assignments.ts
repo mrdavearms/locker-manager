@@ -10,7 +10,7 @@ import type { LockerDb } from '../db/db'
 import { newId, stamp, type OperatorContext } from '../db/context'
 import { allocate, orderLockers, type EngineLocker, type EngineStudent } from '../allocate/engine'
 import { displayGroup } from '../import/groups'
-import { activeYearId, issueCode, lockForLocker, markNeedsNewCode } from './codes'
+import { activeYearId, inCodeBatch, issueCode, lockForLocker, markNeedsNewCode } from './codes'
 import { getSetting, setSetting } from './settings'
 import { groupMap, sortLastGroups } from './students'
 
@@ -302,16 +302,19 @@ export function commitDraft(
 ): { assigned: number; codes: number } {
   const seen = new Set<string>()
   let codes = 0
-  for (const a of assignments) {
-    if (seen.has(a.studentId)) throw new Error('A student appears twice in the allocation.')
-    seen.add(a.studentId)
-    if (currentAssignment(db, a.studentId))
-      throw new Error(
-        `${studentName(db, a.studentId)} already has a locker. Make the allocation again.`
-      )
-    insertAssignment(db, ctx, a.studentId, a.lockerId)
-    if (opts.issueCodes && issueFor(db, ctx, a.lockerId) !== null) codes++
-  }
+  // One pass over the codes already in use for the whole batch, not one per locker.
+  inCodeBatch(db, () => {
+    for (const a of assignments) {
+      if (seen.has(a.studentId)) throw new Error('A student appears twice in the allocation.')
+      seen.add(a.studentId)
+      if (currentAssignment(db, a.studentId))
+        throw new Error(
+          `${studentName(db, a.studentId)} already has a locker. Make the allocation again.`
+        )
+      insertAssignment(db, ctx, a.studentId, a.lockerId)
+      if (opts.issueCodes && issueFor(db, ctx, a.lockerId) !== null) codes++
+    }
+  })
   return { assigned: assignments.length, codes }
 }
 

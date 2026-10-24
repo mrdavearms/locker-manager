@@ -13,7 +13,7 @@ test uses the 228-locker demo school; this is the first look at a big one.
 | Index on `code_set_entry (locker_id, status)` | Fixed: migration 004 (358c426) |
 | Three copies written per save | Improved to about 1.7 times the file; needs a real network-share test |
 | Undo depth and memory | Open: a design choice (snapshots against a change journal) |
-| Allocation with codes but no code set | Open: `takenCodes` is still worked out once per lock |
+| Allocation with codes but no code set | Fixed 24 Oct 2026: a whole allocation reads the codes in use once (`inCodeBatch`) |
 | Whole-file export and rebuild are slow with no progress text | Open |
 | PDF timings | Not measured: needs `pdf.cjs` run on a school Windows laptop |
 | File growth | By design: history is append-only |
