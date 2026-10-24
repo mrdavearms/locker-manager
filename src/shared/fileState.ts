@@ -44,6 +44,8 @@ export type ReadOnlyReason =
   | 'newer_version'
   /** Someone took over editing from this computer. */
   | 'lost_lock'
+  /** This copy of the app is not registered: it may look but not change anything. */
+  | 'unregistered'
 
 export interface ReadOnlyView {
   reason: ReadOnlyReason

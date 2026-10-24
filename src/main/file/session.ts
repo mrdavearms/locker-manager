@@ -97,6 +97,11 @@ export interface SessionDeps {
   /** How long closing waits for a save (default 20 seconds). */
   saveWaitMs?: number
   backupPolicy?: BackupPolicy
+  /**
+   * Whether this copy may edit the file just read (registration). False opens it
+   * read-only without touching the edit lock. Missing means always true.
+   */
+  mayEdit?: (db: LockerDb) => boolean
   timers?: {
     setTimeout: (fn: () => void, ms: number) => Timer
     clearTimeout: (t: Timer) => void
@@ -387,13 +392,33 @@ export class DataFileSession {
         canStartEditing: false
       }
     } else {
-      this.lockSeen = observeLock(
-        null,
-        await readLock(this.d.fs, lockPathFor(path)),
-        this.d.now().getTime()
-      )
-      const lock = await acquireLock(this.lockDeps()).catch(() => null)
-      if (lock === null) {
+      // An unregistered copy only looks: it never writes, refreshes or takes over the
+      // edit lock, so a colleague who is editing is never disturbed (registration 7.4).
+      // If the check itself fails, the file opens read-only: looking is always safe.
+      let mayEdit: boolean
+      try {
+        mayEdit = this.d.mayEdit?.(db) ?? true
+      } catch {
+        mayEdit = false
+      }
+      this.lockSeen = null
+      let lock: Awaited<ReturnType<typeof acquireLock>> | null = null
+      if (mayEdit) {
+        this.lockSeen = observeLock(
+          null,
+          await readLock(this.d.fs, lockPathFor(path)),
+          this.d.now().getTime()
+        )
+        lock = await acquireLock(this.lockDeps()).catch(() => null)
+      }
+      if (!mayEdit) {
+        c.readOnly = {
+          reason: 'unregistered',
+          holder: null,
+          canTakeOver: false,
+          canStartEditing: false
+        }
+      } else if (lock === null) {
         this.problem(
           'lock_failed',
           'Could not write the edit lock beside the file. Opening read-only.'

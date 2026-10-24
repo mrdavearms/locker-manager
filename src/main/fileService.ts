@@ -32,7 +32,10 @@ import { z } from 'zod'
 import { lockersWithAnyCode, logReveal, spareCodeCount } from './repos/codes'
 import { exportWorkbook, importWorkbook } from './portable/workbook'
 import { exportSettings, importSettings, parseSettingsFile } from './portable/settingsFile'
-import { readManaged } from './managed'
+import { readItRegistrationKey, readManaged } from './managed'
+import { getMeta } from './db/context'
+import { applyKeysAfterOpen } from './registration/afterOpen'
+import { enforced, publicKeys, statusFor } from './registration/registration'
 import { codesLocked, noteOpenFile } from './privacy'
 import { noteFileOpened } from './update/updater'
 import { pickOutputPath, saveOutput, stampDate, writeOutput } from './renderService'
@@ -108,6 +111,9 @@ export async function initFileService(): Promise<void> {
     env: { home: homedir(), tmpDir: tmpdir(), platform: process.platform },
     ignoredCopies: (p) => prefs.get().ignoredCopies[p] ?? [],
     onChange: broadcast,
+    // An unregistered copy opens a school's file read-only and never takes the edit
+    // lock (registration 7.4). The demo school always opens for editing.
+    mayEdit: (db) => getMeta(db, 'demo') === '1' || statusFor(db).state !== 'unregistered',
     // Closing could not save: the changes are in a backup. Say so, even with no window.
     // Quitting waits for this message (closeWarningShown), or it vanished with the app.
     onCloseWarning: (message) => {
@@ -195,16 +201,54 @@ function focusedWindow(): BrowserWindow | undefined {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
 }
 
-/** broadcast() adds an opened file to the recent files; this only logs refusals. */
-function afterOpen(result: { ok: true } | { ok: false; message: string }): ActionResult {
+/**
+ * broadcast() adds an opened file to the recent files. This logs refusals, and copies
+ * the registration key between the file and this computer (registration 6.5).
+ */
+async function afterOpen(
+  result: { ok: true } | { ok: false; message: string }
+): Promise<ActionResult> {
   if (!result.ok) log.info('open refused', result.message.slice(0, 60))
+  else if (enforced()) {
+    try {
+      await applyKeysAfterOpen(session, prefs, {
+        itKey: readItRegistrationKey(),
+        publicKeys: publicKeys(),
+        now: new Date()
+      })
+    } catch (error) {
+      // The file is open either way; the next open tries again.
+      log.warn('could not copy the registration key', String(error))
+    }
+  }
   return result
+}
+
+const NEEDS_REGISTRATION: ActionResult = {
+  ok: false,
+  message: 'Register Locker Manager first. You can still try the demo school.',
+  needsRegistration: true
+}
+
+/** New files, practice copies and restored backups wait for a key (registration 7.4). */
+function unregistered(): boolean {
+  return enforced() && statusFor(null).state === 'unregistered'
+}
+
+/**
+ * After a key is entered: a file open read-only only for want of a key opens again,
+ * for editing if nobody else is.
+ */
+export async function reopenAfterRegistration(): Promise<ActionResult> {
+  const st = session.state
+  if (st.status !== 'open' || st.readOnly?.reason !== 'unregistered') return { ok: true }
+  return afterOpen(await session.open(st.path))
 }
 
 /** Opens a path that came from the operating system (double-click, Open With). */
 export async function openFromOs(path: string): Promise<void> {
   if (!/\.lockers$/i.test(path)) return
-  const result = afterOpen(await session.open(path))
+  const result = await afterOpen(await session.open(path))
   if (!result.ok) {
     const win = focusedWindow()
     const opts = {
@@ -291,6 +335,7 @@ export function registerFileHandlers(): void {
   // The school's file will not open: choose a backup, put it where the file was (the
   // file there is kept as a backup first), and open it (stability audit, finding 5).
   ipcMain.handle(channels.fileOpenBackup, async (): Promise<ActionResult> => {
+    if (unregistered()) return NEEDS_REGISTRATION
     const win = focusedWindow()
     const recent = prefs.get().recentFiles[0]?.path
     const pickOpts = {
@@ -340,6 +385,7 @@ export function registerFileHandlers(): void {
 
   ipcMain.handle(channels.fileNew, async (_e, raw: unknown): Promise<ActionResult> => {
     const { schoolName } = NewFileSchema.parse(raw)
+    if (unregistered()) return NEEDS_REGISTRATION
     const win = focusedWindow()
     const opts = {
       title: 'Where should the data file live?',
@@ -384,6 +430,7 @@ export function registerFileHandlers(): void {
   // Practice mode (SPEC.md 10): a copy of the open file in this computer's app folder.
   // Nothing done there reaches the school's file. Starting again replaces the copy.
   ipcMain.handle(channels.filePractice, async (): Promise<ActionResult> => {
+    if (unregistered()) return NEEDS_REGISTRATION
     const st = session.state
     if (st.status !== 'open') return { ok: false, message: 'Open your school’s file first.' }
     if (st.summary.demo || st.summary.practice)
@@ -536,6 +583,7 @@ export function registerFileHandlers(): void {
     channels.fileFromExport,
     async (): Promise<ActionResult> =>
       await whileBusy('importing', async () => {
+        if (unregistered()) return NEEDS_REGISTRATION
         const win = focusedWindow()
         const openOpts = {
           title: 'Choose a Locker Manager portable export',
@@ -604,7 +652,7 @@ export function registerFileHandlers(): void {
     return session.takeOver()
   })
   ipcMain.handle(channels.fileStartEditing, async (): Promise<ActionResult> =>
-    session.startEditing()
+    afterOpen(await session.startEditing())
   )
 
   ipcMain.handle(channels.fileResolveConflict, async (_e, raw: unknown): Promise<ActionResult> => {

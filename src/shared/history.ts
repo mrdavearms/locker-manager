@@ -36,6 +36,7 @@ export function describeAction(action: string): string {
     'file.migrated': 'Updated the file for a new version',
     'file.restored': 'Restored a backup',
     'file.schema_repaired': 'Removed changes made to the file outside Locker Manager',
+    'registration.added': 'Registration added to this file',
     'school.renamed': 'Renamed the school',
     'lock.taken_over': 'Took over editing',
     'conflict.kept_mine': 'Kept their own version in a conflict',
