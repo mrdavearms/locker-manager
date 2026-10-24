@@ -2,7 +2,6 @@ import { createHash, generateKeyPairSync, type KeyObject } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { checkKey } from '../src/copied/keyFormat'
 import {
-  clientAddress,
   handleDecide,
   handleList,
   handleListForm,
@@ -203,35 +202,38 @@ describe('register', () => {
     expect((await handleRegister(good, '198.51.100.7', deps)).status).toBe(200)
   })
 
-  it('refuses every registration once 50 arrived in the last 24 hours, from any address', async () => {
+  it('keeps registering past 50 a day but stops the emails, telling Dave once', async () => {
     for (let i = 0; i < 50; i++)
       expect((await handleRegister(good, `198.51.100.${i}`, deps)).status).toBe(200)
+    expect(mailer.sent).toHaveLength(100)
     mailer.sent = []
+
+    // The 51st: saved and thanked, but only one email, to Dave, saying the emails have stopped.
     const res = await handleRegister(good, '203.0.113.99', deps)
-    expect(res).toEqual({ status: 429, json: { ok: false, error: 'too_many' } })
-    expect(store.rows.size).toBe(50)
+    expect(res).toEqual({ status: 200, json: { ok: true } })
+    expect(store.rows.size).toBe(51)
+    expect(mailer.sent).toEqual([
+      {
+        to: 'dave@dandsarmstrong.com',
+        subject: 'Locker Manager registrations: emails paused',
+        text: 'More than 50 registrations arrived in the last 24 hours, so the service has stopped sending emails for now. The registrations are still saved. Check the list page.'
+      }
+    ])
+
+    // Later ones that day: saved, no email at all.
+    mailer.sent = []
+    for (const ip of ['203.0.113.100', '203.0.113.101'])
+      expect(await handleRegister(good, ip, deps)).toEqual({ status: 200, json: { ok: true } })
+    expect(store.rows.size).toBe(53)
     expect(mailer.sent).toHaveLength(0)
-    // A day later the oldest ones no longer count.
+
+    // A day after the first 50, emails start again.
     deps.now = () => new Date(NOW.getTime() + 24 * 60 * 60 * 1000 + 1)
-    expect((await handleRegister(good, '203.0.113.99', deps)).status).toBe(200)
-  })
-})
-
-describe('clientAddress', () => {
-  it('uses the only entry of X-Forwarded-For', () => {
-    expect(clientAddress('203.0.113.5', '10.0.0.1')).toBe('203.0.113.5')
-  })
-
-  it('uses the rightmost entry, which Google added, not one the sender wrote', () => {
-    expect(clientAddress('1.2.3.4, 5.6.7.8,  203.0.113.5 ', '10.0.0.1')).toBe('203.0.113.5')
-    expect(clientAddress(['1.2.3.4', '5.6.7.8, 203.0.113.5'], '10.0.0.1')).toBe('203.0.113.5')
-  })
-
-  it('falls back to the connection address, then to unknown', () => {
-    expect(clientAddress(undefined, '10.0.0.1')).toBe('10.0.0.1')
-    expect(clientAddress('', '10.0.0.1')).toBe('10.0.0.1')
-    expect(clientAddress(' , ', undefined)).toBe('unknown')
-    expect(clientAddress(undefined, undefined)).toBe('unknown')
+    expect((await handleRegister(good, '203.0.113.102', deps)).status).toBe(200)
+    expect(mailer.sent.map((m) => m.to)).toEqual([
+      'dave@dandsarmstrong.com',
+      'hsmith@example.vic.edu.au'
+    ])
   })
 })
 

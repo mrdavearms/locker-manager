@@ -10,7 +10,6 @@ import { defineSecret, defineString } from 'firebase-functions/params'
 import * as logger from 'firebase-functions/logger'
 import type { Response } from 'express'
 import {
-  clientAddress,
   handleDecide,
   handleList,
   handleListForm,
@@ -141,8 +140,8 @@ export const register = onRequest({ secrets, cors: [SITE_ORIGIN] }, async (req: 
   }
   try {
     const body: unknown = req.body
-    const ip = clientAddress(req.headers['x-forwarded-for'], req.ip)
-    const result = await handleRegister(body, ip, deps())
+    // The address as the platform works it out. Task 11's live test checks it is the sender's.
+    const result = await handleRegister(body, req.ip || 'unknown', deps())
     res.status(result.status).json(result.json)
   } catch (err) {
     failed(res, err, true)

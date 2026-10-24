@@ -65,6 +65,14 @@ export function receivedEmail(): Email {
   }
 }
 
+/** To Dave only, once, when a flood of registrations stops the emails for the day. */
+export function emailsPausedEmail(): Email {
+  return {
+    subject: 'Locker Manager registrations: emails paused',
+    text: 'More than 50 registrations arrived in the last 24 hours, so the service has stopped sending emails for now. The registrations are still saved. Check the list page.'
+  }
+}
+
 export function keyEmail(row: Registration, key: string): Email {
   return {
     subject: `Your Locker Manager registration key for ${row.school}`,

@@ -4,7 +4,7 @@ import { z } from 'zod'
 // Never edit those files here: edit the app's own files and run the script again.
 import { signKey } from './copied/keyFormat'
 import { RegistrationFormSchema, type RegistrationDetails } from './copied/registration'
-import { keyEmail, receivedEmail, rejectEmail, toDaveEmail } from './mail'
+import { emailsPausedEmail, keyEmail, receivedEmail, rejectEmail, toDaveEmail } from './mail'
 import {
   decidedPage,
   listCsv,
@@ -68,7 +68,10 @@ export interface Deps {
 
 const PER_HOUR_FROM_ONE_ADDRESS = 5
 const HOUR_MS = 60 * 60 * 1000
-/** Every registration sends two emails from Dave's mailbox, so a flood must stop well short of Gmail's daily limit. */
+/**
+ * Every registration sends two emails from Dave's mailbox. Past this many in a day the
+ * service still saves registrations but stops emailing, well short of Gmail's daily limit.
+ */
 const PER_DAY_FROM_EVERYONE = 50
 const DAY_MS = 24 * HOUR_MS
 
@@ -101,22 +104,6 @@ export function sameSecret(given: string, expected: string): boolean {
   return timingSafeEqual(a, b)
 }
 
-/**
- * The sender's internet address. Google's front end adds the address it saw to the end of
- * X-Forwarded-For; anything before it was written by the sender and could be made up.
- */
-export function clientAddress(
-  forwardedFor: string | string[] | undefined,
-  connectionIp: string | undefined
-): string {
-  const header = Array.isArray(forwardedFor) ? forwardedFor.join(',') : (forwardedFor ?? '')
-  const entries = header
-    .split(',')
-    .map((part) => part.trim())
-    .filter((part) => part !== '')
-  return entries.at(-1) ?? (connectionIp || 'unknown')
-}
-
 /** Lets the hourly limit recognise a sender without keeping their internet address. */
 export function hashAddress(ip: string, adminToken: string): string {
   return createHash('sha256').update(`${adminToken}:${ip}`, 'utf8').digest('hex')
@@ -143,9 +130,7 @@ export async function handleRegister(
   if (recent >= PER_HOUR_FROM_ONE_ADDRESS) {
     return { status: 429, json: { ok: false, error: 'too_many' } }
   }
-  if ((await deps.store.countSince(now.getTime() - DAY_MS)) >= PER_DAY_FROM_EVERYONE) {
-    return { status: 429, json: { ok: false, error: 'too_many' } }
-  }
+  const today = await deps.store.countSince(now.getTime() - DAY_MS)
 
   const form = parsed.data
   const number = await deps.store.nextNumber()
@@ -165,6 +150,15 @@ export async function handleRegister(
     decidedAt: null,
     key: null
   })
+
+  if (today >= PER_DAY_FROM_EVERYONE) {
+    // Tell Dave once, on the registration that goes past the limit, then stay quiet.
+    if (today === PER_DAY_FROM_EVERYONE) {
+      const paused = emailsPausedEmail()
+      await deps.mailer.send(deps.daveEmail, paused.subject, paused.text)
+    }
+    return { status: 200, json: { ok: true } }
+  }
 
   const toDave = toDaveEmail(row, reviewLink(row, deps.baseUrl))
   await deps.mailer.send(deps.daveEmail, toDave.subject, toDave.text)
