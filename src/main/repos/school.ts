@@ -34,15 +34,19 @@ export function getSchoolProfile(db: LockerDb): SchoolProfile {
   let stripes: string[] = []
   try {
     const parsed: unknown = JSON.parse(r.colour_stripes)
-    if (Array.isArray(parsed)) stripes = parsed.filter((x): x is string => typeof x === 'string')
+    if (Array.isArray(parsed))
+      stripes = parsed.filter((x): x is string => typeof x === 'string' && HEX.test(x))
   } catch {
     stripes = []
   }
+  // Colours are checked on the way out as well as in: a file edited outside the app,
+  // or rebuilt from a workbook, could otherwise put markup into letters.
   return {
     name: r.name,
     shortName: r.short_name,
-    colourPrimary: r.colour_primary,
-    colourAccent: r.colour_accent,
+    colourPrimary:
+      r.colour_primary !== null && HEX.test(r.colour_primary) ? r.colour_primary : null,
+    colourAccent: r.colour_accent !== null && HEX.test(r.colour_accent) ? r.colour_accent : null,
     colourStripes: stripes,
     address: r.address,
     hasLogo: r.logo !== null,

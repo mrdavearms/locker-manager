@@ -23,6 +23,21 @@ const EVIL =
   'image/png;base64,AA)}</style><meta http-equiv="refresh" content="0;url=https://x.example/">'
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
 
+describe('school colours are checked when read', () => {
+  it('a colour that is not #RRGGBB never reaches a letter', async () => {
+    const { db } = await allocatedDemo()
+    const evil = '#000}</style><p>SYNTHETIC injected</p><style>'
+    db.run('UPDATE school SET colour_primary = $c, colour_accent = $c, colour_stripes = $s', {
+      $c: evil,
+      $s: JSON.stringify([evil, '#123456'])
+    })
+    const p = getSchoolProfile(db)
+    expect(p.colourPrimary).toBeNull()
+    expect(p.colourAccent).toBeNull()
+    expect(p.colourStripes).toEqual(['#123456'])
+  })
+})
+
 describe('picture types are allow-listed', () => {
   it('a logo with a type the app does not make is left out', async () => {
     const { db } = await allocatedDemo()
