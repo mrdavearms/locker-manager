@@ -4,6 +4,7 @@ import { guideSectionFor } from '@shared/guideLinks'
 import type { QuickResult } from '@shared/history'
 import type { OnboardingInfo, OperatorInfo } from '@shared/ipc'
 import { AboutDialog } from './components/AboutDialog'
+import { ScreenErrorBoundary } from './components/AppErrorBoundary'
 import { BackupsDialog } from './components/BackupsDialog'
 import { Button } from './components/Button'
 import { ConflictDialog } from './components/ConflictDialog'
@@ -314,111 +315,119 @@ export function App(): React.JSX.Element {
                     <ReadOnlyBanner state={open} onError={setError} />
                   </div>
                 )}
-                {helpOpen ? (
-                  <HelpScreen
-                    key={helpSection}
-                    initialSection={helpSection}
-                    onClose={() => setHelpOpen(false)}
-                    onShowMe={
-                      open
-                        ? (target) => {
-                            setHelpOpen(false)
-                            setScreen(target)
-                          }
-                        : null
-                    }
-                    onTour={() => {
-                      setHelpOpen(false)
-                      setTourAsked(true)
-                    }}
-                    onSetup={
-                      open?.mode === 'edit' && !open.summary.demo
-                        ? () => {
-                            setHelpOpen(false)
-                            setScreen('setup')
-                          }
-                        : null
-                    }
-                    onShowChecklist={
-                      open && onboarding?.checklistHidden
-                        ? () => {
-                            setChecklistHidden(false)
-                            setHelpOpen(false)
-                            setScreen('home')
-                          }
-                        : null
-                    }
-                  />
-                ) : file === null ? null : open ? (
-                  screen === 'students' ? (
-                    <StudentsScreen
-                      key={focus?.n ?? 'students'}
-                      onImport={() => setScreen('import')}
-                      focus={
-                        focus?.studentId
-                          ? { studentId: focus.studentId, intent: focus.intent }
+                <ScreenErrorBoundary
+                  screenKey={helpOpen ? 'help' : screen}
+                  onHome={() => {
+                    setHelpOpen(false)
+                    setScreen('home')
+                  }}
+                >
+                  {helpOpen ? (
+                    <HelpScreen
+                      key={helpSection}
+                      initialSection={helpSection}
+                      onClose={() => setHelpOpen(false)}
+                      onShowMe={
+                        open
+                          ? (target) => {
+                              setHelpOpen(false)
+                              setScreen(target)
+                            }
+                          : null
+                      }
+                      onTour={() => {
+                        setHelpOpen(false)
+                        setTourAsked(true)
+                      }}
+                      onSetup={
+                        open?.mode === 'edit' && !open.summary.demo
+                          ? () => {
+                              setHelpOpen(false)
+                              setScreen('setup')
+                            }
+                          : null
+                      }
+                      onShowChecklist={
+                        open && onboarding?.checklistHidden
+                          ? () => {
+                              setChecklistHidden(false)
+                              setHelpOpen(false)
+                              setScreen('home')
+                            }
                           : null
                       }
                     />
-                  ) : screen === 'import' ? (
-                    <ImportWizard onClose={() => setScreen('students')} onNavigate={setScreen} />
-                  ) : screen === 'lockers' ? (
-                    <LockersScreen
-                      key={focus?.n ?? 'lockers'}
-                      onSetUp={() => setScreen('setup')}
-                      onAllocate={() => setScreen('allocate')}
-                      onOpenStudent={(studentId, intent) =>
-                        setNav({
-                          path: openPath,
-                          screen: 'students',
-                          focus: { studentId, intent, n: Date.now() }
-                        })
-                      }
-                      onPrintResets={printResets}
-                      focusLockerId={focus?.lockerId ?? null}
-                    />
-                  ) : screen === 'allocate' ? (
-                    <AllocateScreen onDone={() => setScreen('lockers')} onNavigate={setScreen} />
-                  ) : screen === 'history' ? (
-                    <HistoryScreen state={open} />
-                  ) : screen === 'print' ? (
-                    <PrintLabelsScreen onSettings={() => setScreen('settings-labels')} />
-                  ) : screen === 'letters' ? (
-                    <LettersScreen onDesign={() => setScreen('settings-letters')} />
-                  ) : screen === 'reports' ? (
-                    <ReportsScreen key={nav.report ?? 'reports'} initialReport={nav.report} />
-                  ) : screen === 'rollover' ? (
-                    <RolloverScreen onNavigate={setScreen} />
-                  ) : screen === 'settings' ? (
-                    <SettingsScreen />
-                  ) : screen.startsWith('settings-') ? (
-                    // settings-labels, settings-privacy and so on open that tab.
-                    <SettingsScreen
-                      key={screen}
-                      initialTab={screen.slice('settings-'.length) as SettingsTab}
-                    />
-                  ) : screen === 'setup' ? (
-                    <SetupWizard onFinish={() => setScreen('home')} />
+                  ) : file === null ? null : open ? (
+                    screen === 'students' ? (
+                      <StudentsScreen
+                        key={focus?.n ?? 'students'}
+                        onImport={() => setScreen('import')}
+                        focus={
+                          focus?.studentId
+                            ? { studentId: focus.studentId, intent: focus.intent }
+                            : null
+                        }
+                      />
+                    ) : screen === 'import' ? (
+                      <ImportWizard onClose={() => setScreen('students')} onNavigate={setScreen} />
+                    ) : screen === 'lockers' ? (
+                      <LockersScreen
+                        key={focus?.n ?? 'lockers'}
+                        onSetUp={() => setScreen('setup')}
+                        onAllocate={() => setScreen('allocate')}
+                        onOpenStudent={(studentId, intent) =>
+                          setNav({
+                            path: openPath,
+                            screen: 'students',
+                            focus: { studentId, intent, n: Date.now() }
+                          })
+                        }
+                        onPrintResets={printResets}
+                        focusLockerId={focus?.lockerId ?? null}
+                      />
+                    ) : screen === 'allocate' ? (
+                      <AllocateScreen onDone={() => setScreen('lockers')} onNavigate={setScreen} />
+                    ) : screen === 'history' ? (
+                      <HistoryScreen state={open} />
+                    ) : screen === 'print' ? (
+                      <PrintLabelsScreen onSettings={() => setScreen('settings-labels')} />
+                    ) : screen === 'letters' ? (
+                      <LettersScreen onDesign={() => setScreen('settings-letters')} />
+                    ) : screen === 'reports' ? (
+                      <ReportsScreen key={nav.report ?? 'reports'} initialReport={nav.report} />
+                    ) : screen === 'rollover' ? (
+                      <RolloverScreen onNavigate={setScreen} />
+                    ) : screen === 'settings' ? (
+                      <SettingsScreen />
+                    ) : screen.startsWith('settings-') ? (
+                      // settings-labels, settings-privacy and so on open that tab.
+                      <SettingsScreen
+                        key={screen}
+                        initialTab={screen.slice('settings-'.length) as SettingsTab}
+                      />
+                    ) : screen === 'setup' ? (
+                      <SetupWizard onFinish={() => setScreen('home')} />
+                    ) : (
+                      <HomeScreen
+                        state={open}
+                        onError={setError}
+                        onNavigate={setScreen}
+                        onPrintResets={printResets}
+                        onFind={(intent) =>
+                          setFinder({ title: FIND_TITLES[intent ?? 'find'], intent })
+                        }
+                        checklistHidden={onboarding?.checklistHidden ?? false}
+                        onHideChecklist={() => setChecklistHidden(true)}
+                      />
+                    )
                   ) : (
-                    <HomeScreen
-                      state={open}
+                    <WelcomeScreen
+                      onNew={() => setNewOpen(true)}
                       onError={setError}
-                      onNavigate={setScreen}
-                      onPrintResets={printResets}
-                      onFind={(intent) =>
-                        setFinder({ title: FIND_TITLES[intent ?? 'find'], intent })
-                      }
-                      checklistHidden={onboarding?.checklistHidden ?? false}
-                      onHideChecklist={() => setChecklistHidden(true)}
+                      managed={computer?.managed}
                     />
-                  )
-                ) : (
-                  <WelcomeScreen
-                    onNew={() => setNewOpen(true)}
-                    onError={setError}
-                    managed={computer?.managed}
-                  />
-                )}
+                  )}
+                </ScreenErrorBoundary>
                 {info && !open && (
                   <p className="pb-6 text-center text-xs text-ink-muted" data-testid="version-line">
                     {versionLine(info)}
