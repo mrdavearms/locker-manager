@@ -774,6 +774,30 @@ describe('sync copies beside the file (SPEC.md 6.3)', () => {
   })
 })
 
+describe('a file changed outside the app', () => {
+  it('opening for editing removes a planted trigger, saves without it and says so', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const planted = await LockerDb.fromBytes(new Uint8Array(readFileSync(path)))
+    planted.execScript(
+      'CREATE TRIGGER planted AFTER INSERT ON audit_log BEGIN UPDATE school SET name = name; END;'
+    )
+    writeFileSync(path, planted.export())
+    planted.close()
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    await dave.session.open(path)
+    await dave.session.flush()
+    const db = await LockerDb.fromBytes(new Uint8Array(readFileSync(path)))
+    const triggers = db
+      .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'trigger'")
+      .map((r) => r.name)
+    const actions = db.all<{ action: string }>('SELECT action FROM audit_log').map((r) => r.action)
+    db.close()
+    expect(triggers).not.toContain('planted')
+    expect(actions).toContain('file.schema_repaired')
+  })
+})
+
 describe('restoring a backup (SPEC.md 4.12)', () => {
   it('previews what a restore undoes, restores, and keeps the current version', async () => {
     const dir = tempDir()

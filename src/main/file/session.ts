@@ -10,6 +10,7 @@ import type {
 import { loadSqlJs, LockerDb } from '../db/db'
 import { appendAudit, getMeta, type AuditEntry, type OperatorContext } from '../db/context'
 import { migrate, schemaState } from '../db/migrate'
+import { repairSchemaObjects } from '../db/schemaGuard'
 import { historyOnlyIn, summarise } from '../db/summary'
 import { saveAtomically, SaveFailedError } from './atomicSave'
 import { carryAppendOnly, keepPrivacy } from './carryForward'
@@ -408,12 +409,24 @@ export class DataFileSession {
           canStartEditing: false
         }
       }
+      // Triggers or views nobody in the app made are removed before anything runs
+      // (schemaGuard.ts), and recorded when this computer is editing.
+      const repaired = await repairSchemaObjects(db)
+      if (repaired.removed.length + repaired.restored.length > 0 && c.mode === 'edit') {
+        appendAudit(db, this.ctx(), {
+          action: 'file.schema_repaired',
+          entity: 'file',
+          after: repaired
+        })
+        this.markChanged()
+      }
       if (schema.kind === 'older') {
         try {
           if (c.mode === 'edit') {
             // SPEC.md 6.6: named backup, migrate, verify, save.
             await this.backupBytes(read.bytes, `before update to ${this.d.appVersion}`)
             migrate(db)
+            await repairSchemaObjects(db)
             appendAudit(db, this.ctx(), {
               action: 'file.migrated',
               entity: 'file',
@@ -424,6 +437,7 @@ export class DataFileSession {
           } else {
             // Viewing only: bring it up to date in memory, never write it.
             migrate(db)
+            await repairSchemaObjects(db)
           }
         } catch (error) {
           // Nothing has been written to the file yet; give back the edit lock so
@@ -940,7 +954,11 @@ export class DataFileSession {
     if (!c) return false
     const next = await LockerDb.fromBytes(bytes)
     const schema = schemaState(next)
-    if (schema.kind === 'older') migrate(next)
+    await repairSchemaObjects(next)
+    if (schema.kind === 'older') {
+      migrate(next)
+      await repairSchemaObjects(next)
+    }
     c.db.close()
     c.db = next
     c.revision++
