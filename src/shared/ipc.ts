@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { REGISTRATION_EMAIL } from './registration'
 
 // The one contract shared by main, preload and renderer. Every payload that
 // crosses the bridge is validated with these schemas in the main process.
@@ -189,12 +190,17 @@ export interface RegistrationView {
 
 export const RegistrationKeySchema = z.object({ key: z.string().min(1).max(5000) })
 
+/** Exactly what `registrationMailto` makes: Dave's address, a subject and a body, nothing else (no cc, to or bcc). */
+const REGISTRATION_MAILTO = new RegExp(
+  `^mailto:${REGISTRATION_EMAIL.replace(/\./g, '\\.')}\\?subject=[^&]*&body=[^&]*$`
+)
+
 /** A filled-in email to Dave, made by main when the app cannot reach the registration service. */
 export const RegistrationMailtoSchema = z.object({
   url: z
     .string()
     .max(10_000)
-    .refine((u) => u.startsWith('mailto:dave@dandsarmstrong.com?'), 'Not a registration email.')
+    .refine((u) => REGISTRATION_MAILTO.test(u), 'Not a registration email.')
 })
 
 export type EnterKeyResult = { ok: true; view: RegistrationView } | { ok: false; message: string }

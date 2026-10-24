@@ -17,6 +17,9 @@ export interface RegistrationDetails {
 
 export const KEY_PREFIX = 'LM1.'
 
+/** Dave's address: registrations by email go here, and keys come from here. */
+export const REGISTRATION_EMAIL = 'dave@dandsarmstrong.com'
+
 /** The registration service's `register` function. Placeholder until the service is deployed. */
 export const REGISTRATION_URL = 'https://registration.invalid/register'
 

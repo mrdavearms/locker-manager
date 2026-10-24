@@ -21,6 +21,7 @@ import {
   type Registration,
   type Store
 } from './logic'
+import { REGISTRATION_EMAIL } from './copied/registration'
 import { gmailMailer } from './mail'
 import type { Page } from './pages'
 
@@ -36,7 +37,6 @@ const REG_ADMIN_TOKEN = defineSecret('REG_ADMIN_TOKEN')
 const BASE_URL = defineString('BASE_URL')
 const secrets = [REG_SIGNING_KEY, GMAIL_USER, GMAIL_APP_PASSWORD, REG_ADMIN_TOKEN]
 
-const DAVE_EMAIL = 'dave@dandsarmstrong.com'
 /** The Locker Manager website, which has its own registration form. */
 const SITE_ORIGIN = 'https://mrdavearms.github.io'
 
@@ -101,7 +101,7 @@ function deps(): Deps {
     mailer: gmailMailer(GMAIL_USER.value(), GMAIL_APP_PASSWORD.value()),
     privateKey: createPrivateKey(REG_SIGNING_KEY.value()),
     adminToken: REG_ADMIN_TOKEN.value(),
-    daveEmail: DAVE_EMAIL,
+    daveEmail: REGISTRATION_EMAIL,
     baseUrl: BASE_URL.value().replace(/\/+$/, ''),
     now: () => new Date()
   }

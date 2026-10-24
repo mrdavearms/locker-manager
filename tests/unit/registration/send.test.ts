@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { registrationMailto, sendRegistration } from '../../../src/main/registration/send'
-import { RegistrationFormSchema, type RegistrationForm } from '../../../src/shared/registration'
+import { RegistrationMailtoSchema } from '../../../src/shared/ipc'
+import {
+  REGISTRATION_EMAIL,
+  RegistrationFormSchema,
+  type RegistrationForm
+} from '../../../src/shared/registration'
 
 const form: RegistrationForm = {
   name: 'Pat Example',
@@ -124,6 +129,31 @@ describe('registrationMailto', () => {
   it('leaves out an empty role', () => {
     const m = registrationMailto({ ...form, role: '' }, '0.13.0')
     expect(decodeURIComponent(m)).not.toContain('Role:')
+  })
+
+  it('goes to the one registration address', () => {
+    expect(REGISTRATION_EMAIL).toBe('dave@dandsarmstrong.com')
+    expect(registrationMailto(form, '0.13.0').startsWith(`mailto:${REGISTRATION_EMAIL}?`)).toBe(
+      true
+    )
+  })
+})
+
+describe('RegistrationMailtoSchema', () => {
+  const ok = (url: string): boolean => RegistrationMailtoSchema.safeParse({ url }).success
+
+  it('accepts the email main makes', () => {
+    expect(ok(registrationMailto(form, '0.13.0'))).toBe(true)
+  })
+
+  it('refuses another address, a look-alike address, or extra fields', () => {
+    expect(ok('mailto:someone@example.com?subject=a&body=b')).toBe(false)
+    expect(ok('mailto:dave@dandsarmstrongxcom?subject=a&body=b')).toBe(false)
+    expect(ok('mailto:dave@dandsarmstrong.com.evil.example?subject=a&body=b')).toBe(false)
+    expect(ok('mailto:dave@dandsarmstrong.com?subject=a&body=b&cc=x@example.com')).toBe(false)
+    expect(ok('mailto:dave@dandsarmstrong.com?cc=x@example.com&subject=a&body=b')).toBe(false)
+    expect(ok('mailto:dave@dandsarmstrong.com,x@example.com?subject=a&body=b')).toBe(false)
+    expect(ok('https://example.com/?subject=a&body=b')).toBe(false)
   })
 })
 

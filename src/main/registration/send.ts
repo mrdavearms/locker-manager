@@ -1,6 +1,8 @@
-import type { RegistrationForm, SendResult } from '../../shared/registration'
-
-const MAIL_TO = 'dave@dandsarmstrong.com'
+import {
+  REGISTRATION_EMAIL,
+  type RegistrationForm,
+  type SendResult
+} from '../../shared/registration'
 
 const MESSAGES = {
   offline:
@@ -24,7 +26,7 @@ export function registrationMailto(form: RegistrationForm, appVersion: string): 
   ]
   const subject = encodeURIComponent('Locker Manager registration')
   const body = encodeURIComponent(lines.join('\n'))
-  return `mailto:${MAIL_TO}?subject=${subject}&body=${body}`
+  return `mailto:${REGISTRATION_EMAIL}?subject=${subject}&body=${body}`
 }
 
 export async function sendRegistration(
