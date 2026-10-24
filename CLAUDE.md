@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 24 October 2026 (v0.12.1 released: efficiency and stability pass, decision 29; 1.0 waits for Dave's hand checks)._
+_Last updated: 24 October 2026 (v0.12.1 released; security audit fixes on main, decision 30; 1.0 waits for Dave's hand checks)._
 
 ## What this is
 
@@ -250,6 +250,20 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     250 ms after typing; table rows and locker tiles are memoised. The problems panel was
     measured fine (70 ms, large-school audit) and is not cached.
 
+30. **Security audit fixes** (24 Oct 2026; docs/audits/2026-10-24-security-audit.md). Change
+    PIN shares unlock's wrong-try limit (`checkGuess` in privacy.ts). School colours that are
+    not #RRGGBB are ignored when read (`getSchoolProfile`), so a file or workbook edited
+    outside the app cannot put markup into letters. Imports limit rows and columns while
+    parsing (`MAX_ROWS`, `MAX_COLS` in import/parse.ts; SheetJS `sheetRows` and a clamped
+    range, Papa `preview`). A restore keeps the current PIN setting and copies forward every
+    history, reveal and print line (`src/main/file/carryForward.ts`, shared with undo). On
+    open and on every reload, `repairSchemaObjects` (src/main/db/schemaGuard.ts) drops views
+    and any trigger the migrations for that schema version do not make, and puts back missing
+    app triggers, before and after migrating; history line `file.schema_repaired`. Backups
+    unzip to at most 512 MB. An installed copy ignores `ELECTRON_RENDERER_URL`. Still open,
+    needing Dave: publisher-checked updates (signing, or an app-level update signature) and
+    signing secrets reaching the ungated build job.
+
 ## Known, accepted
 
 - `npm audit` reports sprintf-js (moderate, denial of service) through electron-builder's
@@ -376,6 +390,10 @@ All data reads and writes from the window go through ONE channel, `rpc`:
   (setting) gives the display ("7A").
 - Import presets live in `src/shared/importPresets.ts` so the window can re-match columns
   instantly when the operator picks another header row.
+- `repairSchemaObjects` compares each trigger's SQL text exactly with what the shipped
+  migrations make. Never edit a shipped migration (it was already a rule); a trigger added or
+  changed in place, outside a new migration, would be removed from every school's file on open.
+  `tests/unit/db/schemaGuard.test.ts` checks every schema fixture comes through untouched.
 - Inside `inCodeBatch` (src/main/repos/codes.ts), the codes in use are read once and then
   kept up to date only by `writeCode`. Anything else that changes a lock's code, a lock's
   status or a code set entry inside a batch makes the copy wrong and can let a duplicate

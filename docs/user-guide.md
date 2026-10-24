@@ -192,6 +192,10 @@ Every save keeps the version it replaced.
 The version you had before restoring is kept as a backup too, so you can change your mind.
 Only the person editing the file can restore.
 
+A restore keeps two things from today's version: the PIN for codes (so going back to a
+backup from before the PIN was set does not remove it), and the History, including every
+record of codes being shown or printed. History is never taken away.
+
 ### If the school's file will not open
 
 If Locker Manager says the file is damaged, use a backup instead.

@@ -59,8 +59,9 @@ signature is in place the prompt disappears.
   that version on the download page instead of trying again; a newer version is tried as usual.
 - macOS: Squirrel.Mac (the usual Electron Mac updater) refuses unsigned builds, so the app
   installs its own updates. It downloads the universal ZIP, checks its SHA-512 against
-  `latest-mac.yml`, unpacks it with `ditto`, checks the bundle identifier, version and code
-  signature, and after quitting swaps the app bundle with two renames, putting the old one
+  `latest-mac.yml`, unpacks it with `ditto`, checks the bundle identifier, version and that
+  the bundle's ad-hoc code signature is intact (this proves the download is whole, not who
+  made it), and after quitting swaps the app bundle with two renames, putting the old one
   back if anything fails. It needs write access to the folder holding the app (usually
   /Applications). Where the user cannot write there, or runs the app from the disk image or
   a translocated copy, the app reports the new version and opens the download page instead.
@@ -82,9 +83,10 @@ signature is in place the prompt disappears.
 - Each user can turn automatic installs off in Settings, This computer (**Install updates
   by themselves**); the app then shows a bar with a link to the download page instead.
   Managed settings can fix this for everyone (`autoUpdate`).
-- **Windows builds are not yet code-signed.** Until they are, an update is trusted because
-  it comes from the project's GitHub release, with a SHA-512 check against `latest.yml` on
-  the same release; there is no publisher signature to check. If your school needs more
+- **Windows and Mac builds are not yet code-signed.** Until they are, an update is trusted
+  because it comes from the project's GitHub release, with a SHA-512 check against
+  `latest.yml` or `latest-mac.yml` on the same release; there is no publisher signature to
+  check on either platform. If your school needs more
   than that, set `autoUpdate` to `false` in managed settings and deploy versions yourself.
 
 ### Network needs
