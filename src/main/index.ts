@@ -29,6 +29,7 @@ import { runSelfTest, SELF_TEST_FLAG } from './selfTest'
 import { shutdownNoteMessage, takeShutdownNote, writeShutdownNote } from './shutdownNote'
 import { detectDeveloperIdSignature, detectWindowsSignature } from './signing'
 import { buildCommit } from './buildInfo'
+import { initRegistration } from './registration/registration'
 import { macBlocker, updateMode, windowsBlocker } from './update/policy'
 import { failedWindowsAttempt, folderWritable, recordWindowsAttempt } from './update/windowsAttempt'
 import {
@@ -204,6 +205,7 @@ if (process.argv.includes(SELF_TEST_FLAG)) {
     if (!app.isPackaged && process.env['LOCKER_MANAGER_FAIL_START'] === '1')
       throw new Error('a start-up test failure')
     await initFileService()
+    initRegistration(preferences)
     // Counted first, so a start that fails anywhere after this is seen (SPEC.md 9.3).
     // Writing the count must never stop the app starting.
     const recover = await noteStartAttempt(preferences()).catch((error: unknown) => {

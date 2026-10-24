@@ -47,6 +47,22 @@ describe('Preferences (this computer only)', () => {
     expect(again.checklistHidden).toEqual(['/a.lockers'])
   })
 
+  it('read a missing or odd registration key as none, keeping the operator name', async () => {
+    const dir = tempDir()
+    writeFileSync(
+      join(dir, 'preferences.json'),
+      JSON.stringify({ version: 1, operatorName: 'Hannah' })
+    )
+    expect((await new Preferences(dir).load()).registrationKey).toBeNull()
+    writeFileSync(
+      join(dir, 'preferences.json'),
+      JSON.stringify({ version: 1, operatorName: 'Hannah', registrationKey: 42 })
+    )
+    const loaded = await new Preferences(dir).load()
+    expect(loaded.operatorName).toBe('Hannah')
+    expect(loaded.registrationKey).toBeNull()
+  })
+
   it('survive a damaged preferences file by starting fresh', async () => {
     const dir = tempDir()
     writeFileSync(join(dir, 'preferences.json'), '{ not json')

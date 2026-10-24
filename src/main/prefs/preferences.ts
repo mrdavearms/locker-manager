@@ -32,7 +32,9 @@ export const PrefsSchema = z.object({
   /** Data files whose getting-started list was hidden on this computer. */
   checklistHidden: z.array(z.string()).default([]).catch([]),
   /** The printer nudge last chosen for labels on this computer. */
-  printerNudge: z.string().nullable().default(null).catch(null)
+  printerNudge: z.string().nullable().default(null).catch(null),
+  /** The registration key entered on this computer (the school's file and IT can hold others). */
+  registrationKey: z.string().nullable().default(null).catch(null)
 })
 export type Prefs = z.infer<typeof PrefsSchema>
 

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { ManagedSchema, type Managed } from '@shared/computer'
 
 // Managed settings for school IT (SPEC.md 9.5): one JSON file in a machine-wide
@@ -7,7 +7,7 @@ import { ManagedSchema, type Managed } from '@shared/computer'
 // cannot be read is ignored and the reason shown in Settings, This computer.
 
 /** True in an installed copy; false under `electron .` (the tests) and plain Node. */
-function installed(): boolean {
+export function installed(): boolean {
   return !!process.versions.electron && !process.defaultApp
 }
 
@@ -22,6 +22,31 @@ export function managedPath(
   if (platform === 'win32') return join('C:\\ProgramData', 'Locker Manager', 'managed.json')
   if (platform === 'darwin') return '/Library/Application Support/Locker Manager/managed.json'
   return '/etc/locker-manager/managed.json'
+}
+
+/**
+ * Where IT puts a school's registration key: beside managed.json. The test override
+ * works only outside an installed copy, for the same reason as managedPath.
+ */
+export function registrationKeyPath(
+  platform: NodeJS.Platform = process.platform,
+  packaged: boolean = installed()
+): string {
+  if (!packaged && process.env.LOCKER_MANAGER_MANAGED_DIR)
+    return join(process.env.LOCKER_MANAGER_MANAGED_DIR, 'registration.key')
+  return join(dirname(managedPath(platform, true)), 'registration.key')
+}
+
+/** The key IT supplied, or null when there is none or it cannot be read. */
+export function readItRegistrationKey(): string | null {
+  try {
+    const text = readFileSync(registrationKeyPath(), 'utf8')
+      .replace(/^\uFEFF/, '')
+      .trim()
+    return text === '' ? null : text
+  } catch {
+    return null
+  }
 }
 
 export function parseManaged(text: string): { managed: Managed; problem: string | null } {
