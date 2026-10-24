@@ -6,6 +6,7 @@ import type { RegistrationDetails } from '../../../src/shared/registration'
 
 let priv: KeyObject
 let pub: KeyObject
+const G = fc.string({ unit: 'grapheme' })
 const now = new Date(2026, 10, 3)
 
 const d: RegistrationDetails = {
@@ -96,12 +97,15 @@ describe('registration key format', () => {
     // The last signature character holds 2 data bits; the other 4 bits are ignored when decoding.
     const twin = alphabet[(alphabet.indexOf(last) & ~15) | ((alphabet.indexOf(last) + 1) & 15)]!
     expect(twin).not.toBe(last)
-    expect(checkKey(key.slice(0, -1) + twin, [pub], now).ok).toBe(false)
+    expect(checkKey(key.slice(0, -1) + twin, [pub], now)).toEqual({
+      ok: false,
+      reason: 'malformed'
+    })
   })
 
   it('round-trips any text and rejects any single-character change to the signature', () => {
     fc.assert(
-      fc.property(fc.string(), fc.string(), fc.string(), fc.nat(), (school, name, email, at) => {
+      fc.property(G, G, G, fc.nat(), (school, name, email, at) => {
         const details = { ...d, school, name, email }
         const key = signKey(details, priv)
         expect(checkKey(key, [pub], now)).toEqual({ ok: true, details })
