@@ -137,3 +137,9 @@ Automated tests cannot do these. Each needs a person, real paper or a real compu
 12. **School proxy** (item 22): on a school network with a proxy that asks for a password,
     use Help > Check for updates. It must either find the update or say plainly that it
     could not check. If it cannot, record what the proxy needs in the IT guide.
+13. **Frozen window on Windows** (efficiency audit, 24 Oct 2026): on a Windows PC with the
+    repository, run `npm run dev`, open a school file, choose View > Toggle Developer Tools
+    and type `while (true) {}` in the Console. Within about 30 seconds the app asks Wait or
+    Reload the window. Reload brings the window back with the file still open; Wait leaves
+    it frozen until the question comes back. Unit tests drive this logic, but no test has
+    frozen a real window.
