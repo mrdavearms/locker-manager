@@ -3,7 +3,7 @@
 This guide is for school office staff and year level leaders. Each section is one task.
 The same guide is inside the app: click **Guide** at the top.
 
-_Last updated: 9 October 2026 (after version 0.10.0)._
+_Last updated: 25 October 2026 (after version 0.12.1; registration is new in 0.13.0)._
 
 ## Getting started
 
@@ -85,6 +85,61 @@ It reads like **Version 0.11.0 · 3f2c1ab · built 9 Oct 2026**. The short code 
 version (here 3f2c1ab) names the exact build. If you report a problem, quote the whole line.
 **About** at the top right (also in the **Help** menu, and on a Mac in the **Locker Manager**
 menu) gives the same details, with the time of the build.
+
+## Register Locker Manager
+
+From version 0.13.0, each school registers Locker Manager once. It is free. Registration
+lets Dave Armstrong, who makes Locker Manager, know which schools use it.
+
+**Register before you update, if you can.** Dave checks each registration by hand and
+usually replies within a day. An updated copy that has no key can look at your school's
+file but cannot change it until the key arrives.
+
+### Register your school
+
+1. Open Locker Manager and click **Register this school**. You can also click **Help**,
+   then **Registration**.
+2. Type your name, your school, your email address and your school's state. Your role is
+   optional.
+3. Tick the box to agree to the privacy note, then click **Send**.
+4. Wait for the email with your key. It comes from dave@dandsarmstrong.com.
+5. Click **I have a key**, paste the key, and click **Register**. The app checks it
+   straight away and says **Registered to** your school's name.
+
+If Locker Manager cannot send the form (for example, your school's network blocks it), it
+offers two other ways: open the registration page on the Locker Manager website, or write
+an email to Dave with your details already filled in.
+
+### One key covers the whole school
+
+The key is saved inside your school's data file. Every computer that opens the file is
+registered, so you paste the key only once. The computer also keeps its own copy, so it can
+open other files and make a new one.
+
+School IT can also put the key on every computer at once. See the IT guide.
+
+### Until the key arrives
+
+A copy with no key still lets you:
+
+- look up students and lockers
+- print lists and export without codes
+- try the demo school
+- update Locker Manager
+
+It does not let you change the school's file, show, print or export codes, make a new
+file, make a practice copy, rebuild a file from an export, or use **Open a backup…**. The
+banner at the top says **This copy is not registered**, with buttons to register or enter
+a key. Once the key is entered, everything works again. Nothing is lost while you wait.
+
+### What is sent, and what is not
+
+When you click **Send**, Locker Manager sends your name, school, email address, state and
+role to the registration service, once. Dave sees them and nobody else does.
+
+Nothing from your school's file is ever sent. No student names, no lockers, no codes. The
+app never sends anything to check a key. It checks the key on the computer, with no
+internet.
 
 ## Tell the app who you are
 

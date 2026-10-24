@@ -97,13 +97,15 @@ Allow outbound HTTPS (port 443) to:
 |---|---|
 | `github.com` | update check: `/mrdavearms/locker-manager/releases.atom`, `/mrdavearms/locker-manager/releases/latest`, and `/mrdavearms/locker-manager/releases/download/...` |
 | `release-assets.githubusercontent.com` | GitHub redirects every `/releases/download/...` address here: `latest.yml`, `latest-mac.yml` and the installers |
+<!-- TODO(task 11): replace with the real registration service host once the service is deployed. -->
+| the registration service address (added when the service goes live) | Registering from inside the app only. Nothing else uses it. The website form at `https://mrdavearms.github.io/locker-manager/register/` needs no firewall change beyond normal web access. |
 
 Checked on 9 October 2026: a request for a release file on `github.com` answers with a
 redirect to `release-assets.githubusercontent.com`, which serves the file. GitHub has
 changed this host before (it was `objects.githubusercontent.com`); if updates stop at a
 firewall, check where the redirect now points.
 
-The app uses the system proxy. Nothing else is contacted.
+The app uses the system proxy. Nothing else is contacted. The app never sends anything to check a registration key.
 
 ## Importing students
 
@@ -271,6 +273,27 @@ the default file appears on the Welcome screen; the demo school is simply not of
 
 A file that is not valid JSON, or has an unknown key or a wrong value, is ignored as a
 whole, and Settings, This computer, says why. The file is read when the app starts.
+
+## Registration
+
+From version 0.13.0, a school registers Locker Manager once. It is free. Someone from the school sends their name, school, email address, state and an optional role. Dave Armstrong approves each one by hand, usually within a day, and emails a registration key.
+
+There is no grace period. A copy with no key opens the school's file read-only and cannot change it. It can still look up students and lockers, print lists and export without codes. The demo school and updates always work. If you can, register before updating a computer to 0.13.0.
+
+The key is saved in the school's data file, so every computer that opens the file is covered. Each Windows or Mac user account also keeps a copy in `preferences.json`. The app checks the key on the computer with no internet. Registering sends the details above, once, when a person clicks Send. Nothing from the data file is ever sent.
+
+### Put the key on every computer
+
+Save the key text, and nothing else, in a file called `registration.key` in the same folder as `managed.json`:
+
+| Platform | Path |
+|---|---|
+| Windows | `C:\ProgramData\Locker Manager\registration.key` |
+| macOS | `/Library/Application Support/Locker Manager/registration.key` |
+
+The key is a single line starting with `LM1.`. The file is read when the app starts. As with `managed.json`, an installed copy reads only this exact path.
+
+The key is a separate file because `managed.json` is checked strictly. An older copy of the app that met an unknown setting in it would ignore every managed setting. `demoEnabled: false` hides the demo school, so a computer with that setting and no key needs a key before it can start anything.
 
 ## Settings on each computer
 

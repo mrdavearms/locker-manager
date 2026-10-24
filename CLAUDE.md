@@ -264,6 +264,16 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     needing Dave: publisher-checked updates (signing, or an app-level update signature) and
     signing secrets reaching the ungated build job.
 
+30. **Registration** (Dave, 25 Oct 2026; docs/superpowers/specs/2026-10-24-registration-design.md).
+    From 0.13.0 a school registers once, free. No grace period: a copy with no key opens the
+    school's file read-only with reason `unregistered` (no edit lock); demo and updates always
+    work. Dave approves each registration by hand; keys are signed (Ed25519) and emailed from
+    dave@dandsarmstrong.com; the form asks for the state. The key lives in meta
+    `registration_v1` and in preferences.json, or in IT's `registration.key` beside
+    managed.json. The app never sends anything to check a key. The test overrides
+    `LOCKER_MANAGER_REGISTRATION=enforce` and `LOCKER_MANAGER_REG_TEST_PUBKEY` are ignored in
+    an installed copy, and `--self-test` fails a packaged build with no production public key.
+
 ## Known, accepted
 
 - `npm audit` reports sprintf-js (moderate, denial of service) through electron-builder's
@@ -318,6 +328,12 @@ From `~/Antigravity/redaction tool/CLAUDE.md` and `~/Antigravity/jacks iep gener
 - `tests/fixtures/schema/vN-SYNTHETIC.lockers`: one file per released schema version. The
   fixture test writes the newest one if missing; commit it with any new migration.
 
+- `src/main/registration/`: `keyFormat` (parse and verify a key), `policy` (what each state
+  allows), `fileKey` (the key in the data file), `registration`, `afterOpen`, `send`, `ipc`.
+  `registration-service/` is the Firebase functions project; `npm run registration:sync-key-format`
+  keeps its copied files in step (CI checks). `scripts/registration-make-key.mjs`
+  (`npm run registration:make-key`) makes a key by hand. The website form is `site/register/`.
+
 ## Data requests (since M2)
 
 All data reads and writes from the window go through ONE channel, `rpc`:
@@ -335,6 +351,10 @@ All data reads and writes from the window go through ONE channel, `rpc`:
   "Locker" and so on in UI text.
 
 ## Gotchas
+
+- e2e tests run with registration off unless `launchApp({ registration: 'enforce' })`. The
+  e2e fixture is a demo file (meta `demo=1`), which never needs a key, so registration tests
+  set demo to `'0'` (see `placeSchoolFile` in tests/e2e/registration.spec.ts).
 
 - **Electron's fs treats a `.asar` file as a folder.** A recursive `rm` of a folder holding a
   downloaded app fails with ENOTEMPTY. 0.11.0 to 0.11.3 hit this on `pending-update`, so

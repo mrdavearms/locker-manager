@@ -36,7 +36,7 @@
 </p>
 
 > [!NOTE]
-> **Version 0.12.1, ready to use at a school.** Every release goes to every school straight
+> **Version 0.12.1, ready to use at a school. Free for schools. Registration required from 0.13.0.** Every release goes to every school straight
 > away, and the app updates itself. Version 1.0 follows after the hand checks in
 > [the release checklist](docs/release-checklist.md): real label sheets on a laser printer,
 > letters on paper, a Windows install at a school, and code signing once it is bought.
@@ -212,6 +212,11 @@ the app asks GitHub (`github.com`) whether a newer version exists and downloads 
 `release-assets.githubusercontent.com`. The requests carry nothing about the school, its
 staff or its students; like any web request, GitHub sees the computer's internet address.
 IT can turn automatic checks off (see the IT guide).
+
+From 0.13.0, a school registers once. Pressing Send on the registration form sends the
+person's name, school, email address, state and optional role to a small registration
+service, and nothing else. The app never sends anything to check a key; it checks the key on
+the computer with no internet.
 
 ### Removing data
 
