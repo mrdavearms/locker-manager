@@ -51,6 +51,16 @@ describe('PIN for codes (SPEC.md 7 item 12)', () => {
     setPin(db, ctx, null, '1357')
     expect(privacyView(db).pinSet).toBe(false)
   })
+  it('changing the PIN shares the wrong-try wait, so it cannot be used to guess the PIN', async () => {
+    const { db, ctx } = await allocatedDemo()
+    noteOpenFile('e.lockers')
+    setPin(db, ctx, '4821', null)
+    for (let i = 0; i < 5; i++)
+      expect(() => setPin(db, ctx, '1111', '0000', 100_000)).toThrow(/current PIN/)
+    expect(() => setPin(db, ctx, '1111', '4821', 101_000)).toThrow(/Too many/)
+    expect(() => unlockCodes(db, '4821', 101_000)).toThrow(/Too many/)
+    expect(setPin(db, ctx, '1111', '4821', 140_000).pinSet).toBe(true)
+  })
 })
 
 describe('managed settings for school IT (SPEC.md 9.5)', () => {

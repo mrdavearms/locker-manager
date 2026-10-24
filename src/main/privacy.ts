@@ -87,22 +87,30 @@ export function shownCode(
   return revealCode(db, ctx, lockerId, 'screen')
 }
 
-export function unlockCodes(db: LockerDb, pin: string, now = Date.now()): PrivacyView {
-  const p = stored(db)
-  if (!p.pinHash) throw new Error('No PIN has been set for this file.')
+/**
+ * Checks a PIN guess against the stored hash under one wrong-try limit, so every way
+ * of testing a guess (unlocking, changing or removing the PIN) waits the same.
+ */
+function checkGuess(hash: string, pin: string, wrong: string, now: number): void {
   if (now < waitUntil)
     throw new Error(
       `Too many wrong PINs. Try again in ${Math.ceil((waitUntil - now) / 1000)} seconds.`
     )
-  if (!pinMatches(p.pinHash, pin)) {
+  if (!pinMatches(hash, pin)) {
     failures++
     if (failures >= 5) {
       waitUntil = now + 30_000
       failures = 0
     }
-    throw new Error('That PIN is not right.')
+    throw new Error(wrong)
   }
   failures = 0
+}
+
+export function unlockCodes(db: LockerDb, pin: string, now = Date.now()): PrivacyView {
+  const p = stored(db)
+  if (!p.pinHash) throw new Error('No PIN has been set for this file.')
+  checkGuess(p.pinHash, pin, 'That PIN is not right.', now)
   unlockedUntil = now + UNLOCK_MS
   return privacyView(db, now)
 }
@@ -115,11 +123,14 @@ export function setPin(
   db: LockerDb,
   ctx: OperatorContext,
   pin: string | null,
-  currentPin: string | null
+  currentPin: string | null,
+  now = Date.now()
 ): PrivacyView {
   const p = stored(db)
-  if (p.pinHash && !(currentPin && pinMatches(p.pinHash, currentPin)))
-    throw new Error('Enter the current PIN first.')
+  if (p.pinHash) {
+    if (!currentPin) throw new Error('Enter the current PIN first.')
+    checkGuess(p.pinHash, currentPin, 'Enter the current PIN first.', now)
+  }
   if (pin !== null && !/^\d{4,8}$/.test(pin)) throw new Error('A PIN is 4 to 8 digits.')
   if (pin === null && readManaged().managed.requirePinForCodes)
     throw new Error('Your IT team requires a PIN, so it cannot be removed.')
