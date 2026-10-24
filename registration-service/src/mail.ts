@@ -50,11 +50,14 @@ export function toDaveEmail(row: Registration, reviewLink: string): Email {
   }
 }
 
-export function receivedEmail(row: Registration): Email {
+/** Holds nothing the sender typed, so the form can never be used to send chosen words to a stranger. */
+export function receivedEmail(): Email {
   return {
     subject: "We've received your Locker Manager registration",
     text: [
-      `Thanks for registering ${row.school}. Dave Armstrong checks each registration by hand, usually within a day. Your registration key will come to this address.`,
+      'Thanks for registering with Locker Manager. Dave Armstrong checks each registration by hand, usually within a day. Your registration key will come to this address.',
+      '',
+      "If you didn't register, you can ignore this email.",
       '',
       'Dave Armstrong',
       ''

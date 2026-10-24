@@ -2,6 +2,7 @@ import { createHash, generateKeyPairSync, type KeyObject } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { checkKey } from '../src/copied/keyFormat'
 import {
+  clientAddress,
   handleDecide,
   handleList,
   handleListForm,
@@ -38,6 +39,9 @@ class MemoryStore implements Store {
     if (!row || row.status !== 'waiting') return false
     this.rows.set(id, { ...row, ...patch })
     return true
+  }
+  async countSince(sinceMs: number): Promise<number> {
+    return [...this.rows.values()].filter((r) => Date.parse(r.createdAt) >= sinceMs).length
   }
   async countRecentFromHash(ipHash: string, sinceMs: number): Promise<number> {
     return [...this.rows.values()].filter(
@@ -142,9 +146,21 @@ describe('register', () => {
       expect(toDave?.text).toContain(text)
     expect(toThem?.to).toBe('hsmith@example.vic.edu.au')
     expect(toThem?.subject).toBe("We've received your Locker Manager registration")
-    expect(toThem?.text).toContain(
-      'Thanks for registering Example Secondary College. Dave Armstrong checks each registration by hand, usually within a day. Your registration key will come to this address.'
+    expect(toThem?.text).toBe(
+      "Thanks for registering with Locker Manager. Dave Armstrong checks each registration by hand, usually within a day. Your registration key will come to this address.\n\nIf you didn't register, you can ignore this email.\n\nDave Armstrong\n"
     )
+  })
+
+  it('puts nothing the sender typed into the email to the registrant', async () => {
+    await handleRegister(
+      { ...good, name: 'Visit spam.example now', school: 'Cheap pills at spam.example' },
+      '203.0.113.5',
+      deps
+    )
+    const [toDave, toThem] = mailer.sent
+    expect(toDave?.text).toContain('Cheap pills at spam.example')
+    expect(toThem?.subject).not.toContain('spam.example')
+    expect(toThem?.text).not.toContain('spam.example')
   })
 
   it('says "the website" when the form came from the website, and numbers each one', async () => {
@@ -185,6 +201,37 @@ describe('register', () => {
     expect(store.rows.size).toBe(5)
     expect(mailer.sent).toHaveLength(0)
     expect((await handleRegister(good, '198.51.100.7', deps)).status).toBe(200)
+  })
+
+  it('refuses every registration once 50 arrived in the last 24 hours, from any address', async () => {
+    for (let i = 0; i < 50; i++)
+      expect((await handleRegister(good, `198.51.100.${i}`, deps)).status).toBe(200)
+    mailer.sent = []
+    const res = await handleRegister(good, '203.0.113.99', deps)
+    expect(res).toEqual({ status: 429, json: { ok: false, error: 'too_many' } })
+    expect(store.rows.size).toBe(50)
+    expect(mailer.sent).toHaveLength(0)
+    // A day later the oldest ones no longer count.
+    deps.now = () => new Date(NOW.getTime() + 24 * 60 * 60 * 1000 + 1)
+    expect((await handleRegister(good, '203.0.113.99', deps)).status).toBe(200)
+  })
+})
+
+describe('clientAddress', () => {
+  it('uses the only entry of X-Forwarded-For', () => {
+    expect(clientAddress('203.0.113.5', '10.0.0.1')).toBe('203.0.113.5')
+  })
+
+  it('uses the rightmost entry, which Google added, not one the sender wrote', () => {
+    expect(clientAddress('1.2.3.4, 5.6.7.8,  203.0.113.5 ', '10.0.0.1')).toBe('203.0.113.5')
+    expect(clientAddress(['1.2.3.4', '5.6.7.8, 203.0.113.5'], '10.0.0.1')).toBe('203.0.113.5')
+  })
+
+  it('falls back to the connection address, then to unknown', () => {
+    expect(clientAddress(undefined, '10.0.0.1')).toBe('10.0.0.1')
+    expect(clientAddress('', '10.0.0.1')).toBe('10.0.0.1')
+    expect(clientAddress(' , ', undefined)).toBe('unknown')
+    expect(clientAddress(undefined, undefined)).toBe('unknown')
   })
 })
 

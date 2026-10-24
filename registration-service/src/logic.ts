@@ -46,6 +46,8 @@ export interface Store {
   /** Writes the patch only while the registration is still waiting, in one step. False if it was already decided. */
   claimDecision(id: string, patch: Partial<Registration>): Promise<boolean>
   countRecentFromHash(ipHash: string, sinceMs: number): Promise<number>
+  /** How many registrations were stored since this time, from any address. */
+  countSince(sinceMs: number): Promise<number>
   nextNumber(): Promise<number>
 }
 
@@ -66,6 +68,9 @@ export interface Deps {
 
 const PER_HOUR_FROM_ONE_ADDRESS = 5
 const HOUR_MS = 60 * 60 * 1000
+/** Every registration sends two emails from Dave's mailbox, so a flood must stop well short of Gmail's daily limit. */
+const PER_DAY_FROM_EVERYONE = 50
+const DAY_MS = 24 * HOUR_MS
 
 /** What the app and the website send: the form, where it came from, and a hidden field only robots fill in. */
 const PayloadSchema = RegistrationFormSchema.extend({
@@ -96,6 +101,22 @@ export function sameSecret(given: string, expected: string): boolean {
   return timingSafeEqual(a, b)
 }
 
+/**
+ * The sender's internet address. Google's front end adds the address it saw to the end of
+ * X-Forwarded-For; anything before it was written by the sender and could be made up.
+ */
+export function clientAddress(
+  forwardedFor: string | string[] | undefined,
+  connectionIp: string | undefined
+): string {
+  const header = Array.isArray(forwardedFor) ? forwardedFor.join(',') : (forwardedFor ?? '')
+  const entries = header
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '')
+  return entries.at(-1) ?? (connectionIp || 'unknown')
+}
+
 /** Lets the hourly limit recognise a sender without keeping their internet address. */
 export function hashAddress(ip: string, adminToken: string): string {
   return createHash('sha256').update(`${adminToken}:${ip}`, 'utf8').digest('hex')
@@ -122,6 +143,9 @@ export async function handleRegister(
   if (recent >= PER_HOUR_FROM_ONE_ADDRESS) {
     return { status: 429, json: { ok: false, error: 'too_many' } }
   }
+  if ((await deps.store.countSince(now.getTime() - DAY_MS)) >= PER_DAY_FROM_EVERYONE) {
+    return { status: 429, json: { ok: false, error: 'too_many' } }
+  }
 
   const form = parsed.data
   const number = await deps.store.nextNumber()
@@ -144,7 +168,7 @@ export async function handleRegister(
 
   const toDave = toDaveEmail(row, reviewLink(row, deps.baseUrl))
   await deps.mailer.send(deps.daveEmail, toDave.subject, toDave.text)
-  const received = receivedEmail(row)
+  const received = receivedEmail()
   await deps.mailer.send(row.email, received.subject, received.text)
   return { status: 200, json: { ok: true } }
 }

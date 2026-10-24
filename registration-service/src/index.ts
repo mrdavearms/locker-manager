@@ -10,6 +10,7 @@ import { defineSecret, defineString } from 'firebase-functions/params'
 import * as logger from 'firebase-functions/logger'
 import type { Response } from 'express'
 import {
+  clientAddress,
   handleDecide,
   handleList,
   handleListForm,
@@ -76,6 +77,12 @@ function firestoreStore(db: Firestore): Store {
       const snap = await registrations.where('ipHash', '==', ipHash).get()
       return snap.docs.filter((d) => Date.parse(String(d.get('createdAt'))) >= sinceMs).length
     },
+    async countSince(sinceMs) {
+      // createdAt is an ISO date, so text order is time order; a single-field filter needs no extra index.
+      const since = new Date(sinceMs).toISOString()
+      const snap = await registrations.where('createdAt', '>=', since).count().get()
+      return snap.data().count
+    },
     async nextNumber() {
       return db.runTransaction(async (tx) => {
         const snap = await tx.get(counter)
@@ -134,7 +141,8 @@ export const register = onRequest({ secrets, cors: [SITE_ORIGIN] }, async (req: 
   }
   try {
     const body: unknown = req.body
-    const result = await handleRegister(body, req.ip ?? 'unknown', deps())
+    const ip = clientAddress(req.headers['x-forwarded-for'], req.ip)
+    const result = await handleRegister(body, ip, deps())
     res.status(result.status).json(result.json)
   } catch (err) {
     failed(res, err, true)
