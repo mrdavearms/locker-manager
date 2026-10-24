@@ -27,6 +27,7 @@ export function gmailMailer(user: string, appPassword: string): Mailer {
 
 export function sentFrom(row: Registration): string {
   if (row.source === 'website') return 'the website'
+  if (row.source === 'manual') return 'made by hand'
   return row.appVersion ? `the app, version ${row.appVersion}` : 'the app'
 }
 

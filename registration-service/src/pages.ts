@@ -159,7 +159,8 @@ export function listPage(rows: Registration[]): Page {
     'State',
     'Role',
     'Status',
-    'Decided'
+    'Decided',
+    'Sent from'
   ]
   const body = rows
     .map((r) =>
@@ -172,7 +173,8 @@ export function listPage(rows: Registration[]): Page {
         r.state,
         r.role ?? '',
         r.status,
-        r.decidedAt ? longDate(r.decidedAt) : ''
+        r.decidedAt ? longDate(r.decidedAt) : '',
+        sentFrom(r)
       ]
         .map((v) => `<td>${e(v)}</td>`)
         .join('')
@@ -195,6 +197,11 @@ ${body}
 function csvCell(value: string): string {
   const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value
   return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
+}
+
+function csvSource(r: Registration): string {
+  if (r.source === 'app') return `app ${r.appVersion ?? ''}`.trim()
+  return r.source === 'manual' ? 'made by hand' : 'website'
 }
 
 export function listCsv(rows: Registration[]): string {
@@ -221,7 +228,7 @@ export function listCsv(rows: Registration[]): string {
       r.role ?? '',
       r.status,
       r.decidedAt ?? '',
-      r.source === 'app' ? `app ${r.appVersion ?? ''}`.trim() : 'website'
+      csvSource(r)
     ]
       .map(csvCell)
       .join(',')

@@ -23,7 +23,8 @@ export interface Registration {
   email: string
   state: string
   role: string | null
-  source: 'app' | 'website'
+  /** 'manual' is a key Dave made by hand with `npm run registration:make-key`. */
+  source: 'app' | 'website' | 'manual'
   appVersion: string | null
   /** SHA-256 of the admin token, ':' and the sender's internet address. The address itself is never kept. */
   ipHash: string

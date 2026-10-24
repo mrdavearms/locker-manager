@@ -1,6 +1,7 @@
 import { createHash, generateKeyPairSync, type KeyObject } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { checkKey } from '../src/copied/keyFormat'
+import { sentFrom } from '../src/mail'
 import {
   handleDecide,
   handleList,
@@ -472,5 +473,41 @@ describe('list', () => {
     expect(lines[3]).toContain('Example Secondary College')
     expect(res.body).not.toMatch(/[0-9a-f]{64}/)
     expect(res.body).not.toContain('203.0.113.5')
+  })
+})
+
+describe('where a registration came from', () => {
+  it('says "made by hand" for a key Dave made himself, in emails, pages, the list and the CSV', async () => {
+    const app = await registerOne()
+    const { appVersion: _, ...fromSite } = good
+    await handleRegister({ ...fromSite, source: 'website', school: 'Site School' }, '1.1.1.1', deps)
+    const manual: Registration = {
+      ...app,
+      id: registrationId(3),
+      number: 3,
+      school: 'Hand School',
+      source: 'manual',
+      appVersion: null,
+      ipHash: 'manual'
+    }
+    store.rows.set(manual.id, manual)
+
+    expect(sentFrom(app)).toBe('the app, version 0.13.0')
+    expect(sentFrom({ ...app, source: 'website', appVersion: null })).toBe('the website')
+    expect(sentFrom(manual)).toBe('made by hand')
+    expect((await handleReview(manual.id, manual.reviewToken, deps)).html).toContain(
+      '<td>made by hand</td>'
+    )
+
+    const list = await handleList('admin-token-for-tests', 'html', deps)
+    expect(list.body).toContain('<th>Sent from</th>')
+    expect(list.body).toContain('<td>made by hand</td>')
+    expect(list.body).toContain('<td>the website</td>')
+    expect(list.body).toContain('<td>the app, version 0.13.0</td>')
+
+    const lines = (await handleList('admin-token-for-tests', 'csv', deps)).body.trimEnd().split('\r\n')
+    expect(lines[1]).toMatch(/,made by hand$/)
+    expect(lines[2]).toMatch(/,website$/)
+    expect(lines[3]).toMatch(/,app 0\.13\.0$/)
   })
 })
