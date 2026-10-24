@@ -49,6 +49,8 @@ export interface Store {
   countRecentFromHash(ipHash: string, sinceMs: number): Promise<number>
   /** How many registrations were stored since this time, from any address. */
   countSince(sinceMs: number): Promise<number>
+  /** Records that Dave was told the emails paused on this day (YYYY-MM-DD), in one step. False if he already was. */
+  claimPauseAlert(day: string): Promise<boolean>
   nextNumber(): Promise<number>
 }
 
@@ -74,6 +76,8 @@ const HOUR_MS = 60 * 60 * 1000
  * service still saves registrations but stops emailing, well short of Gmail's daily limit.
  */
 const PER_DAY_FROM_EVERYONE = 50
+/** Past this many in a day the service stops saving registrations too, so a flood cannot fill the database. */
+const MOST_PER_DAY = 500
 const DAY_MS = 24 * HOUR_MS
 
 /** What the app and the website send: the form, where it came from, and a hidden field only robots fill in. */
@@ -132,6 +136,9 @@ export async function handleRegister(
     return { status: 429, json: { ok: false, error: 'too_many' } }
   }
   const today = await deps.store.countSince(now.getTime() - DAY_MS)
+  if (today >= MOST_PER_DAY) {
+    return { status: 429, json: { ok: false, error: 'too_many' } }
+  }
 
   const form = parsed.data
   const number = await deps.store.nextNumber()
@@ -153,8 +160,8 @@ export async function handleRegister(
   })
 
   if (today >= PER_DAY_FROM_EVERYONE) {
-    // Tell Dave once, on the registration that goes past the limit, then stay quiet.
-    if (today === PER_DAY_FROM_EVERYONE) {
+    // Tell Dave once a day, however many registrations arrive together, then stay quiet.
+    if (await deps.store.claimPauseAlert(schoolDate(now))) {
       const paused = emailsPausedEmail()
       await deps.mailer.send(deps.daveEmail, paused.subject, paused.text)
     }

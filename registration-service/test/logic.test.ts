@@ -48,6 +48,12 @@ class MemoryStore implements Store {
       (r) => r.ipHash === ipHash && Date.parse(r.createdAt) >= sinceMs
     ).length
   }
+  pauseDay: string | null = null
+  async claimPauseAlert(day: string): Promise<boolean> {
+    if (this.pauseDay === day) return false
+    this.pauseDay = day
+    return true
+  }
   async nextNumber(): Promise<number> {
     this.counter += 1
     return this.counter
@@ -235,6 +241,67 @@ describe('register', () => {
       'dave@dandsarmstrong.com',
       'hsmith@example.vic.edu.au'
     ])
+  })
+})
+
+async function fillToday(count: number): Promise<void> {
+  for (let i = 0; i < count; i++) {
+    const number = await store.nextNumber()
+    await store.add({
+      number,
+      name: 'Filler',
+      school: 'Filler School',
+      email: 'filler@example.edu.au',
+      state: 'VIC',
+      role: null,
+      source: 'website',
+      appVersion: null,
+      ipHash: `filler-${i}`,
+      createdAt: NOW.toISOString(),
+      status: 'waiting',
+      reviewToken: 'x',
+      decidedAt: null,
+      key: null
+    })
+  }
+}
+
+const PAUSED_SUBJECT = 'Locker Manager registrations: emails paused'
+
+describe('a flood of registrations', () => {
+  it('sends the paused email exactly once when several arrive at the same moment', async () => {
+    await fillToday(50)
+    const results = await Promise.all(
+      ['203.0.113.1', '203.0.113.2', '203.0.113.3', '203.0.113.4'].map((ip) =>
+        handleRegister(good, ip, deps)
+      )
+    )
+    for (const res of results) expect(res).toEqual({ status: 200, json: { ok: true } })
+    expect(store.rows.size).toBe(54)
+    expect(mailer.sent.map((m) => m.subject)).toEqual([PAUSED_SUBJECT])
+  })
+
+  it('sends the paused email again on a new day in Victoria', async () => {
+    await fillToday(50)
+    await handleRegister(good, '203.0.113.1', deps)
+    await handleRegister(good, '203.0.113.2', deps)
+    expect(mailer.sent.map((m) => m.subject)).toEqual([PAUSED_SUBJECT])
+    // 1 am on 3 November in Melbourne: a new day, though the first 50 still count.
+    deps.now = () => new Date('2026-11-02T14:00:00Z')
+    mailer.sent = []
+    await handleRegister(good, '203.0.113.3', deps)
+    expect(mailer.sent.map((m) => m.subject)).toEqual([PAUSED_SUBJECT])
+  })
+
+  it('stops storing anything once 500 arrived in the last 24 hours', async () => {
+    await fillToday(499)
+    expect((await handleRegister(good, '203.0.113.1', deps)).status).toBe(200)
+    expect(store.rows.size).toBe(500)
+    mailer.sent = []
+    const res = await handleRegister(good, '203.0.113.2', deps)
+    expect(res).toEqual({ status: 429, json: { ok: false, error: 'too_many' } })
+    expect(store.rows.size).toBe(500)
+    expect(mailer.sent).toHaveLength(0)
   })
 })
 

@@ -44,6 +44,7 @@ const ID = /^R-\d{5,}$/
 function firestoreStore(db: Firestore): Store {
   const registrations = db.collection('registrations')
   const counter = db.collection('counters').doc('registrations')
+  const emailPause = db.collection('counters').doc('emailPause')
   return {
     async add(r) {
       const row: Registration = { ...r, id: registrationId(r.number) }
@@ -81,6 +82,14 @@ function firestoreStore(db: Firestore): Store {
       const since = new Date(sinceMs).toISOString()
       const snap = await registrations.where('createdAt', '>=', since).count().get()
       return snap.data().count
+    },
+    async claimPauseAlert(day) {
+      return db.runTransaction(async (tx) => {
+        const snap = await tx.get(emailPause)
+        if (snap.get('day') === day) return false
+        tx.set(emailPause, { day })
+        return true
+      })
     },
     async nextNumber() {
       return db.runTransaction(async (tx) => {
