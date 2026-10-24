@@ -247,8 +247,9 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
   in uuid's v3, v5 and v6 when a buffer is passed; exceljs only calls `v4()` with no buffer,
   so it cannot be reached. The only "fix" offered is exceljs 3.4.0, years older. Re-check
   after each exceljs bump (18 Oct 2026).
-- The renderer bundle is about 870 kB. Loaded from disk inside Electron this is
-  instant; look at it only if start-up ever feels slow.
+- The renderer bundle is about 765 kB, minified (`build.minify` in electron.vite.config.ts;
+  electron-vite stopped minifying by default and it reached 1.7 MB before 24 Oct 2026).
+  Loaded from disk inside Electron this is instant; look at it only if start-up ever feels slow.
 
 ## Lessons carried over from Dave's other desktop apps
 

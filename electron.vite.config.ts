@@ -84,6 +84,10 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
+    // electron-vite no longer minifies the renderer by default; without this the
+    // bundle shipped at 1.7 MB instead of about 0.7 MB. Main stays readable so
+    // error logs from schools carry useful stack traces.
+    build: { minify: true },
     plugins: [react(), tailwindcss(), recordRendererPackages()]
   }
 })
