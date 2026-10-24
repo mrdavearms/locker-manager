@@ -155,3 +155,71 @@ test('Open a backup needs a key', async () => {
   await expect(l.page.getByTestId('registration-dialog')).toBeVisible()
   await l.close()
 })
+
+const SOMETHING_WRONG =
+  'Something went wrong. Try again, or close Locker Manager and open it again.'
+
+test('a key form whose request fails says so and can be tried again', async () => {
+  const l = await launchApp({ registration: 'enforce' })
+  await l.app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('registration:enterKey')
+    ipcMain.handle('registration:enterKey', () => {
+      throw new Error('broken on purpose')
+    })
+  })
+  const p = l.page
+  await p.getByTestId('have-key-button').click()
+  await p.getByTestId('key-input').fill(pasted(makeKey()))
+  await p.getByTestId('key-submit').click()
+  await expect(p.getByTestId('key-message')).toHaveText(SOMETHING_WRONG)
+  await expect(p.getByTestId('key-submit')).toBeEnabled()
+  await l.close()
+})
+
+test('Send, the website form and the email say so when they fail', async () => {
+  const l = await launchApp({ registration: 'enforce' })
+  await l.app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('registration:send')
+    ipcMain.handle('registration:send', () => {
+      throw new Error('broken on purpose')
+    })
+  })
+  const p = l.page
+  await p.getByTestId('register-button').click()
+  await p.locator('#reg-name').fill('Pat Example')
+  await p.locator('#reg-school').fill('Example Secondary College')
+  await p.locator('#reg-email').fill('pat@example.edu.au')
+  await p.locator('#reg-state').selectOption('VIC')
+  await p.getByTestId('privacy-agree').check()
+  await p.getByTestId('send-registration').click()
+  await expect(p.getByTestId('registration-error')).toHaveText(SOMETHING_WRONG)
+  await expect(p.getByTestId('send-registration')).toHaveText('Send')
+  await expect(p.getByTestId('send-registration')).toBeEnabled()
+
+  // Now Send fails the ordinary way, and both ways round it fail too.
+  await l.app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('registration:send')
+    ipcMain.handle('registration:send', () => ({
+      ok: false,
+      reason: 'offline',
+      message: 'Offline on purpose.',
+      mailto: 'mailto:dave@dandsarmstrong.com?subject=a&body=b'
+    }))
+    for (const channel of ['registration:openWebsite', 'registration:openEmail']) {
+      ipcMain.removeHandler(channel)
+      ipcMain.handle(channel, () => {
+        throw new Error('broken on purpose')
+      })
+    }
+  })
+  await p.getByTestId('send-registration').click()
+  await expect(p.getByTestId('send-failed')).toContainText('Offline on purpose.')
+  await expect(p.getByTestId('registration-error')).toHaveCount(0)
+  await p.getByRole('button', { name: 'Use the website form' }).click()
+  await expect(p.getByTestId('registration-error')).toHaveText(SOMETHING_WRONG)
+  await p.getByTestId('send-registration').click()
+  await expect(p.getByTestId('registration-error')).toHaveCount(0)
+  await p.getByRole('button', { name: 'Send by email instead' }).click()
+  await expect(p.getByTestId('registration-error')).toHaveText(SOMETHING_WRONG)
+  await l.close()
+})

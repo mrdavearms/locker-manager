@@ -34,6 +34,9 @@ const STATES: RegistrationForm['state'][] = [
 
 const PRIVACY_NOTE = `We collect your name, school, email and role to send your registration key and to contact your school about ${brand.name}. It is stored on Google Cloud in Sydney, seen only by Dave Armstrong, and never shared. Email dave@dandsarmstrong.com to have it removed.`
 
+/** Shown when a request to main fails outright, so the form is never left stuck or silent. */
+const SOMETHING_WRONG = `Something went wrong. Try again, or close ${brand.name} and open it again.`
+
 /** Register this school, or paste the key that came by email (registration design 6.1, 6.3). */
 export function RegistrationDialog({
   tab,
@@ -107,12 +110,17 @@ function KeyForm({
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
   const submit = async (): Promise<void> => {
     setBusy(true)
-    const r = await window.api.enterRegistrationKey(key)
-    setBusy(false)
-    if (r.ok) {
-      setResult({ ok: true, text: `Registered to ${r.view.school ?? 'your school'}.` })
-      onRegistered(r.view)
-    } else setResult({ ok: false, text: r.message })
+    try {
+      const r = await window.api.enterRegistrationKey(key)
+      if (r.ok) {
+        setResult({ ok: true, text: `Registered to ${r.view.school ?? 'your school'}.` })
+        onRegistered(r.view)
+      } else setResult({ ok: false, text: r.message })
+    } catch {
+      setResult({ ok: false, text: SOMETHING_WRONG })
+    } finally {
+      setBusy(false)
+    }
   }
   if (result?.ok) {
     return (
@@ -192,6 +200,7 @@ function RegisterForm({
   const [problems, setProblems] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState<{ result: SendResult; email: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const submit = async (): Promise<void> => {
     const parsed = RegistrationFormSchema.safeParse({
@@ -212,10 +221,26 @@ function RegisterForm({
       return
     }
     setProblems([])
+    setError(null)
     setBusy(true)
-    const result = await window.api.sendRegistration(parsed.data)
-    setBusy(false)
-    setSent({ result, email: parsed.data.email })
+    try {
+      const result = await window.api.sendRegistration(parsed.data)
+      setSent({ result, email: parsed.data.email })
+    } catch {
+      setError(SOMETHING_WRONG)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** The website form or the ready-made email. Nothing to wait for, but a failure is still said. */
+  const openOtherWay = async (open: () => Promise<void>): Promise<void> => {
+    setError(null)
+    try {
+      await open()
+    } catch {
+      setError(SOMETHING_WRONG)
+    }
   }
 
   if (sent?.result.ok) {
@@ -317,19 +342,26 @@ function RegisterForm({
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => void window.api.openRegistrationWebsite()}
+              onClick={() => void openOtherWay(() => window.api.openRegistrationWebsite())}
             >
               Use the website form
             </Button>
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => void window.api.openRegistrationEmail(failed.mailto)}
+              onClick={() =>
+                void openOtherWay(() => window.api.openRegistrationEmail(failed.mailto))
+              }
             >
               Send by email instead
             </Button>
           </div>
         </div>
+      )}
+      {error && (
+        <p role="alert" className="text-sm font-semibold text-bad" data-testid="registration-error">
+          {error}
+        </p>
       )}
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="secondary" onClick={onClose}>
