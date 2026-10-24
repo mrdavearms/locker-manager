@@ -89,6 +89,16 @@ describe('registration key format', () => {
     })
   })
 
+  it('refuses a signature spelled with spare bits changed', () => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    const key = signKey(d, priv)
+    const last = key[key.length - 1]!
+    // The last signature character holds 2 data bits; the other 4 bits are ignored when decoding.
+    const twin = alphabet[(alphabet.indexOf(last) & ~15) | ((alphabet.indexOf(last) + 1) & 15)]!
+    expect(twin).not.toBe(last)
+    expect(checkKey(key.slice(0, -1) + twin, [pub], now).ok).toBe(false)
+  })
+
   it('round-trips any text and rejects any single-character change to the signature', () => {
     fc.assert(
       fc.property(fc.string(), fc.string(), fc.string(), fc.nat(), (school, name, email, at) => {

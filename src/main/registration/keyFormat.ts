@@ -46,9 +46,15 @@ export function checkKey(text: string, publicKeys: KeyObject[], now: Date): KeyC
   const [body, sig] = parts as [string, string]
   if (!BASE64URL.test(body) || !BASE64URL.test(sig)) return malformed
 
+  // Reject spellings that decode to the same bytes (spare bits in the last character).
+  const bodyBytes = Buffer.from(body, 'base64url')
+  const signature = Buffer.from(sig, 'base64url')
+  if (bodyBytes.toString('base64url') !== body || signature.toString('base64url') !== sig)
+    return malformed
+
   let json: unknown
   try {
-    json = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'))
+    json = JSON.parse(bodyBytes.toString('utf8'))
   } catch {
     return malformed
   }
@@ -58,7 +64,6 @@ export function checkKey(text: string, publicKeys: KeyObject[], now: Date): KeyC
   const parsed = detailsSchema.safeParse(json)
   if (!parsed.success) return malformed
 
-  const signature = Buffer.from(sig, 'base64url')
   const data = Buffer.from(body, 'ascii')
   const signedByUs = publicKeys.some((key) => {
     try {
