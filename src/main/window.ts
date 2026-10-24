@@ -3,6 +3,7 @@ import { app, BrowserWindow, dialog, session, shell } from 'electron'
 import log from 'electron-log/main'
 import { brand } from '@shared/brand'
 import { isAllowedExternalUrl } from '@shared/externalUrls'
+import { watchForHang } from './hangWatch'
 
 const isDev = !!process.env['ELECTRON_RENDERER_URL']
 
@@ -104,6 +105,28 @@ export function createMainWindow(): BrowserWindow {
       `${brand.name} keeps stopping`,
       'The window stopped several times in a minute. Your school’s file is safe. Close Locker Manager and open it again; if it keeps happening, tell your IT team.'
     )
+  })
+
+  // The window's code stopped answering (stuck, not crashed): offer to reload it.
+  watchForHang(win, {
+    ask: async (signal) => {
+      const { response } = await dialog.showMessageBox(win, {
+        type: 'warning',
+        title: `${brand.name} is not responding`,
+        message: 'The window has stopped responding.',
+        detail:
+          'Your school’s file is safe. You can wait, or reload the window. Anything typed on this screen but not yet saved will be lost if you reload.',
+        buttons: ['Wait', 'Reload the window'],
+        defaultId: 0,
+        cancelId: 0,
+        signal
+      })
+      return response === 1 ? 'reload' : 'wait'
+    },
+    reload: () => {
+      if (!win.isDestroyed()) win.webContents.forcefullyCrashRenderer()
+    },
+    log: (message) => log.warn(message)
   })
 
   // Links open in the operator's browser, never inside the app.
