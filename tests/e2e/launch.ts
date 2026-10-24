@@ -1,6 +1,7 @@
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { testPublicKey } from './registrationKeys'
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 
 export interface Launched {
@@ -25,6 +26,10 @@ export async function launchApp(
     tour?: boolean
     keepPrefs?: boolean
     env?: Record<string, string>
+    /** Turns registration on (it is off in a development copy). Needs registrationKeys.ts's test key. */
+    registration?: 'enforce'
+    /** A registration key to put in this computer's preferences. */
+    computerKey?: string
   } = {}
 ): Promise<Launched> {
   const userData = opts.userData ?? mkdtempSync(join(tmpdir(), 'lockers-e2e-ud-'))
@@ -38,13 +43,25 @@ export async function launchApp(
         operatorName: operator,
         recentFiles: [],
         ignoredCopies: {},
-        tourSeenAt: opts.tour ? null : '2026-10-07T09:00:00.000Z'
+        tourSeenAt: opts.tour ? null : '2026-10-07T09:00:00.000Z',
+        ...(opts.computerKey ? { registrationKey: opts.computerKey } : {})
       })
     )
   }
   const app = await electron.launch({
     args: [resolve('.'), `--user-data-dir=${userData}`],
-    env: { ...process.env, CI: '1', LOCKER_MANAGER_BACKGROUND: '1', ...opts.env }
+    env: {
+      ...process.env,
+      CI: '1',
+      LOCKER_MANAGER_BACKGROUND: '1',
+      ...(opts.registration
+        ? {
+            LOCKER_MANAGER_REGISTRATION: opts.registration,
+            LOCKER_MANAGER_REG_TEST_PUBKEY: testPublicKey()
+          }
+        : {}),
+      ...opts.env
+    }
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
