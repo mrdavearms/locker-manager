@@ -29,6 +29,15 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+      # The registration form must never go live while it still points at the placeholder
+      # address. grep's own result is tested, never piped (see CLAUDE.md, Gotchas).
+      - name: Refuse a placeholder registration address
+        run: |
+          if found=$(grep -rlF 'registration.invalid' site); then
+            echo "::error::These files still use the placeholder registration address (registration.invalid). Put the real service address in before publishing the site:"
+            echo "$found"
+            exit 1
+          fi
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
