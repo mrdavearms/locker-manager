@@ -93,11 +93,12 @@ signature is in place the prompt disappears.
 
 Allow outbound HTTPS (port 443) to:
 
+<!-- TODO(task 11): replace with the real registration service host once the service is deployed. -->
+
 | Host | Used for |
 |---|---|
 | `github.com` | update check: `/mrdavearms/locker-manager/releases.atom`, `/mrdavearms/locker-manager/releases/latest`, and `/mrdavearms/locker-manager/releases/download/...` |
 | `release-assets.githubusercontent.com` | GitHub redirects every `/releases/download/...` address here: `latest.yml`, `latest-mac.yml` and the installers |
-<!-- TODO(task 11): replace with the real registration service host once the service is deployed. -->
 | the registration service address (added when the service goes live) | Registering from inside the app only. Nothing else uses it. The website form at `https://mrdavearms.github.io/locker-manager/register/` needs no firewall change beyond normal web access. |
 
 Checked on 9 October 2026: a request for a release file on `github.com` answers with a
@@ -293,7 +294,7 @@ Save the key text, and nothing else, in a file called `registration.key` in the 
 
 The key is a single line starting with `LM1.`. The file is read when the app starts. As with `managed.json`, an installed copy reads only this exact path.
 
-The key is a separate file because `managed.json` is checked strictly. An older copy of the app that met an unknown setting in it would ignore every managed setting. `demoEnabled: false` hides the demo school, so a computer with that setting and no key needs a key before it can start anything.
+The key is a separate file because `managed.json` is checked strictly. An older copy of the app that met an unknown setting in it would ignore every managed setting. With the demo turned off (`demoEnabled: false`), a copy without a key can only open your school's file to look; it needs a key before anyone can make changes.
 
 ## Settings on each computer
 
