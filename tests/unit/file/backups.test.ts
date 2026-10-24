@@ -5,6 +5,7 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { createNewDatabase } from '../../../src/main/db/newFile'
 import {
+  decodeBackup,
   backupFileName,
   backupReach,
   compressBackup,
@@ -539,5 +540,14 @@ describe('writeBackup', () => {
   })
   it('lists nothing when the folder does not exist yet', async () => {
     expect(await listBackups(nodeFs, join(tempDir(), 'none'), 'Locker data')).toEqual([])
+  })
+})
+
+describe('a backup that unzips too far', () => {
+  it('is treated as damaged instead of filling memory', async () => {
+    const bomb = new Uint8Array(gzipSync(new Uint8Array(4 * 1024 * 1024)))
+    expect(bomb.byteLength).toBeLessThan(10_000)
+    expect(await decodeBackup(bomb, 1024 * 1024)).toBeNull()
+    expect((await decodeBackup(bomb))?.byteLength).toBe(4 * 1024 * 1024)
   })
 })

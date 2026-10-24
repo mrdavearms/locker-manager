@@ -274,11 +274,22 @@ export async function compressBackup(bytes: Uint8Array): Promise<Uint8Array> {
   return out
 }
 
+/**
+ * The most a backup may unzip to. A large school's file is about 54 MB after twelve
+ * years (docs/audits/2026-10-09-large-school.md); a small file in the shared folder
+ * that unzips past this is treated as damaged rather than filling this computer's
+ * memory.
+ */
+export const MAX_BACKUP_BYTES = 512 * 1024 * 1024
+
 /** Undoes compressBackup when the bytes start with the gzip signature; null if damaged. */
-async function decodeBackup(bytes: Uint8Array): Promise<Uint8Array | null> {
+export async function decodeBackup(
+  bytes: Uint8Array,
+  maxBytes = MAX_BACKUP_BYTES
+): Promise<Uint8Array | null> {
   if (bytes.byteLength < 2 || bytes[0] !== 0x1f || bytes[1] !== 0x8b) return bytes
   try {
-    const out = await gunzipAsync(bytes)
+    const out = await gunzipAsync(bytes, { maxOutputLength: maxBytes })
     return new Uint8Array(out.buffer, out.byteOffset, out.byteLength)
   } catch {
     return null
