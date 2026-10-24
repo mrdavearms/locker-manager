@@ -766,7 +766,11 @@ describe('sync copies beside the file (SPEC.md 6.3)', () => {
     expect(await schoolNameOnDisk(path)).toBe('SYNTHETIC High School')
     clock.t += 60_000
     afterHold!()
-    await expect.poll(() => schoolNameOnDisk(path)).toBe('SYNTHETIC After Sleep')
+    // Windows runners are slow at file operations: the default 1 second failed the
+    // v0.12.1 release build even though the save did happen.
+    await expect
+      .poll(() => schoolNameOnDisk(path), { timeout: 15_000 })
+      .toBe('SYNTHETIC After Sleep')
   })
 })
 
