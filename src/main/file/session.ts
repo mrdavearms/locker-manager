@@ -12,6 +12,7 @@ import { appendAudit, getMeta, type AuditEntry, type OperatorContext } from '../
 import { migrate, schemaState } from '../db/migrate'
 import { historyOnlyIn, summarise } from '../db/summary'
 import { saveAtomically, SaveFailedError } from './atomicSave'
+import { carryAppendOnly, keepPrivacy } from './carryForward'
 import {
   BACKUP_FOLDER_NAME,
   backupFileName,
@@ -556,31 +557,10 @@ export class DataFileSession {
     const next = await LockerDb.fromBytes(step.bytes)
     try {
       // History, reveal and print records may point at students or lockers the older snapshot does not
-      // have yet; history is kept whole, so the link check is off while copying. A reveal line's
-      // student or locker is cleared when the snapshot lacks it: a link to nothing made every later
-      // migration refuse the file (docs/audits/2026-10-20-stability-audit.md, finding 1).
-      const has = (table: 'student' | 'locker', id: unknown): boolean =>
-        typeof id === 'string' &&
-        next.get(`SELECT 1 AS x FROM ${table} WHERE id = $id`, { $id: id }) !== undefined
+      // have yet; history is kept whole, so the link check is off while copying (carryForward.ts).
       next.run('PRAGMA foreign_keys = OFF')
       next.transaction(() => {
-        for (const table of ['audit_log', 'code_reveal_log', 'print_job']) {
-          const have = new Set(next.all<{ id: string }>(`SELECT id FROM ${table}`).map((r) => r.id))
-          const cols = next.all<{ name: string }>(`PRAGMA table_info(${table})`).map((r) => r.name)
-          for (const row of c.db.all<Record<string, string | number | null>>(
-            `SELECT * FROM ${table}`
-          )) {
-            if (have.has(String(row.id))) continue
-            if (table === 'code_reveal_log') {
-              if (row.student_id != null && !has('student', row.student_id)) row.student_id = null
-              if (row.locker_id != null && !has('locker', row.locker_id)) row.locker_id = null
-            }
-            next.run(
-              `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((col) => `$${col}`).join(', ')})`,
-              Object.fromEntries(cols.map((col) => [`$${col}`, row[col] ?? null]))
-            )
-          }
-        }
+        carryAppendOnly(c.db, next)
         appendAudit(next, this.ctx(), {
           action: kind === 'undo' ? 'undo' : 'redo',
           entity: 'file',
@@ -1353,8 +1333,22 @@ export class DataFileSession {
       return { ok: false, message: 'That backup was made by a newer version of the app.' }
     await this.flush()
     if (c.conflict) return { ok: false, message: 'Sort out the conflict first.' }
-    await this.backupBytes(c.db.export(), `before restoring ${backupStem(b.name)}`)
+    const currentBytes = c.db.export()
+    await this.backupBytes(currentBytes, `before restoring ${backupStem(b.name)}`)
     await this.replaceInMemory(r.bytes)
+    // The restored version keeps today's PIN and every history and reveal line written
+    // since it was made, as undo does (carryForward.ts).
+    const current = await LockerDb.fromBytes(currentBytes)
+    try {
+      c.db.run('PRAGMA foreign_keys = OFF')
+      c.db.transaction(() => {
+        carryAppendOnly(current, c.db)
+        keepPrivacy(current, c.db)
+      })
+    } finally {
+      c.db.run('PRAGMA foreign_keys = ON')
+      current.close()
+    }
     // replaceInMemory reset the hash to the backup's; the disk still holds the current version.
     const disk = await readDataFile(this.d.fs, c.path)
     if (!disk.ok) return { ok: false, message: readProblemMessage(disk.problem) }

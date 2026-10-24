@@ -804,6 +804,35 @@ describe('restoring a backup (SPEC.md 4.12)', () => {
     expect(after.some((b) => b.label?.startsWith('before restoring'))).toBe(true)
   })
 
+  it('a restore keeps the current PIN and every history line written since the backup', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const clock = { t: Date.parse('2026-10-06T09:12:00Z') }
+    const dave = person('Dave', 'DAVE-MAC', dir, clock)
+    await dave.session.open(path)
+    rename(dave, 'SYNTHETIC Before PIN')
+    await dave.session.flush()
+    clock.t += 60_000
+    // Stands in for privacy.setPin: the PIN is a setting in the file.
+    dave.session.write({ action: 'privacy.pin_set', entity: 'settings' }, (db) => {
+      db.run(
+        `INSERT INTO settings (key, value, created_at, updated_at, updated_by)
+         VALUES ('privacy', '{"pinHash":"scrypt$SYNTHETIC$SYNTHETIC","autoHideSeconds":30}', 'x', 'x', 'Dave')`
+      )
+    })
+    await dave.session.flush()
+    const beforePin = (await dave.session.listAllBackups()).filter((b) => b.source === 'shared')[0]!
+    clock.t += 60_000
+    expect(await dave.session.restoreBackup(beforePin)).toEqual({ ok: true })
+    const db = await LockerDb.fromBytes(new Uint8Array(readFileSync(path)))
+    const privacy = db.get<{ value: string }>("SELECT value FROM settings WHERE key = 'privacy'")
+    const actions = db.all<{ action: string }>('SELECT action FROM audit_log').map((r) => r.action)
+    db.close()
+    expect(privacy?.value).toContain('SYNTHETIC')
+    expect(actions).toContain('privacy.pin_set')
+    expect(actions).toContain('file.restored')
+  })
+
   it('previews and restores an older, uncompressed backup', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)

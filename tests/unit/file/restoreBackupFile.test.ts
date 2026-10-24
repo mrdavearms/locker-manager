@@ -64,6 +64,31 @@ describe('opening a backup when the file will not open', () => {
     expect(kept.some((f) => f.includes('set aside when a backup was restored'))).toBe(true)
   })
 
+  it('over a file that still opens, keeps its PIN and its history lines', async () => {
+    const dir = tempDir()
+    const backup = await backupBeside(dir)
+    const target = originalFor(backup)!
+    const current = await LockerDb.fromBytes(await schoolBytes('SYNTHETIC Current College'))
+    current.run(
+      `INSERT INTO settings (key, value, created_at, updated_at, updated_by)
+       VALUES ('privacy', '{"pinHash":"scrypt$SYNTHETIC$SYNTHETIC","autoHideSeconds":30}', 'x', 'x', 'Dave')`
+    )
+    current.run(
+      `INSERT INTO audit_log (id, at, operator, machine, action, entity, created_at, updated_at, updated_by)
+       VALUES ('synthetic-line', '2026-10-20T03:00:00Z', 'Dave', 'DAVE-MAC', 'codes.revealed', 'locker', 'x', 'x', 'Dave')`
+    )
+    writeFileSync(target, current.export())
+    current.close()
+    expect(await restoreBackupFile(nodeFs, backup, target, ctx())).toEqual({ ok: true })
+    expect(await nameOf(target)).toBe('SYNTHETIC Backed Up College')
+    const db = await LockerDb.fromBytes(new Uint8Array(readFileSync(target)))
+    expect(
+      db.get<{ value: string }>("SELECT value FROM settings WHERE key = 'privacy'")?.value
+    ).toContain('SYNTHETIC')
+    expect(db.get("SELECT 1 AS x FROM audit_log WHERE id = 'synthetic-line'")).toBeDefined()
+    db.close()
+  })
+
   it('refuses something that is not a Locker Manager backup, changing nothing', async () => {
     const dir = tempDir()
     const notBackup = join(dir, 'notes.lockers.gz')

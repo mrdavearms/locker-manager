@@ -12,6 +12,7 @@ import { errorCode, type FsPort } from './fsPort'
 import { sha256 } from './hash'
 import { classifyLock, lockPathFor, readLock } from './lockFile'
 import { readProblemMessage } from './readDataFile'
+import { carryAppendOnly, keepPrivacy } from './carryForward'
 import { baseName } from './siblings'
 
 // Opening a backup when the school's file will not open. A damaged file used to
@@ -101,11 +102,12 @@ export async function restoreBackupFile(
       }
     }
   }
+  const bytes = existing ? await keepFromCurrent(existing, read.bytes) : read.bytes
   try {
     const out = await saveAtomically({
       fs,
       path: target,
-      bytes: read.bytes,
+      bytes,
       expectedHash: existing ? sha256(existing) : null,
       randomSuffix: ctx.randomSuffix
     })
@@ -118,4 +120,42 @@ export async function restoreBackupFile(
     }
   }
   return { ok: true }
+}
+
+/**
+ * When the file being replaced can still be read, the restored version keeps its PIN
+ * and every history and reveal line written since the backup (carryForward.ts), as
+ * restoring from the Backups screen does. A damaged file gives nothing to keep.
+ */
+async function keepFromCurrent(existing: Uint8Array, backup: Uint8Array): Promise<Uint8Array> {
+  let current: LockerDb
+  try {
+    current = await LockerDb.fromBytes(existing)
+  } catch {
+    return backup
+  }
+  try {
+    if (
+      current.integrityProblems().length > 0 ||
+      !current.get("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = 'settings'")
+    )
+      return backup
+    const restored = await LockerDb.fromBytes(backup)
+    try {
+      restored.run('PRAGMA foreign_keys = OFF')
+      restored.transaction(() => {
+        carryAppendOnly(current, restored)
+        keepPrivacy(current, restored)
+      })
+      return restored.export()
+    } catch {
+      return backup
+    } finally {
+      restored.close()
+    }
+  } catch {
+    return backup
+  } finally {
+    current.close()
+  }
 }
