@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Accessibility, Ban, Hash, KeyRound, Lock, Users, X } from 'lucide-react'
 import type { LockerView } from '@shared/locations'
 import { KeyPanel } from '@renderer/lockers/KeyPanel'
@@ -27,19 +27,20 @@ function tone(l: LockerView): string {
   return 'bg-surface border-line-strong text-ink-muted'
 }
 
-function LockerTile({
+/** Memoised: choosing a locker redraws two tiles, not every tile in the school. */
+const LockerTile = memo(function LockerTile({
   l,
   selected,
   onSelect
 }: {
   l: LockerView
   selected: boolean
-  onSelect: () => void
+  onSelect: (id: string) => void
 }): React.JSX.Element {
   const holder = l.holders[0]
   return (
     <button
-      onClick={onSelect}
+      onClick={() => onSelect(l.id)}
       style={{ gridRow: l.row ?? undefined, gridColumn: l.column ?? undefined }}
       aria-label={`Locker ${l.number}${holder ? `, ${holder.name}` : ', spare'}${l.status !== 'in_service' ? `, ${l.status.replace(/_/g, ' ')}` : ''}`}
       className={cn(
@@ -63,7 +64,7 @@ function LockerTile({
       )}
     </button>
   )
-}
+})
 
 function LockerPanel({
   l,
@@ -412,7 +413,11 @@ export function LockersScreen({
   const canEdit = useCanEdit()
   const byBank = useMemo(() => {
     const m = new Map<string, LockerView[]>()
-    for (const l of lockers ?? []) m.set(l.bankId, [...(m.get(l.bankId) ?? []), l])
+    for (const l of lockers ?? []) {
+      const list = m.get(l.bankId)
+      if (list) list.push(l)
+      else m.set(l.bankId, [l])
+    }
     return m
   }, [lockers])
   const selected = lockers?.find((l) => l.id === selectedId) ?? null
@@ -493,7 +498,7 @@ export function LockersScreen({
                             key={l.id}
                             l={l}
                             selected={l.id === selectedId}
-                            onSelect={() => setSelectedId(l.id)}
+                            onSelect={setSelectedId}
                           />
                         ))}
                       </div>
