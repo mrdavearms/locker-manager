@@ -6,6 +6,7 @@ import { BrowserWindow, session, type Session } from 'electron'
 import { PDFDocument } from 'pdf-lib'
 import { namedPaper } from '@shared/labelGeometry'
 import { guardRenderContents, renderRequestAllowed } from './guard'
+import { RENDER_LIMIT_MS, settleWithin } from './settle'
 
 // Renders our own HTML to PDF in a hidden window (SPEC.md 5.3): no scripts, no
 // network, page size from CSS, zero margins. The page is written to a private
@@ -50,7 +51,8 @@ export async function sweepRenderTemp(now = Date.now()): Promise<void> {
 async function withPage<T>(
   html: string,
   fn: (win: BrowserWindow) => Promise<T>,
-  javascript = false
+  javascript = false,
+  limitMs: number | null = RENDER_LIMIT_MS
 ): Promise<T> {
   const file = join(tmpdir(), `${TEMP_PREFIX}${randomBytes(8).toString('hex')}.html`)
   await writeFile(file, html, { encoding: 'utf8', mode: 0o600 })
@@ -71,8 +73,8 @@ async function withPage<T>(
   guardRenderContents(win.webContents)
   try {
     // Fonts are embedded as data URLs, so they are ready when the page has loaded.
-    await win.loadFile(file)
-    return await fn(win)
+    const work = win.loadFile(file).then(() => fn(win))
+    return await settleWithin(work, win.webContents, limitMs)
   } finally {
     win.destroy()
     await unlink(file).catch(() => undefined)
@@ -117,7 +119,10 @@ export async function printHtml(
           },
           (printed, reason) => resolve(printed ? { printed } : { printed, reason })
         )
-      })
+      }),
+    false,
+    // No time limit: the system print dialog may still be open in front of someone.
+    null
   )
 }
 
@@ -177,6 +182,9 @@ export async function printReport(
           },
           (printed, reason) => resolve(printed ? { printed } : { printed, reason })
         )
-      })
+      }),
+    false,
+    // No time limit: the system print dialog may still be open in front of someone.
+    null
   )
 }
