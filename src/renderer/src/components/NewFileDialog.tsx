@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { FolderSync } from 'lucide-react'
+import { brand } from '@shared/brand'
+import { registerBlurb, useRegistration, useUnregistered } from '@renderer/lib/registration'
 import { Button } from './Button'
 import { Modal } from './Modal'
 
@@ -10,6 +12,7 @@ interface Props {
 }
 
 export function NewFileDialog({ open, onOpenChange, onCreate }: Props): React.JSX.Element {
+  const unregistered = useUnregistered()
   return (
     <Modal
       open={open}
@@ -18,8 +21,37 @@ export function NewFileDialog({ open, onOpenChange, onCreate }: Props): React.JS
       description="One file holds everything for your school: lockers, students, codes and history."
       testId="new-file-dialog"
     >
-      <NewFileForm onCancel={() => onOpenChange(false)} onCreate={onCreate} />
+      {unregistered ? (
+        <RegisterFirst onClose={() => onOpenChange(false)} />
+      ) : (
+        <NewFileForm onCancel={() => onOpenChange(false)} onCreate={onCreate} />
+      )}
     </Modal>
+  )
+}
+
+/** A new school file needs a key first (registration 7.4). */
+function RegisterFirst({ onClose }: { onClose: () => void }): React.JSX.Element {
+  const { openRegistration } = useRegistration()
+  const go = (tab: 'register' | 'key'): void => {
+    onClose()
+    openRegistration(tab)
+  }
+  return (
+    <div data-testid="new-file-register">
+      <p>{registerBlurb(brand.name, true)}</p>
+      <div className="mt-6 flex flex-wrap justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button variant="secondary" data-testid="have-key-button" onClick={() => go('key')}>
+          I have a key
+        </Button>
+        <Button data-testid="register-button" onClick={() => go('register')}>
+          Register this school
+        </Button>
+      </div>
+    </div>
   )
 }
 

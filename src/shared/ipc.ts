@@ -171,6 +171,34 @@ export type ActionResult =
       needsRegistration?: boolean
     }
 
+// ------------------------------------------------------------ registration
+
+/** Where the key that registers this copy came from. Mirrors main's RegistrationSource. */
+export type RegistrationSourceView = 'computer' | 'it' | 'file'
+
+/** What the window is told about registration. Never carries the key itself. */
+export interface RegistrationView {
+  state: 'registered' | 'unregistered'
+  school: string | null
+  id: string | null
+  email: string | null
+  source: RegistrationSourceView | null
+  /** False in a development copy, which counts as registered without a key. */
+  enforced: boolean
+}
+
+export const RegistrationKeySchema = z.object({ key: z.string().min(1).max(5000) })
+
+/** A filled-in email to Dave, made by main when the app cannot reach the registration service. */
+export const RegistrationMailtoSchema = z.object({
+  url: z
+    .string()
+    .max(10_000)
+    .refine((u) => u.startsWith('mailto:dave@dandsarmstrong.com?'), 'Not a registration email.')
+})
+
+export type EnterKeyResult = { ok: true; view: RegistrationView } | { ok: false; message: string }
+
 /** Sent while letters are made: `done` of `total` steps (each chunk is checked, then made). */
 export interface LettersProgress {
   done: number

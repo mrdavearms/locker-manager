@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { BookOpen, Info, Search, UserRound } from 'lucide-react'
 import { guideSectionFor } from '@shared/guideLinks'
 import type { QuickResult } from '@shared/history'
-import type { OnboardingInfo, OperatorInfo } from '@shared/ipc'
+import type { OnboardingInfo, OperatorInfo, RegistrationView } from '@shared/ipc'
 import { AboutDialog } from './components/AboutDialog'
 import { ScreenErrorBoundary } from './components/AppErrorBoundary'
 import { BackupsDialog } from './components/BackupsDialog'
@@ -17,6 +17,7 @@ import { NewFileDialog } from './components/NewFileDialog'
 import { OperatorDialog } from './components/OperatorDialog'
 import { PinGateProvider } from './components/PinGate'
 import { ReadOnlyBanner } from './components/ReadOnlyBanner'
+import { RegistrationDialog } from './components/RegistrationDialog'
 import { AddStudentDialog } from './components/AddStudentDialog'
 import { QuickFind } from './components/QuickFind'
 import { StatusBar } from './components/StatusBar'
@@ -28,6 +29,7 @@ import { versionLine } from './lib/format'
 import { useFileState } from './lib/useFileState'
 import { useUpdateStatus } from './lib/useUpdateStatus'
 import { useComputer } from './lib/useComputer'
+import { RegistrationContext, type RegistrationTab } from './lib/registration'
 import { AllocateScreen } from './lockers/AllocateScreen'
 import { PrintLabelsScreen } from './print/PrintLabelsScreen'
 import { LettersScreen } from './letters/LettersScreen'
@@ -103,6 +105,9 @@ export function App(): React.JSX.Element {
       }
     })
   }, [])
+  const [registration, setRegistration] = useState<RegistrationView | null>(null)
+  const [registrationTab, setRegistrationTab] = useState<RegistrationTab | 'menu' | null>(null)
+  const openRegistration = useCallback((tab: RegistrationTab) => setRegistrationTab(tab), [])
   const [finder, setFinder] = useState<Finder | null>(null)
   // The typed name when Add a student was opened from the find box for a new student.
   const [addingStudent, setAddingStudent] = useState<string | null>(null)
@@ -127,6 +132,8 @@ export function App(): React.JSX.Element {
   useEffect(loadOperator, [loadOperator])
   useEffect(() => window.api.onOpenAbout(() => setAboutOpen(true)), [])
   useEffect(() => window.api.onOpenTour(() => setTourAsked(true)), [])
+  useEffect(() => window.api.onRegistrationChanged(setRegistration), [])
+  useEffect(() => window.api.onOpenRegistration(() => setRegistrationTab('menu')), [])
 
   const open = file?.status === 'open' ? file : null
   const openPath = open?.path ?? null
@@ -136,6 +143,11 @@ export function App(): React.JSX.Element {
     setMessagePath(openPath)
     setMessage(null)
   }
+  // A key in the open file counts too, so look again when another file opens.
+  const readOnlyReason = open?.readOnly?.reason ?? null
+  useEffect(() => {
+    void window.api.getRegistration().then(setRegistration)
+  }, [openPath, readOnlyReason])
   const holder = open?.readOnly?.holder
   const editingBy = holder ? `${holder.operator} on ${holder.computer}` : null
   const screen: Screen = nav.path === openPath ? nav.screen : 'home'
@@ -234,326 +246,357 @@ export function App(): React.JSX.Element {
       })
   }
 
-  return (
-    <div className="grain flex min-h-full flex-col">
-      <header className="border-b border-line bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-3">
-          <LockerMark className="size-9" animate />
-          <div className="flex-1">
-            <p className="font-display text-lg font-semibold leading-tight">
-              {info?.name ?? 'Locker Manager'}
-            </p>
-            {open && <p className="text-xs text-ink-muted">{open.summary.schoolName}</p>}
-          </div>
-          {open && (
-            <button
-              onClick={() => setFinder({ title: FIND_TITLES.find, intent: null })}
-              className="hidden items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink-muted hover:bg-surface-muted md:inline-flex"
-              data-testid="open-find"
-            >
-              <Search size={15} aria-hidden /> Find
-              <kbd className="rounded bg-surface-muted px-1.5 text-xs">
-                {navigator.platform.toLowerCase().includes('mac') ? '⌘K' : 'Ctrl K'}
-              </kbd>
-            </button>
-          )}
-          {open?.summary.demo && <DemoBadge />}
-          {open?.summary.practice && <PracticeBadge />}
-          {operator && (
-            <button
-              data-testid="operator-chip"
-              onClick={() => setOperatorOpen(true)}
-              className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm hover:bg-surface-muted"
-              title="Change your name"
-            >
-              <UserRound size={16} className="text-brand" aria-hidden />
-              <span className="font-semibold">{operator.name ?? operator.suggested}</span>
-              <span className="hidden text-ink-muted lg:inline">on {operator.machine}</span>
-            </button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openGuide}
-            title="Help for this screen"
-            data-testid="open-help"
-          >
-            <BookOpen size={16} aria-hidden /> Guide
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setAboutOpen(true)}
-            data-testid="open-about"
-          >
-            <Info size={16} aria-hidden /> About
-          </Button>
-        </div>
-      </header>
+  const shownTab: RegistrationTab | null =
+    registrationTab === 'menu'
+      ? registration?.state === 'registered'
+        ? 'key'
+        : 'register'
+      : registrationTab
 
-      <AppContextProvider
-        revision={open?.revision ?? 0}
-        canEdit={open?.mode === 'edit' && !open.conflict}
-        editingBy={editingBy}
-        needsNewerApp={open?.readOnly?.reason === 'newer_version'}
-        inConflict={!!open?.conflict}
-        showError={setError}
-        notify={notify}
-      >
-        <PinGateProvider showError={setError}>
-          <div className="flex flex-1 flex-col md:flex-row">
-            {open && <NavRail screen={screen} onNavigate={setScreen} />}
-            <main className="min-w-0 flex-1">
-              <div className="mx-auto max-w-6xl">
-                {update.state !== 'idle' && (
-                  <div className="px-6 pt-6">
-                    <UpdateBanner status={update} />
-                  </div>
-                )}
-                {open && !helpOpen && screen !== 'home' && open.readOnly && (
-                  <div className="px-6 pt-6">
-                    <ReadOnlyBanner state={open} onError={setError} />
-                  </div>
-                )}
-                <ScreenErrorBoundary
-                  screenKey={helpOpen ? 'help' : screen}
-                  onHome={() => {
-                    setHelpOpen(false)
-                    setScreen('home')
-                  }}
-                >
-                  {helpOpen ? (
-                    <HelpScreen
-                      key={helpSection}
-                      initialSection={helpSection}
-                      onClose={() => setHelpOpen(false)}
-                      onShowMe={
-                        open
-                          ? (target) => {
-                              setHelpOpen(false)
-                              setScreen(target)
-                            }
-                          : null
-                      }
-                      onTour={() => {
-                        setHelpOpen(false)
-                        setTourAsked(true)
-                      }}
-                      onSetup={
-                        open?.mode === 'edit' && !open.summary.demo
-                          ? () => {
-                              setHelpOpen(false)
-                              setScreen('setup')
-                            }
-                          : null
-                      }
-                      onShowChecklist={
-                        open && onboarding?.checklistHidden
-                          ? () => {
-                              setChecklistHidden(false)
-                              setHelpOpen(false)
-                              setScreen('home')
-                            }
-                          : null
-                      }
-                    />
-                  ) : file === null ? null : open ? (
-                    screen === 'students' ? (
-                      <StudentsScreen
-                        key={focus?.n ?? 'students'}
-                        onImport={() => setScreen('import')}
-                        focus={
-                          focus?.studentId
-                            ? { studentId: focus.studentId, intent: focus.intent }
+  return (
+    <RegistrationContext.Provider value={{ view: registration, openRegistration }}>
+      <div className="grain flex min-h-full flex-col">
+        <header className="border-b border-line bg-surface/90 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-3">
+            <LockerMark className="size-9" animate />
+            <div className="flex-1">
+              <p className="font-display text-lg font-semibold leading-tight">
+                {info?.name ?? 'Locker Manager'}
+              </p>
+              {open && <p className="text-xs text-ink-muted">{open.summary.schoolName}</p>}
+            </div>
+            {open && (
+              <button
+                onClick={() => setFinder({ title: FIND_TITLES.find, intent: null })}
+                className="hidden items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink-muted hover:bg-surface-muted md:inline-flex"
+                data-testid="open-find"
+              >
+                <Search size={15} aria-hidden /> Find
+                <kbd className="rounded bg-surface-muted px-1.5 text-xs">
+                  {navigator.platform.toLowerCase().includes('mac') ? '⌘K' : 'Ctrl K'}
+                </kbd>
+              </button>
+            )}
+            {open?.summary.demo && <DemoBadge />}
+            {open?.summary.practice && <PracticeBadge />}
+            {operator && (
+              <button
+                data-testid="operator-chip"
+                onClick={() => setOperatorOpen(true)}
+                className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm hover:bg-surface-muted"
+                title="Change your name"
+              >
+                <UserRound size={16} className="text-brand" aria-hidden />
+                <span className="font-semibold">{operator.name ?? operator.suggested}</span>
+                <span className="hidden text-ink-muted lg:inline">on {operator.machine}</span>
+              </button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={openGuide}
+              title="Help for this screen"
+              data-testid="open-help"
+            >
+              <BookOpen size={16} aria-hidden /> Guide
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAboutOpen(true)}
+              data-testid="open-about"
+            >
+              <Info size={16} aria-hidden /> About
+            </Button>
+          </div>
+        </header>
+
+        <AppContextProvider
+          revision={open?.revision ?? 0}
+          canEdit={open?.mode === 'edit' && !open.conflict}
+          editingBy={editingBy}
+          needsNewerApp={open?.readOnly?.reason === 'newer_version'}
+          inConflict={!!open?.conflict}
+          showError={setError}
+          notify={notify}
+        >
+          <PinGateProvider showError={setError}>
+            <div className="flex flex-1 flex-col md:flex-row">
+              {open && <NavRail screen={screen} onNavigate={setScreen} />}
+              <main className="min-w-0 flex-1">
+                <div className="mx-auto max-w-6xl">
+                  {update.state !== 'idle' && (
+                    <div className="px-6 pt-6">
+                      <UpdateBanner status={update} />
+                    </div>
+                  )}
+                  {open && !helpOpen && screen !== 'home' && open.readOnly && (
+                    <div className="px-6 pt-6">
+                      <ReadOnlyBanner state={open} onError={setError} />
+                    </div>
+                  )}
+                  <ScreenErrorBoundary
+                    screenKey={helpOpen ? 'help' : screen}
+                    onHome={() => {
+                      setHelpOpen(false)
+                      setScreen('home')
+                    }}
+                  >
+                    {helpOpen ? (
+                      <HelpScreen
+                        key={helpSection}
+                        initialSection={helpSection}
+                        onClose={() => setHelpOpen(false)}
+                        onShowMe={
+                          open
+                            ? (target) => {
+                                setHelpOpen(false)
+                                setScreen(target)
+                              }
+                            : null
+                        }
+                        onTour={() => {
+                          setHelpOpen(false)
+                          setTourAsked(true)
+                        }}
+                        onSetup={
+                          open?.mode === 'edit' && !open.summary.demo
+                            ? () => {
+                                setHelpOpen(false)
+                                setScreen('setup')
+                              }
+                            : null
+                        }
+                        onShowChecklist={
+                          open && onboarding?.checklistHidden
+                            ? () => {
+                                setChecklistHidden(false)
+                                setHelpOpen(false)
+                                setScreen('home')
+                              }
                             : null
                         }
                       />
-                    ) : screen === 'import' ? (
-                      <ImportWizard onClose={() => setScreen('students')} onNavigate={setScreen} />
-                    ) : screen === 'lockers' ? (
-                      <LockersScreen
-                        key={focus?.n ?? 'lockers'}
-                        onSetUp={() => setScreen('setup')}
-                        onAllocate={() => setScreen('allocate')}
-                        onOpenStudent={(studentId, intent) =>
-                          setNav({
-                            path: openPath,
-                            screen: 'students',
-                            focus: { studentId, intent, n: Date.now() }
-                          })
-                        }
-                        onPrintResets={printResets}
-                        focusLockerId={focus?.lockerId ?? null}
-                      />
-                    ) : screen === 'allocate' ? (
-                      <AllocateScreen onDone={() => setScreen('lockers')} onNavigate={setScreen} />
-                    ) : screen === 'history' ? (
-                      <HistoryScreen state={open} />
-                    ) : screen === 'print' ? (
-                      <PrintLabelsScreen onSettings={() => setScreen('settings-labels')} />
-                    ) : screen === 'letters' ? (
-                      <LettersScreen onDesign={() => setScreen('settings-letters')} />
-                    ) : screen === 'reports' ? (
-                      <ReportsScreen key={nav.report ?? 'reports'} initialReport={nav.report} />
-                    ) : screen === 'rollover' ? (
-                      <RolloverScreen onNavigate={setScreen} />
-                    ) : screen === 'settings' ? (
-                      <SettingsScreen />
-                    ) : screen.startsWith('settings-') ? (
-                      // settings-labels, settings-privacy and so on open that tab.
-                      <SettingsScreen
-                        key={screen}
-                        initialTab={screen.slice('settings-'.length) as SettingsTab}
-                      />
-                    ) : screen === 'setup' ? (
-                      <SetupWizard onFinish={() => setScreen('home')} />
+                    ) : file === null ? null : open ? (
+                      screen === 'students' ? (
+                        <StudentsScreen
+                          key={focus?.n ?? 'students'}
+                          onImport={() => setScreen('import')}
+                          focus={
+                            focus?.studentId
+                              ? { studentId: focus.studentId, intent: focus.intent }
+                              : null
+                          }
+                        />
+                      ) : screen === 'import' ? (
+                        <ImportWizard
+                          onClose={() => setScreen('students')}
+                          onNavigate={setScreen}
+                        />
+                      ) : screen === 'lockers' ? (
+                        <LockersScreen
+                          key={focus?.n ?? 'lockers'}
+                          onSetUp={() => setScreen('setup')}
+                          onAllocate={() => setScreen('allocate')}
+                          onOpenStudent={(studentId, intent) =>
+                            setNav({
+                              path: openPath,
+                              screen: 'students',
+                              focus: { studentId, intent, n: Date.now() }
+                            })
+                          }
+                          onPrintResets={printResets}
+                          focusLockerId={focus?.lockerId ?? null}
+                        />
+                      ) : screen === 'allocate' ? (
+                        <AllocateScreen
+                          onDone={() => setScreen('lockers')}
+                          onNavigate={setScreen}
+                        />
+                      ) : screen === 'history' ? (
+                        <HistoryScreen state={open} />
+                      ) : screen === 'print' ? (
+                        <PrintLabelsScreen onSettings={() => setScreen('settings-labels')} />
+                      ) : screen === 'letters' ? (
+                        <LettersScreen onDesign={() => setScreen('settings-letters')} />
+                      ) : screen === 'reports' ? (
+                        <ReportsScreen key={nav.report ?? 'reports'} initialReport={nav.report} />
+                      ) : screen === 'rollover' ? (
+                        <RolloverScreen onNavigate={setScreen} />
+                      ) : screen === 'settings' ? (
+                        <SettingsScreen />
+                      ) : screen.startsWith('settings-') ? (
+                        // settings-labels, settings-privacy and so on open that tab.
+                        <SettingsScreen
+                          key={screen}
+                          initialTab={screen.slice('settings-'.length) as SettingsTab}
+                        />
+                      ) : screen === 'setup' ? (
+                        <SetupWizard onFinish={() => setScreen('home')} />
+                      ) : (
+                        <HomeScreen
+                          state={open}
+                          onError={setError}
+                          onNavigate={setScreen}
+                          onPrintResets={printResets}
+                          onFind={(intent) =>
+                            setFinder({ title: FIND_TITLES[intent ?? 'find'], intent })
+                          }
+                          checklistHidden={onboarding?.checklistHidden ?? false}
+                          onHideChecklist={() => setChecklistHidden(true)}
+                        />
+                      )
                     ) : (
-                      <HomeScreen
-                        state={open}
+                      <WelcomeScreen
+                        onNew={() => setNewOpen(true)}
                         onError={setError}
-                        onNavigate={setScreen}
-                        onPrintResets={printResets}
-                        onFind={(intent) =>
-                          setFinder({ title: FIND_TITLES[intent ?? 'find'], intent })
-                        }
-                        checklistHidden={onboarding?.checklistHidden ?? false}
-                        onHideChecklist={() => setChecklistHidden(true)}
+                        managed={computer?.managed}
                       />
-                    )
-                  ) : (
-                    <WelcomeScreen
-                      onNew={() => setNewOpen(true)}
-                      onError={setError}
-                      managed={computer?.managed}
-                    />
+                    )}
+                  </ScreenErrorBoundary>
+                  {info && !open && (
+                    <p
+                      className="pb-6 text-center text-xs text-ink-muted"
+                      data-testid="version-line"
+                    >
+                      {versionLine(info)}
+                      {info.signed ? '' : ' · unsigned build'} · Free and open source · Your data
+                      never leaves your school
+                    </p>
                   )}
-                </ScreenErrorBoundary>
-                {info && !open && (
-                  <p className="pb-6 text-center text-xs text-ink-muted" data-testid="version-line">
-                    {versionLine(info)}
-                    {info.signed ? '' : ' · unsigned build'} · Free and open source · Your data
-                    never leaves your school
-                  </p>
-                )}
-              </div>
-            </main>
-          </div>
-          {open && finder && (
-            <QuickFind
-              open
-              title={finder.title}
-              onClose={() => setFinder(null)}
-              onPick={onFound}
-              {...(finder.intent === 'assign'
-                ? {
-                    onAddStudent: (typed: string) => {
-                      setFinder(null)
-                      setAddingStudent(typed)
+                </div>
+              </main>
+            </div>
+            {open && finder && (
+              <QuickFind
+                open
+                title={finder.title}
+                onClose={() => setFinder(null)}
+                onPick={onFound}
+                {...(finder.intent === 'assign'
+                  ? {
+                      onAddStudent: (typed: string) => {
+                        setFinder(null)
+                        setAddingStudent(typed)
+                      }
                     }
-                  }
-                : {})}
+                  : {})}
+              />
+            )}
+            {open && (
+              <AddStudentDialog
+                open={addingStudent !== null}
+                initialName={addingStudent ?? ''}
+                onClose={() => setAddingStudent(null)}
+                onAdded={(s) => {
+                  setAddingStudent(null)
+                  setNav({
+                    path: openPath,
+                    screen: 'students',
+                    focus: { studentId: s.id, intent: 'assign', n: Date.now() }
+                  })
+                }}
+              />
+            )}
+            <Tour
+              open={tourOpen}
+              onClose={closeTour}
+              onShowMe={
+                open
+                  ? (target) => {
+                      setHelpOpen(false)
+                      setScreen(target)
+                    }
+                  : null
+              }
             />
-          )}
-          {open && (
-            <AddStudentDialog
-              open={addingStudent !== null}
-              initialName={addingStudent ?? ''}
-              onClose={() => setAddingStudent(null)}
-              onAdded={(s) => {
-                setAddingStudent(null)
-                setNav({
-                  path: openPath,
-                  screen: 'students',
-                  focus: { studentId: s.id, intent: 'assign', n: Date.now() }
-                })
-              }}
-            />
-          )}
-          <Tour
-            open={tourOpen}
-            onClose={closeTour}
-            onShowMe={
-              open
-                ? (target) => {
-                    setHelpOpen(false)
-                    setScreen(target)
-                  }
-                : null
-            }
+          </PinGateProvider>
+        </AppContextProvider>
+
+        <MessageStrip message={message} onUndo={undoFromMessage} onClose={closeMessage} />
+
+        {open && (
+          <StatusBar
+            state={open}
+            onBackups={() => setBackupsOpen(true)}
+            onClose={() => void window.api.closeFile()}
+            onCopies={() => setScreen('home')}
           />
-        </PinGateProvider>
-      </AppContextProvider>
+        )}
 
-      <MessageStrip message={message} onUndo={undoFromMessage} onClose={closeMessage} />
-
-      {open && (
-        <StatusBar
-          state={open}
-          onBackups={() => setBackupsOpen(true)}
-          onClose={() => void window.api.closeFile()}
-          onCopies={() => setScreen('home')}
+        {open?.conflict && (
+          <ConflictDialog
+            conflict={open.conflict}
+            canEdit={open.mode === 'edit'}
+            onMerged={(title, body) => setNotice({ title, body })}
+          />
+        )}
+        <Modal
+          open={notice !== null}
+          onOpenChange={(o) => !o && setNotice(null)}
+          title={notice?.title ?? ''}
+          description={notice?.body ?? ''}
+          testId="notice-dialog"
+        >
+          <div className="mt-6 flex justify-end">
+            <Button onClick={() => setNotice(null)}>OK</Button>
+          </div>
+        </Modal>
+        <BackupsDialog
+          open={backupsOpen}
+          onOpenChange={setBackupsOpen}
+          canEdit={open?.mode === 'edit'}
         />
-      )}
-
-      {open?.conflict && (
-        <ConflictDialog
-          conflict={open.conflict}
-          canEdit={open.mode === 'edit'}
-          onMerged={(title, body) => setNotice({ title, body })}
+        <NewFileDialog
+          open={newOpen}
+          onOpenChange={setNewOpen}
+          onCreate={async (name) => {
+            const r = await window.api.newFile(name)
+            if (!r.ok && r.needsRegistration) {
+              setNewOpen(false)
+              openRegistration('register')
+              return null
+            }
+            if (r.ok) {
+              setNewOpen(false)
+              const state = await window.api.getFileState()
+              if (state.status === 'open')
+                setNav({ path: state.path, screen: 'setup', focus: null })
+              return null
+            }
+            return r.cancelled ? null : r.message
+          }}
         />
-      )}
-      <Modal
-        open={notice !== null}
-        onOpenChange={(o) => !o && setNotice(null)}
-        title={notice?.title ?? ''}
-        description={notice?.body ?? ''}
-        testId="notice-dialog"
-      >
-        <div className="mt-6 flex justify-end">
-          <Button onClick={() => setNotice(null)}>OK</Button>
-        </div>
-      </Modal>
-      <BackupsDialog
-        open={backupsOpen}
-        onOpenChange={setBackupsOpen}
-        canEdit={open?.mode === 'edit'}
-      />
-      <NewFileDialog
-        open={newOpen}
-        onOpenChange={setNewOpen}
-        onCreate={async (name) => {
-          const r = await window.api.newFile(name)
-          if (r.ok) {
-            setNewOpen(false)
-            const state = await window.api.getFileState()
-            if (state.status === 'open') setNav({ path: state.path, screen: 'setup', focus: null })
-            return null
-          }
-          return r.cancelled ? null : r.message
-        }}
-      />
-      <OperatorDialog
-        open={operatorOpen}
-        info={operator}
-        required={operator?.name === null}
-        onDone={() => {
-          setOperatorOpen(false)
-          loadOperator()
-        }}
-      />
-      <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} info={info} />
-      <Modal
-        open={error !== null}
-        onOpenChange={(o) => !o && setError(null)}
-        title="That did not work"
-        description="Nothing has been changed."
-        testId="error-dialog"
-      >
-        <p data-testid="error-message">{error}</p>
-        <div className="mt-6 flex justify-end">
-          <Button onClick={() => setError(null)}>OK</Button>
-        </div>
-      </Modal>
-    </div>
+        <OperatorDialog
+          open={operatorOpen}
+          info={operator}
+          required={operator?.name === null}
+          onDone={() => {
+            setOperatorOpen(false)
+            loadOperator()
+          }}
+        />
+        <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} info={info} />
+        <RegistrationDialog
+          tab={shownTab}
+          view={registration}
+          onTab={setRegistrationTab}
+          onClose={() => setRegistrationTab(null)}
+          onRegistered={setRegistration}
+        />
+        <Modal
+          open={error !== null}
+          onOpenChange={(o) => !o && setError(null)}
+          title="That did not work"
+          description="Nothing has been changed."
+          testId="error-dialog"
+        >
+          <p data-testid="error-message">{error}</p>
+          <div className="mt-6 flex justify-end">
+            <Button onClick={() => setError(null)}>OK</Button>
+          </div>
+        </Modal>
+      </div>
+    </RegistrationContext.Provider>
   )
 }

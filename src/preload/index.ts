@@ -8,15 +8,18 @@ import type { ComputerSettings, ComputerView } from '../shared/computer'
 import type { RecordRestorePreview } from '../shared/history'
 import type { StorageView } from '../shared/storage'
 import type { BackupPreview, BackupView, FileState } from '../shared/fileState'
+import type { RegistrationForm, SendResult } from '../shared/registration'
 import type {
   ActionResult,
   AppInfo,
+  EnterKeyResult,
   InstallResult,
   LettersProgress,
   OnboardingInfo,
   OnboardingSet,
   OperatorInfo,
   RecentFile,
+  RegistrationView,
   UpdateStatus
 } from '../shared/ipc'
 
@@ -68,6 +71,21 @@ const api = {
   getOnboarding: (): Promise<OnboardingInfo> => ipcRenderer.invoke(channels.onboardingGet),
   setOnboarding: (patch: OnboardingSet): Promise<OnboardingInfo> =>
     ipcRenderer.invoke(channels.onboardingSet, patch),
+
+  // registration
+  getRegistration: (): Promise<RegistrationView> => ipcRenderer.invoke(channels.registrationGet),
+  enterRegistrationKey: (key: string): Promise<EnterKeyResult> =>
+    ipcRenderer.invoke(channels.registrationEnterKey, { key }),
+  sendRegistration: (form: RegistrationForm): Promise<SendResult> =>
+    ipcRenderer.invoke(channels.registrationSend, form),
+  openRegistrationWebsite: (): Promise<void> =>
+    ipcRenderer.invoke(channels.registrationOpenWebsite),
+  openRegistrationEmail: (url: string): Promise<void> =>
+    ipcRenderer.invoke(channels.registrationOpenEmail, { url }),
+  onRegistrationChanged: (listener: (view: RegistrationView) => void) =>
+    subscribe(channels.registrationChanged, listener),
+  onOpenRegistration: (listener: () => void) =>
+    subscribe<void>(channels.openRegistration, () => listener()),
 
   // the data file
   getFileState: (): Promise<FileState> => ipcRenderer.invoke(channels.fileGetState),

@@ -62,6 +62,13 @@ export const channels = {
   computerSet: 'computer:set',
   onboardingGet: 'onboarding:get',
   onboardingSet: 'onboarding:set',
+  registrationGet: 'registration:get',
+  registrationEnterKey: 'registration:enterKey',
+  registrationSend: 'registration:send',
+  /** Opens the website registration form (a fixed address; the window never names it). */
+  registrationOpenWebsite: 'registration:openWebsite',
+  /** Opens a filled-in email to Dave; main checks the address. */
+  registrationOpenEmail: 'registration:openEmail',
   // main -> renderer events
   computerChanged: 'computer:changed',
   openLocker: 'event:ui:openLocker',
@@ -69,5 +76,7 @@ export const channels = {
   openAbout: 'event:ui:openAbout',
   openTour: 'event:ui:openTour',
   fileState: 'event:file:state',
-  renderLettersProgress: 'event:render:lettersProgress'
+  renderLettersProgress: 'event:render:lettersProgress',
+  registrationChanged: 'registration:changed',
+  openRegistration: 'registration:open'
 } as const

@@ -11,6 +11,7 @@ import { GettingStarted } from '@renderer/onboarding/GettingStarted'
 import type { Screen } from '@renderer/components/NavRail'
 import { ResetList, type LockerIntent } from '@renderer/lockers/LockerActions'
 import { plural } from '@renderer/lib/format'
+import { useRegistration } from '@renderer/lib/registration'
 import type { OpenFileState } from '@renderer/lib/useFileState'
 
 interface Props {
@@ -98,6 +99,7 @@ export function HomeScreen({
   checklistHidden: boolean
   onHideChecklist: () => void
 }): React.JSX.Element {
+  const { openRegistration } = useRegistration()
   const c = state.summary.counts
   const stats = [
     { label: 'Lockers', value: c.lockers },
@@ -256,7 +258,11 @@ export function HomeScreen({
             variant="secondary"
             data-testid="start-practice"
             onClick={() =>
-              void window.api.practice().then((r) => !r.ok && !r.cancelled && onError(r.message))
+              void window.api.practice().then((r) => {
+                if (r.ok || r.cancelled) return
+                if (r.needsRegistration) openRegistration('register')
+                else onError(r.message)
+              })
             }
           >
             Practise on a copy

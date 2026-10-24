@@ -5,15 +5,23 @@ import {
   FilePlus2,
   FolderOpen,
   GraduationCap,
+  KeyRound,
   TriangleAlert,
   X
 } from 'lucide-react'
+import { brand } from '@shared/brand'
 import type { RecentFile } from '@shared/ipc'
 import type { Managed } from '@shared/computer'
 import { Button } from '@renderer/components/Button'
 import { cn } from '@renderer/lib/cn'
 import { LockerBank } from '@renderer/components/LockerBank'
 import { formatWhen } from '@renderer/lib/format'
+import {
+  registerBlurb,
+  registerHeading,
+  useRegistration,
+  useUnregistered
+} from '@renderer/lib/registration'
 
 interface Props {
   onNew: () => void
@@ -25,6 +33,9 @@ interface Props {
 export function WelcomeScreen({ onNew, onError, managed }: Props): React.JSX.Element {
   const [recent, setRecent] = useState<RecentFile[]>([])
   const [busy, setBusy] = useState(false)
+  const { openRegistration } = useRegistration()
+  const unregistered = useUnregistered()
+  const demoAllowed = managed?.demoEnabled !== false
 
   const refresh = (): void => {
     void window.api.recentFiles().then(setRecent)
@@ -32,12 +43,18 @@ export function WelcomeScreen({ onNew, onError, managed }: Props): React.JSX.Ele
   useEffect(refresh, [])
 
   const act = async (
-    fn: () => Promise<{ ok: boolean; cancelled?: boolean; message?: string }>
+    fn: () => Promise<{
+      ok: boolean
+      cancelled?: boolean
+      message?: string
+      needsRegistration?: boolean
+    }>
   ): Promise<void> => {
     setBusy(true)
     const r = await fn()
     setBusy(false)
-    if (!r.ok && !r.cancelled && r.message) onError(r.message)
+    if (!r.ok && r.needsRegistration) openRegistration('register')
+    else if (!r.ok && !r.cancelled && r.message) onError(r.message)
   }
 
   const choices = [
@@ -62,7 +79,7 @@ export function WelcomeScreen({ onNew, onError, managed }: Props): React.JSX.Ele
       action: () => void act(() => window.api.openDemo()),
       testId: 'open-demo'
     }
-  ].filter((c) => c.testId !== 'open-demo' || managed?.demoEnabled !== false)
+  ].filter((c) => c.testId !== 'open-demo' || demoAllowed)
   const itFile = managed?.defaultDataFile
 
   return (
@@ -87,6 +104,45 @@ export function WelcomeScreen({ onNew, onError, managed }: Props): React.JSX.Ele
           <LockerBank className="mx-auto w-full max-w-sm" />
         </div>
       </section>
+
+      {unregistered && (
+        <section
+          className="card mt-8 flex flex-wrap items-center gap-5 p-6"
+          data-testid="register-panel"
+          aria-labelledby="register-heading"
+        >
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+            <KeyRound size={24} aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1 basis-72">
+            <h2 id="register-heading" className="text-lg font-semibold">
+              {registerHeading(brand.name)}
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted">{registerBlurb(brand.name, demoAllowed)}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button data-testid="register-button" onClick={() => openRegistration('register')}>
+              Register this school
+            </Button>
+            <Button
+              variant="secondary"
+              data-testid="have-key-button"
+              onClick={() => openRegistration('key')}
+            >
+              I have a key
+            </Button>
+            {demoAllowed && (
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void act(() => window.api.openDemo())}
+              >
+                Try the demo school
+              </Button>
+            )}
+          </div>
+        </section>
+      )}
 
       {itFile && (
         <div className="card mt-8 flex flex-wrap items-center gap-4 p-5" data-testid="it-file">

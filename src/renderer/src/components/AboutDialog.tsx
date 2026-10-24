@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AppInfo } from '@shared/ipc'
 import { formatDateTime } from '@renderer/lib/format'
+import { useRegistration } from '@renderer/lib/registration'
 import { Button } from './Button'
 import { LockerMark } from './LockerMark'
 import { Modal } from './Modal'
@@ -13,6 +14,7 @@ interface Props {
 
 export function AboutDialog({ open, onOpenChange, info }: Props): React.JSX.Element {
   const [noticesOpen, setNoticesOpen] = useState(false)
+  const registration = useRegistration().view
   return (
     <>
       <Modal
@@ -34,6 +36,14 @@ export function AboutDialog({ open, onOpenChange, info }: Props): React.JSX.Elem
             </dd>
             <dt className="text-ink-muted">Built on</dt>
             <dd data-testid="about-built">{info ? formatDateTime(info.builtAt) : '…'}</dd>
+            <dt className="text-ink-muted">Registration</dt>
+            <dd data-testid="registered-to">
+              {registration === null
+                ? '…'
+                : registration.state === 'registered'
+                  ? `Registered to ${registration.school} (${registration.id})`
+                  : 'Not registered'}
+            </dd>
             <dt className="text-ink-muted">Licence</dt>
             <dd>{info?.licence ?? '…'}</dd>
             <dt className="text-ink-muted">Platform</dt>

@@ -1,4 +1,5 @@
 import { createPublicKey, type KeyObject } from 'node:crypto'
+import type { RegistrationView } from '@shared/ipc'
 import type { LockerDb } from '../db/db'
 import { installed, readItRegistrationKey } from '../managed'
 import type { Preferences, Prefs } from '../prefs/preferences'
@@ -126,4 +127,15 @@ export async function enterKey(
     ok: true,
     status: { state: 'registered', details: check.details, source: 'computer', key }
   }
+}
+
+/** What the window may know about a status: never the key itself. */
+export function toRegistrationView(
+  status: RegistrationStatus,
+  enforced: boolean
+): RegistrationView {
+  if (status.state === 'unregistered')
+    return { state: 'unregistered', school: null, id: null, email: null, source: null, enforced }
+  const { school, id, email } = status.details
+  return { state: 'registered', school, id, email, source: status.source, enforced }
 }

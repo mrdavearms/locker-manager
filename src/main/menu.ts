@@ -15,6 +15,7 @@ export function buildMenu(): void {
     { label: 'Take the tour again', click: () => sendToFocused(channels.openTour) },
     { type: 'separator' },
     { label: 'Check for updates…', click: () => void checkForUpdates(true) },
+    { label: 'Registration…', click: () => sendToFocused(channels.openRegistration) },
     { label: 'Open the download page', click: () => void shell.openExternal(brand.releasesUrl) },
     { type: 'separator' },
     { label: `About ${brand.name}`, click: () => sendToFocused(channels.openAbout) }

@@ -30,6 +30,7 @@ import { shutdownNoteMessage, takeShutdownNote, writeShutdownNote } from './shut
 import { detectDeveloperIdSignature, detectWindowsSignature } from './signing'
 import { buildCommit } from './buildInfo'
 import { initRegistration } from './registration/registration'
+import { registerRegistrationHandlers } from './registration/ipc'
 import { macBlocker, updateMode, windowsBlocker } from './update/policy'
 import { failedWindowsAttempt, folderWritable, recordWindowsAttempt } from './update/windowsAttempt'
 import {
@@ -226,6 +227,7 @@ if (process.argv.includes(SELF_TEST_FLAG)) {
     void sweepRenderTemp()
     registerIpcHandlers(signed)
     registerFileHandlers()
+    registerRegistrationHandlers()
     registerRpc(fileSession, rpcHandlers)
     registerRenderHandlers()
     registerDocumentHandlers()

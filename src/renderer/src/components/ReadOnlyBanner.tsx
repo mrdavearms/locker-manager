@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { brand } from '@shared/brand'
 import { Banner } from '@renderer/components/Banner'
 import { Button } from '@renderer/components/Button'
 import { formatWhen } from '@renderer/lib/format'
+import { useRegistration } from '@renderer/lib/registration'
 import type { OpenFileState } from '@renderer/lib/useFileState'
 
 interface Props {
@@ -12,6 +14,7 @@ interface Props {
 export function ReadOnlyBanner({ state, onError }: Props): React.JSX.Element | null {
   const ro = state.readOnly
   const [busy, setBusy] = useState(false)
+  const { openRegistration } = useRegistration()
   if (!ro) return null
   const holder = ro.holder
   const act = async (fn: () => Promise<{ ok: boolean; message?: string }>): Promise<void> => {
@@ -19,6 +22,29 @@ export function ReadOnlyBanner({ state, onError }: Props): React.JSX.Element | n
     const r = await fn()
     setBusy(false)
     if (!r.ok && r.message) onError(r.message)
+  }
+  if (ro.reason === 'unregistered') {
+    return (
+      <Banner
+        tone="locked"
+        title={`This copy of ${brand.name} is not registered, so you can look but not change anything.`}
+        testId="read-only-banner"
+        actions={
+          <>
+            <Button data-testid="register-button" onClick={() => openRegistration('register')}>
+              Register
+            </Button>
+            <Button
+              variant="secondary"
+              data-testid="have-key-button"
+              onClick={() => openRegistration('key')}
+            >
+              I have a key
+            </Button>
+          </>
+        }
+      />
+    )
   }
   if (ro.reason === 'newer_version') {
     return (
