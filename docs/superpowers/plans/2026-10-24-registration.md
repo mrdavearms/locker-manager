@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Schools register Locker Manager (name, school, email), Dave approves each registration by email, and the school pastes a signed key that the app checks offline. Unregistered copies get the demo school and read-only access to existing files; existing installs get a grace period.
+**Goal:** Schools register Locker Manager (name, school, email), Dave approves each registration by email, and the school pastes a signed key that the app checks offline. Unregistered copies, including existing installs that update without a key, get the demo school and read-only access to existing files. There is no grace period (Dave, 25 October 2026).
 
-**Architecture:** A key is an Ed25519-signed block of text (`LM1.<details>.<signature>`). The app holds only the public key and verifies with `node:crypto`, so nothing is sent to check a key. One pure function decides the registration state from the keys it can find (computer, IT's `registration.key` file, the open data file) and the grace rules. The data file session gains one gate, `mayEdit(db)`, which opens a file read-only with the new reason `unregistered` and without taking the edit lock. A small Firebase project (`registration-service/` in this repo) receives registrations, emails Dave, and signs and emails keys on approval.
+**Architecture:** A key is an Ed25519-signed block of text (`LM1.<details>.<signature>`). The app holds only the public key and verifies with `node:crypto`, so nothing is sent to check a key. One pure function decides whether the copy is registered from the keys it can find (computer, IT's `registration.key` file, the open data file). The data file session gains one gate, `mayEdit(db)`, which opens a file read-only with the new reason `unregistered` and without taking the edit lock. A small Firebase project (`registration-service/` in this repo) receives registrations, emails Dave, and signs and emails keys on approval.
 
 **Tech Stack:** Electron, React 19, TypeScript strict, Zod, sql.js, Vitest, fast-check, Playwright for Electron, `node:crypto` Ed25519, `semver` (already a dependency). Service: Firebase Cloud Functions v2 (Node.js 22), Firestore, Secret Manager, Nodemailer with a Gmail app password.
 
@@ -22,7 +22,8 @@
 - An unregistered copy can always open a school file read-only. It never takes the edit lock.
 - Test-only environment variables (`LOCKER_MANAGER_REGISTRATION`, `LOCKER_MANAGER_REG_TEST_PUBKEY`) are ignored in an installed copy, using the same `installed()` test as `src/main/managed.ts`.
 - No private key is ever committed, test or real. Tests generate a key pair at run time. `npm run check:no-student-data` must pass.
-- Grace end: `2027-01-31` (end of that day, the computer's local time). First version with registration: `0.13.0`. Both are constants in `src/main/registration/policy.ts`. Dave may change the date (design section 12); change only the constant.
+- No grace period. A copy is registered or unregistered, nothing else (Dave, 25 October 2026).
+- Keys are emailed from `dave@dandsarmstrong.com`. The form asks for the school's state (drop-down).
 - Conventional commits written for school staff, ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Work on `main` in small commits (repo CLAUDE.md). Do not tag or release until task 13, and only after Dave says so.
 - Before each commit: `npm run check`. End-to-end tests need `npm run build` first, then `npx playwright test tests/e2e/<file>`.
 - Every outward step (creating the Firebase project, turning on billing, creating secrets, deploying, publishing the site, releasing) waits for Dave's go-ahead in chat. gcloud and firebase commands use `--account=dave@dandsarmstrong.com` / the `dave@` Firebase login.
@@ -32,7 +33,7 @@
 1. **A key pasted from an email with line breaks, spaces, or "smart" characters added by Outlook.** It must still be accepted. Task 1 strips all whitespace and zero-width characters before decoding; its test pastes a key broken over three lines with a leading tab and a trailing non-breaking space.
 2. **An unregistered computer opening the shared school file while a registered colleague is editing it.** It must not take, steal or disturb the edit lock, and must not later "start editing" by itself when the lock frees. Task 4 tests that no lock file is written and that `canStartEditing` stays false through a poll tick.
 3. **A backup restored from before the school registered.** The restored file has no key. A covered computer must put the key back; an uncovered one opens it read-only. Task 4 tests the first case; task 7 the second.
-4. **The computer's clock is wrong (set years ahead or behind).** A wrong clock must never turn a registered copy unregistered while keys have no expiry. Task 2 tests that a key with `expires: null` stays valid at year 2100 and year 2000, and that the grace check uses only `now` (so a clock set back extends grace, which is accepted).
+4. **The computer's clock is wrong (set years ahead or behind).** A wrong clock must never turn a registered copy unregistered while keys have no expiry. Task 2 tests that a key with `expires: null` stays valid at year 2100 and year 2000.
 5. **The registration service is unreachable from a school network.** Send must fail within 15 seconds with a plain message and offer the website and email fallbacks, never a spinner that never ends. Task 6 tests a refused connection and a server that never answers.
 
 ---
@@ -106,7 +107,7 @@
 
 ---
 
-### Task 2: Which state is this copy in
+### Task 2: Is this copy registered
 
 **Files:**
 - Create: `src/main/registration/policy.ts` (pure)
@@ -116,42 +117,34 @@
 - Consumes: `checkKey`, `RegistrationDetails` (task 1).
 - Produces:
   ```ts
-  export const GRACE_ENDS = '2027-01-31'
-  export const REGISTRATION_SINCE = '0.13.0'
   export type RegistrationSource = 'computer' | 'it' | 'file'
   export type RegistrationStatus =
     | { state: 'registered'; details: RegistrationDetails; source: RegistrationSource; key: string }
-    | { state: 'grace'; until: string }        // until = GRACE_ENDS
-    | { state: 'unregistered'; graceEnded: boolean }
+    | { state: 'unregistered' }
   export interface PolicyInput {
     computerKey: string | null
     itKey: string | null
     fileKey: string | null
-    computerHadOlderVersion: boolean
-    fileCreatedWith: string | null     // meta created_with_app_version, null when no file is open
-    fileGraceMark: boolean             // meta registration_grace = '1' (design 7.3)
     publicKeys: KeyObject[]
     now: Date
   }
   export function registrationStatus(input: PolicyInput): RegistrationStatus
-  export function isOlderThanRegistration(version: string | null): boolean
-  export function graceOpen(now: Date): boolean
+  export function keysAfterOpen(input: {
+    fileKey: string | null; computerKey: string | null; itKey: string | null
+    mode: 'edit' | 'read_only'; publicKeys: KeyObject[]; now: Date
+  }): { saveToComputer: string | null; writeToFile: string | null }
   ```
-  Order of keys checked: `it`, then `computer`, then `file`; the first valid one wins. Grace applies when no key is valid, `graceOpen(now)` is true, and any of `computerHadOlderVersion`, `fileGraceMark`, or `isOlderThanRegistration(fileCreatedWith)`. `isOlderThanRegistration` uses `semver.lt(semver.coerce(v), REGISTRATION_SINCE)` and returns false for null or unparseable text. `graceEnded` is true when the copy would have qualified for grace but the date has passed.
+  Order of keys checked: `it`, then `computer`, then `file`; the first valid one wins. `keysAfterOpen` (design 6.5): `saveToComputer` is the file's key when it is valid and the computer has no valid key; `writeToFile` is the computer's (or else IT's) valid key when the mode is `edit` and the file has no valid key. A valid key is never replaced.
 
 - [ ] **Step 1: Write the failing tests**
 
   Table-driven tests in `policy.test.ts`, keys made with task 1's `signKey` and a run-time pair:
   - valid computer key, nothing else: `registered`, `source: 'computer'`.
   - invalid IT key plus valid file key: `registered`, `source: 'file'`.
-  - no key, `computerHadOlderVersion: true`, now 2026-12-01: `{ state: 'grace', until: '2027-01-31' }`.
-  - no key, file created with `'0.12.1'`, now 2027-01-31 23:59 local: `grace`.
-  - same, now 2027-02-01 00:00 local: `{ state: 'unregistered', graceEnded: true }`.
-  - no key, new install, file created with `'0.13.0'` but `fileGraceMark: true`, now 2026-12-01: `grace`.
-  - no key, new install, file created with `'0.13.0'`: `{ state: 'unregistered', graceEnded: false }`.
-  - file created with `'0.13.0-beta.1'`: not older (beta of the same release counts as the new version, `semver.coerce` drops the suffix).
-  - `fileCreatedWith: 'garbage'` and `null`: not older.
+  - valid IT key and valid computer key: `source: 'it'`.
+  - no key: `{ state: 'unregistered' }`. An expired key only: `unregistered`.
   - clock: a key with `expires: null` is `registered` at `new Date(2100, 0, 1)` and `new Date(2000, 0, 1)`.
+  - `keysAfterOpen`: file key valid, computer none: saves the file key to the computer. File none, computer valid, edit: writes the computer key to the file. Same in read-only: writes nothing. File key A and computer key B both valid: nothing changes. File key invalid, computer valid, edit: writes the computer key.
 
 - [ ] **Step 2: Run them and see them fail**
 
@@ -169,7 +162,7 @@
 
   ```bash
   git add src/main/registration/policy.ts tests/unit/registration/policy.test.ts
-  git commit -m "feat(registration): decide registered, grace or unregistered from the keys found"
+  git commit -m "feat(registration): decide whether a copy is registered from the keys it finds"
   ```
 
 ---
@@ -177,9 +170,8 @@
 ### Task 3: Where keys are kept, and the registration service in the main process
 
 **Files:**
-- Modify: `src/main/prefs/preferences.ts` (two new fields)
+- Modify: `src/main/prefs/preferences.ts` (one new field)
 - Modify: `src/main/managed.ts` (read `registration.key`)
-- Modify: `src/main/recovery.ts` or `src/main/index.ts` (mark an existing install before `lastStartedVersion` is overwritten)
 - Create: `src/main/registration/fileKey.ts` (meta helpers, Electron-free)
 - Create: `src/main/registration/registration.ts` (Electron glue: public keys, current status, enter a key)
 - Test: `tests/unit/registration/storage.test.ts`, additions to `tests/unit/preferences.test.ts`
@@ -187,25 +179,23 @@
 **Interfaces:**
 - Consumes: tasks 1 and 2.
 - Produces:
-  - `PrefsSchema` gains `registrationKey: string | null` (default null, `.catch(null)`) and `registrationGrace: boolean` (default false, `.catch(false)`).
+  - `PrefsSchema` gains `registrationKey: string | null` (default null, `.catch(null)`).
   - In `managed.ts`: `export function registrationKeyPath(platform?, packaged?): string` (same folder as `managedPath`, file `registration.key`, test override `LOCKER_MANAGER_MANAGED_DIR` only when not installed) and `export function readItRegistrationKey(): string | null` (whole file text, BOM removed, trimmed; null when missing or unreadable).
-  - In `fileKey.ts`: `export const FILE_KEY_META = 'registration_v1'`, `export function readFileKey(db: LockerDb): string | null`, `export function writeFileKey(db: LockerDb, key: string): void` (uses `getMeta`/`setMeta` from `src/main/db/context.ts`), `export function fileCreatedWith(db: LockerDb): string | null`, `export const GRACE_META = 'registration_grace'`, `export function hasGraceMark(db: LockerDb): boolean`, and `export function writeGraceMark(db: LockerDb): void`.
+  - In `fileKey.ts`: `export const FILE_KEY_META = 'registration_v1'`, `export function readFileKey(db: LockerDb): string | null`, and `export function writeFileKey(db: LockerDb, key: string): void` (uses `getMeta`/`setMeta` from `src/main/db/context.ts`).
   - In `registration.ts`:
     ```ts
     export function publicKeys(): KeyObject[]
     export function enforced(): boolean
     export function statusFor(db: LockerDb | null): RegistrationStatus
     export async function enterKey(text: string): Promise<{ ok: true; status: RegistrationStatus } | { ok: false; message: string }>
-    export async function markExistingInstall(prefs: Preferences, lastStartedVersion: string | null): Promise<void>
     export const PRODUCTION_PUBLIC_KEY: string | null   // base64 SPKI DER; null until task 11
     ```
-    `publicKeys()` returns the production key when set, plus the test key from `LOCKER_MANAGER_REG_TEST_PUBKEY` when not installed. `enforced()` is true in an installed copy; when not installed it is true only if `LOCKER_MANAGER_REGISTRATION=enforce`. When not enforced, `statusFor` returns `registered` with `details.school = 'Development copy'`, `id = 'DEV'`, `source: 'computer'`, so `npm run dev` and every existing e2e test behave as today. `enterKey` checks with `checkKey`, saves to `prefs.registrationKey`, and returns a staff-facing message for each failure reason (wording in task 5). `markExistingInstall` sets `registrationGrace: true` once when `isOlderThanRegistration(lastStartedVersion)`.
+    `publicKeys()` returns the production key when set, plus the test key from `LOCKER_MANAGER_REG_TEST_PUBKEY` when not installed. `enforced()` is true in an installed copy; when not installed it is true only if `LOCKER_MANAGER_REGISTRATION=enforce`. When not enforced, `statusFor` returns `registered` with `details.school = 'Development copy'`, `id = 'DEV'`, `source: 'computer'`, so `npm run dev` and every existing e2e test behave as today. `enterKey` checks with `checkKey`, saves to `prefs.registrationKey`, and returns a staff-facing message for each failure reason (wording in task 5).
 
 - [ ] **Step 1: Write the failing tests**
-  - `storage.test.ts`: `writeFileKey` then `readFileKey` on a fresh `createNewDatabase` returns the key; `readFileKey` on a file without one returns null; `fileCreatedWith` returns the `appVersion` passed to `createNewDatabase`.
+  - `storage.test.ts`: `writeFileKey` then `readFileKey` on a fresh `createNewDatabase` returns the key; `readFileKey` on a file without one returns null.
   - `storage.test.ts`: `readItRegistrationKey` with `LOCKER_MANAGER_MANAGED_DIR` pointing at a temp folder: missing file gives null; file `"﻿LM1.abc\r\n"` gives `'LM1.abc'`.
-  - `preferences.test.ts`: an old `preferences.json` without the new fields loads with `registrationKey: null`, `registrationGrace: false`; a file with `registrationGrace: "yes"` keeps the operator name and reads `false`.
-  - `storage.test.ts`: `markExistingInstall` with `'0.12.1'` sets grace; with `null` (new install) and `'0.13.0'` does not; calling it twice does not write twice (spy on `update`).
+  - `preferences.test.ts`: an old `preferences.json` without the new fields loads with `registrationKey: null`; a file with `registrationKey: 42` keeps the operator name and reads `null`.
 
 - [ ] **Step 2: Run them and see them fail**
 
@@ -214,7 +204,7 @@
 
 - [ ] **Step 3: Implement the files above**
 
-  Call `markExistingInstall(prefs, prefs.get().lastStartedVersion)` in start-up after preferences load and **before** `src/main/recovery.ts` writes `lastStartedVersion`. Read recovery.ts lines 15 to 25 to place it. Leave `PRODUCTION_PUBLIC_KEY = null` with a comment pointing to task 11.
+  Leave `PRODUCTION_PUBLIC_KEY = null` with a comment pointing to task 11.
 
 - [ ] **Step 4: Run the tests and see them pass**
 
@@ -224,7 +214,7 @@
 - [ ] **Step 5: Commit**
 
   ```bash
-  git add src/main/prefs/preferences.ts src/main/managed.ts src/main/recovery.ts src/main/index.ts src/main/registration tests/unit
+  git add src/main/prefs/preferences.ts src/main/managed.ts src/main/registration tests/unit
   git commit -m "feat(registration): keep the key on the computer, in the school's file, or from IT"
   ```
 
@@ -247,7 +237,6 @@
   - `fileService.ts` passes `mayEdit: (db) => statusFor(db).state !== 'unregistered'`.
   - `fileService.ts` exports `async function reopenAfterRegistration(): Promise<ActionResult>`: if a file is open read-only for `unregistered`, `session.open(samePath)`; otherwise a no-op success.
   - After any successful open (`afterOpen`): if the file has a valid key and the computer has no valid key, save the file's key to `prefs.registrationKey`. If the session is in edit mode, the file has no valid key, and `statusFor(db)` is registered from `computer` or `it`, write it with `session.write({ action: 'registration.added', entity: 'file' }, (db) => writeFileKey(db, key))`. No replay function: a conflict merge may drop it, and the next open puts it back. Never replace a valid key already in the file or on the computer (design 6.5).
-  - If the session is in edit mode, the copy's state is `grace`, and the file has no grace mark, write it with `session.write({ action: 'registration.grace_marked', entity: 'file' }, writeGraceMark)`. Also write the mark into a file made by `fileNew` or `fileFromExport` during grace.
   - `fileOpenBackup` is gated like `fileNew` (it writes over the school's file; design 7.4).
   - `fileNew`, `filePractice`, `fileFromExport`, `fileOpenBackup` return `{ ok: false, message: 'Register Locker Manager first. You can still try the demo school.', needsRegistration: true }` when `statusFor(null).state === 'unregistered'` and enforced. Add optional `needsRegistration?: boolean` to `ActionResult` in `src/shared/ipc.ts`.
   - The demo (`fileOpenDemo`) is never gated. A demo file is opened with `mayEdit` returning true (check `getMeta(db, 'demo') === '1'` first).
@@ -260,7 +249,7 @@
   - `puts the computer's key back into a restored file`: create a file, open with a gate that is true and a computer key set, assert `readFileKey` after the debounced save is the computer key and History has `registration.added`.
   - `never replaces a key already in the file`: a file holding valid key A, opened by a computer holding valid key B, still holds key A, and the computer still holds key B.
 
-  These afterOpen rules live in `fileService.ts`, which is Electron glue. Put the decision in a pure function `keysAfterOpen(input: { fileKey: string | null; computerKey: string | null; itKey: string | null; mode: 'edit' | 'read_only'; state: RegistrationStatus['state']; fileGraceMark: boolean; publicKeys: KeyObject[]; now: Date }): { saveToComputer: string | null; writeToFile: string | null; writeGraceMark: boolean }` in `src/main/registration/policy.ts`, and test it there with one case per rule above.
+  These afterOpen rules call `keysAfterOpen` (task 2); this test proves `fileService.ts` acts on its answer.
 
 - [ ] **Step 2: Run them and see them fail**
 
@@ -289,30 +278,28 @@
 - Modify: `src/shared/channels.ts`, `src/shared/ipc.ts`, `src/preload/index.ts`
 - Create: `src/main/registration/ipc.ts` (handlers; registered where `registerFileHandlers` is called in `src/main/index.ts`)
 - Create: `src/renderer/src/components/RegistrationDialog.tsx` (two tabs: Register, I have a key)
-- Create: `src/renderer/src/components/RegistrationBanner.tsx` (grace banner)
-- Modify: `src/renderer/src/screens/WelcomeScreen.tsx`, `src/renderer/src/screens/HomeScreen.tsx`, `src/renderer/src/components/ReadOnlyBanner.tsx`, `src/renderer/src/components/AboutDialog.tsx`, `src/renderer/src/components/NewFileDialog.tsx`, `src/renderer/src/App.tsx`, `src/main/menu.ts`
+- Modify: `src/renderer/src/screens/WelcomeScreen.tsx`, `src/renderer/src/components/ReadOnlyBanner.tsx`, `src/renderer/src/components/AboutDialog.tsx`, `src/renderer/src/components/NewFileDialog.tsx`, `src/renderer/src/App.tsx`, `src/main/menu.ts`
 - Test: `tests/e2e/registration.spec.ts` (written in task 7; this task checks by unit test and by hand in `npm run dev` with `LOCKER_MANAGER_REGISTRATION=enforce`)
 
 **Interfaces:**
 - Consumes: tasks 3 and 4; `sendRegistration` (task 6) through the `registrationSend` channel. Build the Send tab against the channel; task 6 fills the handler.
 - Produces:
   - Channels: `registrationGet: 'registration:get'`, `registrationEnterKey: 'registration:enterKey'`, `registrationSend: 'registration:send'`, `registrationChanged: 'registration:changed'` (main to window), `openRegistration: 'registration:open'` (menu to window).
-  - `RegistrationView` in `src/shared/ipc.ts`: `{ state: 'registered' | 'grace' | 'unregistered'; school: string | null; id: string | null; email: string | null; source: RegistrationSource | null; graceUntil: string | null; graceEnded: boolean; enforced: boolean }`. Dates shown with the app's usual date format (6 Oct 2026).
+  - `RegistrationView` in `src/shared/ipc.ts`: `{ state: 'registered' | 'unregistered'; school: string | null; id: string | null; email: string | null; source: RegistrationSource | null; enforced: boolean }`. Dates shown with the app's usual date format (6 Oct 2026).
   - `window.api.getRegistration(): Promise<RegistrationView>`, `enterRegistrationKey(key: string): Promise<{ ok: true; view: RegistrationView } | { ok: false; message: string }>`, `sendRegistration(form: RegistrationForm): Promise<SendResult>` (task 6 types), `onRegistrationChanged(cb)`.
   - After a key is accepted: main calls `reopenAfterRegistration()` and sends `registrationChanged`.
   - Help menu gains `Registration…` after `Check for updates…`.
-  - Test ids: `register-button`, `have-key-button`, `registration-dialog`, `key-input`, `key-submit`, `key-message`, `registration-banner`, `registered-to`.
+  - Test ids: `register-button`, `have-key-button`, `registration-dialog`, `key-input`, `key-submit`, `key-message`, `registered-to`.
 - Exact staff-facing words (Plain English; the implementer may adjust layout, not meaning):
   - Welcome, unregistered: heading "Register Locker Manager", text "Locker Manager is free for schools. Register once and every computer that opens your school's file is covered. Until then you can try the demo school." Buttons "Register this school", "I have a key", "Try the demo school".
-  - Grace banner: "Please register Locker Manager by {31 Jan 2027}. It's free and takes two minutes." Buttons "Register", "I have a key", and a close button labelled "Not now". Closing hides it until the next start, except within 14 days of the end date, when it has no close button.
-  - Read-only banner, reason `unregistered`: "This copy of Locker Manager is not registered, so you can look but not change anything." When `graceEnded`: add "The free period for existing schools ended on {31 Jan 2027}." Buttons "Register", "I have a key".
+  - Read-only banner, reason `unregistered`: "This copy of Locker Manager is not registered, so you can look but not change anything." Buttons "Register", "I have a key".
   - Key messages: malformed "That doesn't look like a Locker Manager key. Copy the whole key from the email, starting with LM1." bad_signature "That key isn't valid. Check you copied all of it, or ask for a new one." expired "That key expired on {date}. Ask for a new one." unknown_version "That key is for a newer version of Locker Manager. Update the app, then try again."
   - Success: "Registered to {school}." About: "Registered to {school} ({id})" or "Not registered".
   - New file dialog when unregistered: shows the Welcome text above instead of the form.
 
 - [ ] **Step 1: Write a failing unit test for the view mapping**
 
-  Put `toRegistrationView(status: RegistrationStatus, enforced: boolean): RegistrationView` in `src/main/registration/registration.ts`. Test in `tests/unit/registration/view.test.ts`: registered maps school, id, email and source; grace maps `graceUntil: '2027-01-31'`; unregistered with `graceEnded: true` maps through.
+  Put `toRegistrationView(status: RegistrationStatus, enforced: boolean): RegistrationView` in `src/main/registration/registration.ts`. Test in `tests/unit/registration/view.test.ts`: registered maps school, id, email and source; unregistered maps nulls; `enforced` passes through.
 
 - [ ] **Step 2: Run it and see it fail**
 
@@ -368,7 +355,7 @@
   export async function sendRegistration(form: RegistrationForm, deps: { fetch: typeof fetch; url: string; appVersion: string; timeoutMs?: number }): Promise<SendResult>
   export function registrationMailto(form: RegistrationForm, appVersion: string): string
   ```
-  The request is `POST` JSON `{ ...form, source: 'app', appVersion }`. Default timeout 15 000 ms through `AbortSignal.timeout`. Mapping: network error or timeout gives `offline`; HTTP 403 or an HTML response (a school filter page) gives `blocked`; 429 gives `too_many`; other non-2xx gives `server`. Every failure includes `mailto` (to `dave@dandsarmstrong.com`, subject "Locker Manager registration", the form fields in the body, URL-encoded). The state field is design question 3; if Dave says no, drop it here and in task 8.
+  The request is `POST` JSON `{ ...form, source: 'app', appVersion }`. Default timeout 15 000 ms through `AbortSignal.timeout`. Mapping: network error or timeout gives `offline`; HTTP 403 or an HTML response (a school filter page) gives `blocked`; 429 gives `too_many`; other non-2xx gives `server`. Every failure includes `mailto` (to `dave@dandsarmstrong.com`, subject "Locker Manager registration", the form fields in the body, URL-encoded).
   - The dialog shows the message plus two buttons: "Use the website form" (opens `REGISTER_PAGE_URL` with `shell.openExternal`) and "Send by email instead" (opens the `mailto`).
   - Success text: "Thanks. Dave Armstrong checks each registration by hand, usually within a day. Your key will come to {email}."
 
@@ -405,13 +392,13 @@
 ### Task 7: End-to-end tests
 
 **Files:**
-- Modify: `tests/e2e/launch.ts` (options `registration?: 'enforce'`, `computerKey?: string`, `lastStartedVersion?: string`)
+- Modify: `tests/e2e/launch.ts` (options `registration?: 'enforce'`, `computerKey?: string`)
 - Create: `tests/e2e/registrationKeys.ts` (run-time key pair and `makeKey(partial)`)
 - Create: `tests/e2e/registration.spec.ts`
 
 **Interfaces:**
 - Consumes: everything above.
-- Produces: `launchApp({ registration: 'enforce' })` sets `LOCKER_MANAGER_REGISTRATION=enforce` and `LOCKER_MANAGER_REG_TEST_PUBKEY` (base64 SPKI DER of the run-time pair). `computerKey` and `lastStartedVersion` are written into the `preferences.json` that `launchApp` already writes. `makeKey(partial?: Partial<RegistrationDetails>): string` signs with the run-time private key, defaults as in task 1.
+- Produces: `launchApp({ registration: 'enforce' })` sets `LOCKER_MANAGER_REGISTRATION=enforce` and `LOCKER_MANAGER_REG_TEST_PUBKEY` (base64 SPKI DER of the run-time pair). `computerKey` is written into the `preferences.json` that `launchApp` already writes. `makeKey(partial?: Partial<RegistrationDetails>): string` signs with the run-time private key, defaults as in task 1.
 
 - [ ] **Step 1: Write the tests** (each starts with `registration: 'enforce'`):
   - `a new install can try the demo but not start a school file`: Welcome shows `register-button`; Try the demo school opens the demo with editing; New file shows the registration text.
@@ -420,7 +407,7 @@
   - `an unregistered copy opens a school file read-only and leaves the lock alone`: place a fixture (`placeFixture(sharedFolder())`), open it; read-only banner says "not registered"; no `.lock` file beside it (check the lock file name in `src/main/file/lockFile.ts`).
   - `entering a key while a file is open starts editing`: continue the previous case, enter a key; the read-only banner goes; History later shows "Registration added to this file".
   - `a key in the school's file covers a new computer`: copy the file from the previous case, launch a second copy with a fresh userData and no key; it opens in edit mode; its `preferences.json` now holds `registrationKey`.
-  - `an existing install gets the grace banner`: `lastStartedVersion: '0.12.1'`; open a fixture; editing works; `registration-banner` visible with "31 Jan 2027". (Start-up does not write `lastStartedVersion` in an unpackaged copy, `src/main/recovery.ts`, but it does read what `launchApp` wrote, which is all this test needs.)
+  - `an existing install with no key is look-only after updating`: an operator already set, as an updated copy would have, and no key; open a fixture; read-only banner says "not registered".
   - `Open a backup needs a key`: unregistered, press Open a backup… on the first screen; the registration text shows and no file dialog opens.
   - Re-run `tests/e2e/small-school.spec.ts` with `registration: 'enforce'` and a `computerKey` to prove the simple path still works when registered.
 
@@ -438,7 +425,7 @@
 
   ```bash
   git add tests/e2e
-  git commit -m "test(registration): new installs, keys, read-only files, grace and shared files"
+  git commit -m "test(registration): new installs, keys, read-only files and shared files"
   ```
 
 ---
@@ -529,7 +516,7 @@
 ### Task 10: Words for staff, IT and the record
 
 **Files:**
-- Modify: `docs/user-guide.md` (new section "Registering Locker Manager": why, how, what works before, grace, the key covering the whole school, what is sent and what is not)
+- Modify: `docs/user-guide.md` (new section "Registering Locker Manager": why, how, what works before a key arrives (no grace period: existing schools are look-only after updating until they enter a key), the key covering the whole school, what is sent and what is not)
 - Modify: `src/shared/guideLinks.ts` (Welcome and the registration dialog open that section; the existing unit test checks the slug)
 - Modify: `docs/it-guide.md` (the `registration.key` file and its paths on Windows and Mac; why it is not in `managed.json`; firewall row for the service host, needed only for in-app registration; privacy paragraph; "the app never sends anything to check a key")
 - Modify: `README.md` (status line "Free for schools. Registration required from 0.13.0"; privacy section sentence)
@@ -537,7 +524,7 @@
 - Modify: `CLAUDE.md` (decision 30, short, in the style of the others; "Where things live" gains `src/main/registration/` and `registration-service/`)
 - Create: `docs/release-highlights/v0.13.0.md` (staff-facing: what registration is, the date, how to register, that it is free)
 
-- [ ] **Step 1**: Write the pages above. Use Plain English. Give the grace date as "31 January 2027".
+- [ ] **Step 1**: Write the pages above. Use Plain English. The release highlights must tell existing schools to register before updating, because after updating they are look-only until a key arrives.
 - [ ] **Step 2**: `npm run check` passes (the guide link test included).
 - [ ] **Step 3: Commit**
 
@@ -560,7 +547,7 @@ Every command here runs as `dave@dandsarmstrong.com`. Stop and ask Dave before e
   openssl pkey -in "$TMPDIR/reg-signing.pem" -pubout -outform DER | base64
   ```
   Put the private key into Secret Manager as `REG_SIGNING_KEY`, then delete the file. Put the base64 public key into `PRODUCTION_PUBLIC_KEY` in `src/main/registration/registration.ts`. Also keep a copy of the private key where Dave keeps other recovery secrets (losing it means every future key needs a new app release). Ask Dave where.
-- [ ] **Step 3 ★: Email secrets**: `GMAIL_USER` (the address Dave chose, design question 2) and `GMAIL_APP_PASSWORD` (Dave creates the app password himself; never type it for him). `REG_ADMIN_TOKEN`: 32 random bytes, base64url, made with `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`.
+- [ ] **Step 3 ★: Email secrets**: `GMAIL_USER` = `dave@dandsarmstrong.com` and `GMAIL_APP_PASSWORD` (Dave creates the app password himself; never type it for him). `REG_ADMIN_TOKEN`: 32 random bytes, base64url, made with `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`.
 - [ ] **Step 4 ★: Deploy** with `npx firebase deploy --only functions,firestore:rules --project <id>` from `registration-service/`. Put the real `register` URL into `REGISTRATION_URL`, `site/register/index.html` and the IT guide firewall row.
 - [ ] **Step 5 ★: Live test with Dave**: Dave registers his own school from `npm run dev` with `LOCKER_MANAGER_REGISTRATION=enforce` (the dev copy accepts the production key too), approves it from his email, pastes the key, and sees "Registered to ...". Then from the website form. Then the list page and CSV.
 - [ ] **Step 6: Commit**
@@ -583,5 +570,5 @@ Every command here runs as `dave@dandsarmstrong.com`. Stop and ask Dave before e
 ### Task 13: Release 0.13.0 (only when Dave says so)
 
 - [ ] **Step 1 ★**: Run `scripts/release.sh` for 0.13.0 as usual (it runs the Mac two-update proof first). Do not pipe it through `tail`.
-- [ ] **Step 2**: Confirm the update proof passes on Windows and Mac, and that a copy of 0.12.1 updates to 0.13.0 and shows the grace banner, not the unregistered screen.
+- [ ] **Step 2**: Confirm the update proof passes on Windows and Mac, and that a copy of 0.12.1 updates to 0.13.0 and opens the school file read-only with the "not registered" message.
 - [ ] **Step 3**: Tell Dave the release is out, with the release page link, and remind him that registrations will start arriving at the address he chose.

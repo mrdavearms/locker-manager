@@ -1,6 +1,6 @@
 # Registration: design
 
-_Written 24 October 2026 for Dave Armstrong. Status: waiting for Dave's approval. Nothing is built yet._
+_Written 24 October 2026 for Dave Armstrong. Approved by Dave 25 October 2026, with no grace period, keys sent from dave@dandsarmstrong.com, and the school's state on the form._
 
 ## 1. What this is and why
 
@@ -22,10 +22,12 @@ So the feature has two jobs:
 
 | Question | Dave's answer |
 |---|---|
-| Must schools already using the app register? | Yes, with a grace period. They keep working and see a polite banner, then need a key. |
+| Must schools already using the app register? | Yes, straight away, with no grace period (changed 25 October 2026). After updating, an unregistered copy can look at the school's file but not change it until a key is entered. |
 | Who approves a registration? | Dave approves each one. |
 | What can someone do before they have a key? | Try the app with the built-in demo school only. |
 | Is a small online service acceptable? | Yes, small and cheap, on Google Cloud like his other apps. |
+| Which address sends keys? | dave@dandsarmstrong.com (25 October 2026). |
+| Ask for the school's state? | Yes, a drop-down (25 October 2026). |
 
 ## 3. Goals
 
@@ -147,8 +149,7 @@ School IT can also place the key on every computer in one go, as a file named `r
 | State | How a copy gets here |
 |---|---|
 | **Registered** | A valid key is on the computer, in the managed `registration.key` file, or in the open data file. |
-| **Grace** | Not registered, and either this computer ran an older version before updating, or the file was made by an older version. Lasts until the grace end date. |
-| **Unregistered** | Neither of the above. A new install with no key. Or a copy whose grace period has ended. |
+| **Unregistered** | No valid key anywhere. A new install, and every existing install that updates to 0.13.0 without a key. |
 
 A key whose `expires` date has passed counts as no key. None expire yet.
 
@@ -156,23 +157,9 @@ A key whose `expires` date has passed counts as no key. None expire yet.
 
 Everything works as now. About shows "Registered to Example Secondary College (R-00012)". Nothing else changes.
 
-### 7.3 Grace
+### 7.3 Schools already using the app
 
-Everything works as now. Home and the first screen show a banner:
-
-> Please register Locker Manager by 31 January 2027. It is free and takes two minutes. [Register] [I have a key]
-
-The banner can be closed. It comes back each time the app starts, and stays put in the last 14 days of the grace period.
-
-**The grace end date is one fixed date for everyone**, not 60 days from each school's first update. My recommendation is **31 January 2027**: it gives every existing school more than 60 days (allowing for the release around early November), and it falls after the summer holidays, when schools are not under the start-of-year locker rush. Section 12 asks Dave to confirm it. A fixed date is easier to say in the banner, the website and the release notes, and easier to test.
-
-How a copy knows it qualifies:
-
-- **The computer ran an older version.** `preferences.json` holds `lastStartedVersion`. If it shows a version older than the registration release when the new version first starts, the computer is marked as an existing install (a new `registrationGrace` field). This must be read before the start-up recovery code overwrites `lastStartedVersion` (`src/main/recovery.ts`).
-- **The file was made by an older version.** Every data file holds `created_with_app_version` in `meta`. A file made by an older version qualifies. This covers a school that installs the app on a new computer during the grace period and opens its existing file.
-- **The file was made or edited during grace.** A copy in grace that edits or creates a file writes `registration_grace = 1` into the file's `meta`. A file carrying that mark also qualifies. Without it, a file a school creates in December with 0.13.0 would say "made by 0.13.0", and a new computer opening it would get no grace.
-
-`lastStartedVersion` has only existed since 0.8.0 (7 October 2026). A copy older than that looks like a new install, but the file rules above still give it grace when it opens the school's file.
+There is no grace period (Dave, 25 October 2026). When a school's computer updates to 0.13.0 and has no key, it is unregistered. It opens the school's file read-only, with the message in 7.4, until someone enters a key. Because Dave approves each registration by hand, a school can be look-only for up to a day. The release notes, the website and the in-app message say this plainly, and say how to register before updating.
 
 ### 7.4 Unregistered
 
@@ -257,25 +244,22 @@ SPEC.md says, in 1.2, "No cloud service, user accounts or sync server" and "No b
 1. **The check can be removed by anyone who can build the app.** Locker Manager is MIT-licensed and the source is public. A capable person can delete the check and build their own copy. Registration stops ordinary schools using the app without telling Dave. It does not stop someone determined. That is the right level for "make sure it's schools". It is not strong copy protection, and no design that keeps the source public can be.
 2. **Charging later and the MIT licence.** Versions already released under MIT stay MIT forever. Dave owns all the code, so he can choose a different licence for future versions if he decides to charge, for example a licence that lets schools read the code but not sell or rebuild it. That decision is not needed now. The key format already has room for plans and expiry dates.
 3. **Selling software to schools as a serving principal.** If Dave charges Victorian government schools, the Department of Education's conflict of interest and outside employment policies are likely to apply. Worth checking before any price is set. Free registration raises no such question.
-4. **The grace end date goes into the app.** Once released, changing it needs a new release. Pick a date Dave is comfortable with.
-5. **One key works in any copy.** If a school forwards its key to another school, the second school is registered too, and Dave would not hear about it. The key still shows the first school's name in About, so this is easy to spot if it matters. Tying a key to one school's file is possible later. It is left out now because a mismatch would lock out real schools.
+4. **One key works in any copy.** If a school forwards its key to another school, the second school is registered too, and Dave would not hear about it. The key still shows the first school's name in About, so this is easy to spot if it matters. Tying a key to one school's file is possible later. It is left out now because a mismatch would lock out real schools.
 
-## 12. Open questions for Dave
+## 12. Questions Dave answered (25 October 2026)
 
-1. Is **31 January 2027** right for the end of the grace period?
-2. Which email address should keys come from? Recommendation: a new address such as `lockermanager@dandsarmstrong.com` (a Google Workspace user or group), so school replies do not mix with Dave's main inbox. Using `dave@dandsarmstrong.com` directly also works and needs no new address. One thing to know: the service signs in to Gmail with an app password (a special password just for the service). That needs a real Google Workspace user with 2-Step Verification turned on, and the Workspace admin setting that allows app passwords. A Google group cannot sign in. So `lockermanager@dandsarmstrong.com` would need to be a user, which is one more Workspace licence (about A$11 a month on Business Starter). If that cost is unwelcome, send from `dave@` and set the Reply-To to the same address.
-3. Should the registration form ask for anything else, for example the school's state or number of lockers? Recommendation: add state (a drop-down) and leave out locker numbers. State costs the school one click and tells Dave where the app is spreading.
+1. Grace period: none.
+2. Keys are sent from `dave@dandsarmstrong.com`, using a Gmail app password for that account (2-Step Verification must be on and the Workspace admin setting must allow app passwords).
+3. The form asks for the school's state, as a drop-down: ACT, NSW, NT, QLD, SA, TAS, VIC, WA, Outside Australia.
 
 ## 13. Calls I made (Dave may change any of these)
 
 - One key per school, stored in the data file, rather than per computer.
-- After grace, unregistered copies open school files read-only rather than not at all.
+- Unregistered copies open school files read-only rather than not at all.
 - Two-step approval (link, then button) to stop email virus scanners approving by accident.
-- A fixed grace end date for everyone, rather than 60 days per school.
 - Firebase with Gmail app-password email, copying Hunt 1000, rather than a paid email service.
 - A separate `registration.key` file for IT, not a field in `managed.json`.
 - A key is not tied to one school's file, and a valid key already in a file or on a computer is never replaced (section 6.5).
-- Files edited or created during grace carry a grace mark, so new computers opening them also get grace.
 - "Open a backup…" needs a key, because it changes the school's file.
 - No key revocation in this build. A revocation list could later be a small file on the website that the app reads alongside its update check, sending nothing.
 - The release that adds registration is 0.13.0. It goes out like every other release: full release, update proof, no pre-release.
