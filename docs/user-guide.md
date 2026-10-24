@@ -98,7 +98,7 @@ file but cannot change it until the key arrives.
 ### Register your school
 
 1. Open Locker Manager and click **Register this school**. You can also click **Help**,
-   then **Registration**.
+   then **Registration…**.
 2. Type your name, your school, your email address and your school's state. Your role is
    optional.
 3. Tick the box to agree to the privacy note, then click **Send**.
@@ -129,7 +129,7 @@ A copy with no key still lets you:
 
 It does not let you change the school's file, show, print or export codes, make a new
 file, make a practice copy, rebuild a file from an export, or use **Open a backup…**. The
-banner at the top says **This copy is not registered**, with buttons to register or enter
+banner at the top says this copy is not registered, with buttons to register or enter
 a key. Once the key is entered, everything works again. Nothing is lost while you wait.
 
 ### What is sent, and what is not
