@@ -374,4 +374,9 @@ describe('the school profile', () => {
     setTerms(d, testContext(), nsw.terms)
     expect(getTerms(d).group).toEqual({ one: 'Roll class', many: 'Roll classes' })
   })
+  it('falls back to the usual words when the stored terminology is damaged', async () => {
+    const d = await db()
+    d.run("UPDATE school SET terminology = '{not json'")
+    expect(getTerms(d).group.one).toBe('Homeroom')
+  })
 })

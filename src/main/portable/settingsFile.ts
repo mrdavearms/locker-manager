@@ -50,7 +50,13 @@ export function exportSettings(db: LockerDb, appVersion: string, now: Date): Set
   const settings: Partial<Record<(typeof SHARED_KEYS)[number], unknown>> = {}
   for (const key of SHARED_KEYS) {
     const row = db.get<{ value: string }>('SELECT value FROM settings WHERE key = $k', { $k: key })
-    if (row) settings[key] = JSON.parse(row.value)
+    if (!row) continue
+    // A damaged setting is left out rather than stopping the whole export.
+    try {
+      settings[key] = JSON.parse(row.value)
+    } catch {
+      continue
+    }
   }
   const images = db
     .all<{

@@ -47,4 +47,13 @@ describe('settings file (SPEC.md 7)', () => {
     expect(know.imageId).not.toBe(pic)
     expect(() => parseSettingsFile('{"format":"other"}')).toThrow(/not a Locker Manager/)
   })
+
+  it('leaves out a damaged setting instead of failing the export', async () => {
+    const ctx = testContext()
+    const a = await createDemoDatabase(ctx, '0.8.0')
+    setCodeRules(a, ctx, { ...codeRules(a), length: 5 })
+    a.run("UPDATE settings SET value = '{not json' WHERE key = 'codes.rules'")
+    const file = exportSettings(a, '0.8.0', new Date())
+    expect(file.settings['codes.rules']).toBeUndefined()
+  })
 })

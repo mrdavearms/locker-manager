@@ -171,7 +171,12 @@ export function setLogos(
 }
 
 export function getTerms(db: LockerDb): Terminology {
-  return resolveTerms(JSON.parse(row(db).terminology || '{}'))
+  // Every screen reads these words; a damaged value must not stop them all.
+  try {
+    return resolveTerms(JSON.parse(row(db).terminology || '{}'))
+  } catch {
+    return resolveTerms({})
+  }
 }
 
 export function setTerms(db: LockerDb, ctx: OperatorContext, terms: Terminology): void {
