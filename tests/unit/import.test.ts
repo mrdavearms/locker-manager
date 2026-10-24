@@ -106,6 +106,26 @@ describe('parsing', () => {
       ])
     }
   })
+  it('a small file that declares a huge sheet is read quickly, within the row and column limits', async () => {
+    // Flat OpenDocument: one header row, then a row repeated a million times with a
+    // cell in the last column. Tiny on disk, about 17 billion cells as declared.
+    const fods = `<?xml version="1.0"?><office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:mimetype="application/vnd.oasis.opendocument.spreadsheet"><office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-row><table:table-cell office:value-type="string"><text:p>Student ID</text:p></table:table-cell></table:table-row><table:table-row table:number-rows-repeated="1048575"><table:table-cell table:number-columns-repeated="16383"/><table:table-cell office:value-type="string"><text:p>SYN</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document>`
+    const started = Date.now()
+    const f = await parseFile('SYNTHETIC.ods', new TextEncoder().encode(fods))
+    expect(Date.now() - started).toBeLessThan(10_000)
+    const rows = f.sheets[0]!.rows
+    expect(rows.length).toBeLessThanOrEqual(20_000)
+    expect(Math.max(...rows.map((r) => r.length))).toBeLessThanOrEqual(200)
+    expect(rows[0]).toEqual(['Student ID'])
+
+    const lines = await parseFile(
+      'SYNTHETIC.csv',
+      new TextEncoder().encode('a,b\n'.repeat(500_000))
+    )
+    expect(lines.sheets[0]!.rows).toHaveLength(20_000)
+    const wide = await parseFile('SYNTHETIC.csv', new TextEncoder().encode('x,'.repeat(5000)))
+    expect(wide.sheets[0]!.rows[0]!.length).toBeLessThanOrEqual(200)
+  })
   it('refuses a file type it cannot read, plainly', async () => {
     await expect(parseFile('photo.jpg', new Uint8Array([1, 2, 3]))).rejects.toThrow(
       /not a file Locker Manager can read/

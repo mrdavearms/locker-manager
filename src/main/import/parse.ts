@@ -18,12 +18,18 @@ export interface ParsedFile {
 }
 
 const MAX_ROWS = 20_000
+// No student export has anywhere near this many columns. Both limits are applied
+// while parsing, not after, so a small file that declares a huge sheet cannot make
+// the parsers build millions of empty cells.
+const MAX_COLS = 200
 
 function trimRows(rows: string[][]): string[][] {
-  const cleaned = rows.map((r) => r.map((c) => (c ?? '').toString().replace(/\r?\n/g, ' ').trim()))
+  const cleaned = rows
+    .slice(0, MAX_ROWS)
+    .map((r) => r.slice(0, MAX_COLS).map((c) => (c ?? '').toString().replace(/\r?\n/g, ' ').trim()))
   // Drop trailing empty rows and trailing empty cells.
   while (cleaned.length > 0 && cleaned[cleaned.length - 1]!.every((c) => c === '')) cleaned.pop()
-  return cleaned.slice(0, MAX_ROWS).map((r) => {
+  return cleaned.map((r) => {
     const out = [...r]
     while (out.length > 0 && out[out.length - 1] === '') out.pop()
     return out
@@ -33,7 +39,8 @@ function trimRows(rows: string[][]): string[][] {
 export function parseDelimited(text: string): string[][] {
   const result = Papa.parse<string[]>(text.replace(/^\uFEFF/, ''), {
     delimitersToGuess: [',', ';', '\t', '|'],
-    skipEmptyLines: false
+    skipEmptyLines: false,
+    preview: MAX_ROWS
   })
   return trimRows(result.data)
 }
@@ -46,10 +53,13 @@ async function parseXlsx(bytes: Uint8Array): Promise<ParsedSheet[]> {
   const sheets: ParsedSheet[] = []
   wb.eachSheet((ws) => {
     const rows: string[][] = []
-    ws.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    // Empty rows and cells are left as gaps and filled below, so a far-away cell
+    // does not make ExcelJS create every row and cell before it.
+    ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber > MAX_ROWS) return
       const cells: string[] = []
-      row.eachCell({ includeEmpty: true }, (cell, col) => {
-        cells[col - 1] = cell.text ?? ''
+      row.eachCell({ includeEmpty: false }, (cell, col) => {
+        if (col <= MAX_COLS) cells[col - 1] = cell.text ?? ''
       })
       rows[rowNumber - 1] = Array.from(cells, (c) => c ?? '')
     })
@@ -59,9 +69,22 @@ async function parseXlsx(bytes: Uint8Array): Promise<ParsedSheet[]> {
 }
 
 function parseWithSheetJs(bytes: Uint8Array): ParsedSheet[] {
-  const wb = XLSX.read(bytes, { type: 'array', cellDates: false, cellText: true })
+  // sheetRows also makes SheetJS use the cells actually present, not the size the
+  // file declares.
+  const wb = XLSX.read(bytes, {
+    type: 'array',
+    cellDates: false,
+    cellText: true,
+    sheetRows: MAX_ROWS
+  })
   return wb.SheetNames.map((name) => {
     const ws = wb.Sheets[name]
+    if (ws?.['!ref']) {
+      const range = XLSX.utils.decode_range(ws['!ref'])
+      range.e.c = Math.min(range.e.c, range.s.c + MAX_COLS - 1)
+      range.e.r = Math.min(range.e.r, range.s.r + MAX_ROWS - 1)
+      ws['!ref'] = XLSX.utils.encode_range(range)
+    }
     const rows = ws
       ? (XLSX.utils.sheet_to_json<string[]>(ws, {
           header: 1,

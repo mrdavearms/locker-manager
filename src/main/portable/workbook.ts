@@ -216,7 +216,9 @@ function sheetRows(ws: ExcelJS.Worksheet): (string | number | null)[][] {
   const out: (string | number | null)[][] = []
   ws.eachRow({ includeEmpty: false }, (row) => {
     const values: (string | number | null)[] = []
-    const n = ws.columnCount
+    // This row's own cells, not the widest row's: one far-right cell must not make
+    // every row that wide.
+    const n = Math.min(ws.columnCount, row.cellCount)
     for (let i = 1; i <= n; i++) values.push(cellValue(row.getCell(i).value))
     out.push(values)
   })
