@@ -273,7 +273,7 @@ the default file appears on the Welcome screen; the demo school is simply not of
 | `requirePinForCodes` | `true` means codes cannot be shown, printed or exported until a PIN is set for the file and entered. The PIN cannot then be removed. |
 
 A file that is not valid JSON, or has an unknown key or a wrong value, is ignored as a
-whole, and Settings, This computer, says why. The file is read when the app starts.
+whole, and Settings, This computer, says why. The app reads the file each time it checks registration, so there is no need to restart it: a key put there while the app is running takes effect the next time a school file is opened.
 
 ## Registration
 
