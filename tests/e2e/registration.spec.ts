@@ -186,6 +186,9 @@ test('Send, the website form and the email say so when they fail', async () => {
   })
   const p = l.page
   await p.getByTestId('register-button').click()
+  await expect(p.getByTestId('registration-dialog')).toContainText(
+    "We collect your name, school, email, state and role to send your registration key and to contact your school about Locker Manager. It is kept on Google Cloud in Sydney and in Dave Armstrong's email, seen only by Dave Armstrong, and never shared. Email dave@dandsarmstrong.com to have it removed."
+  )
   await p.locator('#reg-name').fill('Pat Example')
   await p.locator('#reg-school').fill('Example Secondary College')
   await p.locator('#reg-email').fill('pat@example.edu.au')

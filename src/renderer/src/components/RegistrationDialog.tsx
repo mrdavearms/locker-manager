@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { brand } from '@shared/brand'
 import type { RegistrationView } from '@shared/ipc'
 import {
+  REGISTRATION_EMAIL,
   RegistrationFormSchema,
   type RegistrationForm,
   type SendResult
@@ -32,7 +33,7 @@ const STATES: RegistrationForm['state'][] = [
   'Outside Australia'
 ]
 
-const PRIVACY_NOTE = `We collect your name, school, email and role to send your registration key and to contact your school about ${brand.name}. It is stored on Google Cloud in Sydney, seen only by Dave Armstrong, and never shared. Email dave@dandsarmstrong.com to have it removed.`
+const PRIVACY_NOTE = `We collect your name, school, email, state and role to send your registration key and to contact your school about ${brand.name}. It is kept on Google Cloud in Sydney and in Dave Armstrong's email, seen only by Dave Armstrong, and never shared. Email ${REGISTRATION_EMAIL} to have it removed.`
 
 /** Shown when a request to main fails outright, so the form is never left stuck or silent. */
 const SOMETHING_WRONG = `Something went wrong. Try again, or close ${brand.name} and open it again.`
