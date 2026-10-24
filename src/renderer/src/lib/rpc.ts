@@ -24,13 +24,20 @@ export function useRpc<M extends RpcMethod>(
   const key = JSON.stringify(params)
   useEffect(() => {
     let cancelled = false
-    void window.api.rpc(method, JSON.parse(key) as RpcParams<M>).then((r) => {
-      if (cancelled) return
-      if (r.ok) {
-        setData(r.value)
-        setError(null)
-      } else setError(r.message)
-    })
+    window.api.rpc(method, JSON.parse(key) as RpcParams<M>).then(
+      (r) => {
+        if (cancelled) return
+        if (r.ok) {
+          setData(r.value)
+          setError(null)
+        } else setError(r.message)
+      },
+      // The request itself failed (not a plain "no" from the file): say so rather
+      // than leaving the screen empty with no message.
+      (e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+      }
+    )
     return () => {
       cancelled = true
     }

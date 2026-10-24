@@ -84,13 +84,18 @@ export function LettersScreen({ onDesign }: { onDesign: () => void }): React.JSX
     let cancelled = false
     const [sel, lg, i] = [...(JSON.parse(key) as [LetterSelection | null, LetterLanguage]), index]
     if (!sel) return
-    void window.api.rpc('letters.preview', { selection: sel, language: lg, index: i }).then((r) => {
-      if (cancelled) return
-      if (r.ok) {
-        setPreview(r.value)
-        setProblem(null)
-      } else setProblem(r.message)
-    })
+    window.api.rpc('letters.preview', { selection: sel, language: lg, index: i }).then(
+      (r) => {
+        if (cancelled) return
+        if (r.ok) {
+          setPreview(r.value)
+          setProblem(null)
+        } else setProblem(r.message)
+      },
+      (e: unknown) => {
+        if (!cancelled) setProblem(e instanceof Error ? e.message : String(e))
+      }
+    )
     return () => {
       cancelled = true
     }

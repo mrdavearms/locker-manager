@@ -331,14 +331,22 @@ const SEVERITY_ICON = { error: AlertTriangle, warning: AlertTriangle, info: Info
 
 function CheckStep({
   analysis,
+  problem,
   options,
   onOptions
 }: {
   analysis: ImportAnalysis | null
+  problem: string | null
   options: ImportOptions
   onOptions: (o: ImportOptions) => void
 }): React.JSX.Element {
   const terms = useTerms()
+  if (!analysis && problem)
+    return (
+      <SectionCard title="The file could not be checked">
+        {problem} Go back and check the columns, or choose the file again.
+      </SectionCard>
+    )
   if (!analysis) return <SectionCard title="Checking…">Reading every row…</SectionCard>
   const errors = analysis.problems.filter((p) => p.severity === 'error')
   const warnings = analysis.problems.filter((p) => p.severity === 'warning')
@@ -665,6 +673,7 @@ export function ImportWizard({
     wholeSchool: false
   })
   const [analysis, setAnalysis] = useState<ImportAnalysis | null>(null)
+  const [analyseProblem, setAnalyseProblem] = useState<string | null>(null)
   const [sel, setSel] = useState({
     add: new Set<string>(),
     update: new Set<string>(),
@@ -681,9 +690,14 @@ export function ImportWizard({
   useEffect(() => {
     if (!importId || (step !== 'check' && step !== 'compare')) return
     let cancelled = false
-    void window.api.rpc('import.analyse', { importId, files: settings, options }).then((r) => {
-      if (cancelled) return
-      if (r.ok) {
+    window.api.rpc('import.analyse', { importId, files: settings, options }).then(
+      (r) => {
+        if (cancelled) return
+        if (!r.ok) {
+          setAnalyseProblem(r.message)
+          return
+        }
+        setAnalyseProblem(null)
         setAnalysis(r.value)
         if (step === 'check') {
           setSel({
@@ -699,8 +713,11 @@ export function ImportWizard({
             markMissing: new Set(r.value.leavers.map((l) => l.studentId))
           })
         }
+      },
+      (e: unknown) => {
+        if (!cancelled) setAnalyseProblem(e instanceof Error ? e.message : String(e))
       }
-    })
+    )
     return () => {
       cancelled = true
     }
@@ -790,7 +807,12 @@ export function ImportWizard({
         <ColumnsStep previews={previews} settings={settings} onChange={setSettings} />
       )}
       {step === 'check' && (
-        <CheckStep analysis={analysis} options={options} onOptions={setOptions} />
+        <CheckStep
+          analysis={analysis}
+          problem={analyseProblem}
+          options={options}
+          onOptions={setOptions}
+        />
       )}
       {step === 'compare' && analysis && (
         <CompareStep analysis={analysis} sel={sel} onSel={setSel} />

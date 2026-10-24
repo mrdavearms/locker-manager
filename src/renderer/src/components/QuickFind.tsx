@@ -30,14 +30,19 @@ export function QuickFind({
   useEffect(() => {
     let cancelled = false
     if (q.trim() === '') return
-    void window.api.rpc('search.quick', { q }).then((r) => {
-      if (cancelled) return
-      if (r.ok) {
-        setResults(r.value)
-        setActive(0)
+    window.api.rpc('search.quick', { q }).then(
+      (r) => {
+        if (cancelled) return
+        if (r.ok) {
+          setResults(r.value)
+          setActive(0)
+        }
+        setAnswered(q)
+      },
+      () => {
+        if (!cancelled) setAnswered(q)
       }
-      setAnswered(q)
-    })
+    )
     return () => {
       cancelled = true
     }
