@@ -14,6 +14,13 @@ files:
   - package.json
   - '!**/*.map'
   - '!out/notices/**'
+  # sql.js ships about 22 MB of builds the app never loads. It needs only
+  # sql-wasm.js and sql-wasm.wasm (the package's "main" and the file beside it).
+  - '!node_modules/sql.js/dist/sql-asm*'
+  - '!node_modules/sql.js/dist/worker.*'
+  - '!node_modules/sql.js/dist/*-debug.*'
+  - '!node_modules/sql.js/dist/*-browser*'
+  - '!node_modules/sql.js/dist/*.zip'
 asar: true
 extraResources:
   - from: resources/fonts
