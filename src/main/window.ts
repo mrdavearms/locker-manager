@@ -5,7 +5,11 @@ import { brand } from '@shared/brand'
 import { isAllowedExternalUrl } from '@shared/externalUrls'
 import { watchForHang } from './hangWatch'
 
-const isDev = !!process.env['ELECTRON_RENDERER_URL']
+// The development server's address, from electron-vite. An installed copy never
+// loads its window from an address in the environment (security audit run-1).
+const devRendererUrl = (): string | undefined =>
+  app.isPackaged ? undefined : process.env['ELECTRON_RENDERER_URL']
+const isDev = !!devRendererUrl()
 
 // The end-to-end tests start the app dozens of times. With this set, the window
 // opens without taking focus from whoever is using the computer, and on a Mac
@@ -136,7 +140,7 @@ export function createMainWindow(): BrowserWindow {
   })
   win.webContents.on('will-navigate', (event) => event.preventDefault())
 
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL']
+  const rendererUrl = devRendererUrl()
   if (rendererUrl) {
     void win.loadURL(rendererUrl)
   } else {
