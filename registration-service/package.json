@@ -1,0 +1,27 @@
+{
+  "name": "locker-manager-registration-service",
+  "description": "Receives Locker Manager registrations, emails Dave, and emails signed keys once he approves them.",
+  "private": true,
+  "license": "MIT",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run typecheck && vitest run"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0",
+    "nodemailer": "^8.0.11",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/nodemailer": "^8.0.2",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

@@ -13,6 +13,8 @@ files:
   - out/**
   - package.json
   - '!**/*.map'
+  # The registration service runs on Google Cloud, never inside the app.
+  - '!registration-service/**'
   - '!out/notices/**'
   # sql.js ships about 22 MB of builds the app never loads. It needs only
   # sql-wasm.js and sql-wasm.wasm (the package's "main" and the file beside it).

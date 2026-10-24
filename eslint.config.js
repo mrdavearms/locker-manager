@@ -13,7 +13,9 @@ export default tseslint.config(
       'node_modules',
       'coverage',
       'playwright-report',
-      'test-results'
+      'test-results',
+      // The registration service has its own package, tsconfig and tests.
+      'registration-service'
     ]
   },
   js.configs.recommended,

@@ -37,6 +37,7 @@
     "proof:mac": "npm run dist:dir && bash scripts/update-proof/onward-mac.sh --two-updates",
     "check:no-student-data": "node scripts/check-no-student-data.mjs",
     "verify:release-assets": "node scripts/verify-release-assets.mjs",
+    "registration:sync-key-format": "node scripts/sync-registration-copy.mjs",
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {

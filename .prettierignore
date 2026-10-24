@@ -5,6 +5,8 @@ release
 coverage
 test-results
 playwright-report
+# Its own package; src/copied/ must stay byte-for-byte the app's files.
+registration-service
 package-lock.json
 tests/golden
 tests/fixtures
