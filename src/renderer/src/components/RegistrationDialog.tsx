@@ -33,7 +33,7 @@ const STATES: RegistrationForm['state'][] = [
   'Outside Australia'
 ]
 
-const PRIVACY_NOTE = `We collect your name, school, email, state, role and any notes you add to send your registration key and to contact your school about ${brand.name}. It is kept on Google Cloud in Sydney and in Dave Armstrong's email, seen only by Dave Armstrong, and never shared. Email ${REGISTRATION_EMAIL} to have it removed.`
+const PRIVACY_NOTE = `Your details are used only to send your key and to contact your school about ${brand.name}. They're stored in Sydney, seen only by Dave Armstrong, and never shared. Email ${REGISTRATION_EMAIL} to have them removed.`
 
 /** Shown when a request to main fails outright, so the form is never left stuck or silent. */
 const SOMETHING_WRONG = `Something went wrong. Try again, or close ${brand.name} and open it again.`
@@ -55,7 +55,7 @@ export function RegistrationDialog({
       open={tab !== null}
       onOpenChange={(o) => !o && onClose()}
       title={`Register ${brand.name}`}
-      description={`In most circumstances, ${brand.name} is free for schools. Register once and every computer that opens your school's file is covered.`}
+      description={`In most circumstances, ${brand.name} is free for schools, and registering costs nothing. Most schools are approved the same day, and the key comes by email. Register once and every computer that opens your school's file is covered.`}
       testId="registration-dialog"
     >
       {view?.state === 'registered' && view.enforced && (
@@ -169,7 +169,7 @@ function KeyForm({
           Cancel
         </Button>
         <Button type="submit" data-testid="key-submit" disabled={busy || key.trim() === ''}>
-          Register
+          Use this key
         </Button>
       </div>
     </form>
@@ -251,8 +251,8 @@ function RegisterForm({
     return (
       <div>
         <p className="font-semibold" role="status" data-testid="send-done">
-          Thanks. Dave Armstrong checks each registration by hand, usually within a day. Your key
-          will come to {sent.email}.
+          Thanks. Most schools have their key within a day, often within a few hours. It will come
+          to {sent.email}. Until then you can look at your school's file and try the demo school.
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="secondary" onClick={onHaveKey}>
@@ -272,31 +272,34 @@ function RegisterForm({
         e.preventDefault()
         void submit()
       }}
-      className="space-y-4"
+      className="space-y-3"
     >
-      <p className="text-sm font-semibold" data-testid="free-wording">
-        Registering costs nothing.
-      </p>
-      <Field label="Your name" htmlFor="reg-name">
-        <TextInput
-          id="reg-name"
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={100}
-          autoComplete="name"
-        />
-      </Field>
-      <Field label="Your school" htmlFor="reg-school">
-        <TextInput
-          id="reg-school"
-          value={school}
-          onChange={(e) => setSchool(e.target.value)}
-          maxLength={150}
-          autoComplete="organization"
-        />
-      </Field>
-      <Field label="Your email" htmlFor="reg-email" hint="Your key will be sent here.">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Your name" htmlFor="reg-name">
+          <TextInput
+            id="reg-name"
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={100}
+            autoComplete="name"
+          />
+        </Field>
+        <Field label="Your school" htmlFor="reg-school">
+          <TextInput
+            id="reg-school"
+            value={school}
+            onChange={(e) => setSchool(e.target.value)}
+            maxLength={150}
+            autoComplete="organization"
+          />
+        </Field>
+      </div>
+      <Field
+        label="Your email"
+        htmlFor="reg-email"
+        hint="Use your school email address. It helps us confirm your school quickly."
+      >
         <TextInput
           id="reg-email"
           type="email"
@@ -306,33 +309,39 @@ function RegisterForm({
           autoComplete="email"
         />
       </Field>
-      <Field label="State" htmlFor="reg-state">
-        <Select id="reg-state" value={state} onChange={(e) => setState(e.target.value)}>
-          <option value="">Choose…</option>
-          {STATES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Your role (optional)" htmlFor="reg-role" hint="For example, Business manager.">
-        <TextInput
-          id="reg-role"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          maxLength={100}
-          autoComplete="organization-title"
-        />
-      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="State" htmlFor="reg-state">
+          <Select id="reg-state" value={state} onChange={(e) => setState(e.target.value)}>
+            <option value="">Choose…</option>
+            {STATES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field
+          label="Your role (optional)"
+          htmlFor="reg-role"
+          hint="For example, Business manager."
+        >
+          <TextInput
+            id="reg-role"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            maxLength={100}
+            autoComplete="organization-title"
+          />
+        </Field>
+      </div>
       <Field
         label="Notes (optional)"
         htmlFor="reg-notes"
-        hint="Anything you'd like Dave to know, for example how your school plans to use Locker Manager."
+        hint={`Anything you'd like Dave Armstrong, who makes ${brand.name}, to know. For example, how your school plans to use it.`}
       >
         <textarea
           id="reg-notes"
-          rows={3}
+          rows={2}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           maxLength={1000}
@@ -384,7 +393,8 @@ function RegisterForm({
           {error}
         </p>
       )}
-      <div className="flex justify-end gap-2 pt-2">
+      {/* Kept in view at the bottom of the pop-up, so Send never needs a scroll to find. */}
+      <div className="sticky -bottom-7 -mx-7 -mb-7 flex justify-end gap-2 border-t border-line bg-surface px-7 py-4">
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>

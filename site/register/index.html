@@ -268,6 +268,7 @@
           </p>
           <p class="lead">
             In most circumstances, Locker Manager is free for schools. Registering costs nothing.
+            Most schools are approved the same day.
           </p>
         </div>
 
@@ -279,7 +280,17 @@
           <input id="school" name="school" type="text" autocomplete="organization" required />
 
           <label for="email">Email</label>
-          <input id="email" name="email" type="email" autocomplete="email" required />
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            aria-describedby="email-hint"
+            required
+          />
+          <p class="hint" id="email-hint">
+            Use your school email address. It helps us confirm your school quickly.
+          </p>
 
           <label for="state">State or territory</label>
           <select id="state" name="state" required>
@@ -307,8 +318,8 @@
             maxlength="1000"
           ></textarea>
           <p class="hint" id="notes-hint">
-            Anything you'd like Dave to know, for example how your school plans to use Locker
-            Manager.
+            Anything you'd like Dave Armstrong, who makes Locker Manager, to know. For example, how
+            your school plans to use it.
           </p>
 
           <div class="hp" aria-hidden="true">
@@ -322,10 +333,9 @@
           </label>
 
           <p class="note" id="privacy">
-            We collect your name, school, email, state, role and any notes you add to send your
-            registration key and to contact your school about Locker Manager. It is kept on Google
-            Cloud in Sydney and in Dave Armstrong's email, seen only by Dave Armstrong, and never
-            shared. Email dave@dandsarmstrong.com to have it removed.
+            Your details are used only to send your key and to contact your school about Locker
+            Manager. They're stored in Sydney, seen only by Dave Armstrong, and never shared. Email
+            dave@dandsarmstrong.com to have them removed.
           </p>
 
           <button class="submit" type="submit" id="send">Register</button>
@@ -449,7 +459,7 @@
               show('ok', function (box) {
                 paragraph(
                   box,
-                  'Thanks. Dave Armstrong checks each registration by hand, usually within a day. Your key will come to ' +
+                  'Thanks. Most schools have their key within a day, often within a few hours. It will come to ' +
                     f.email +
                     '.'
                 )

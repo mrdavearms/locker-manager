@@ -91,8 +91,8 @@ menu) gives the same details, with the time of the build.
 From version 0.13.0, each school registers Locker Manager once. It is free. Registration
 lets Dave Armstrong, who makes Locker Manager, know which schools use it.
 
-**Register before you update, if you can.** Dave checks each registration by hand and
-usually replies within a day. An updated copy that has no key can look at your school's
+**Register before you update, if you can.** Most schools are approved the same day, and
+nearly always within a day. An updated copy that has no key can look at your school's
 file but cannot change it until the key arrives.
 
 ### Register your school
@@ -103,7 +103,7 @@ file but cannot change it until the key arrives.
    notes are optional.
 3. Tick the box to agree to the privacy note, then click **Send**.
 4. Wait for the email with your key. It comes from dave@dandsarmstrong.com.
-5. Click **I have a key**, paste the key, and click **Register**. The app checks it
+5. Click **I have a key**, paste the key, and click **Use this key**. The app checks it
    straight away and says **Registered to** your school's name.
 
 If Locker Manager cannot send the form (for example, your school's network blocks it), it
