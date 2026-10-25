@@ -10,7 +10,7 @@ import {
 import { cn } from '@renderer/lib/cn'
 import type { RegistrationTab } from '@renderer/lib/registration'
 import { Button } from './Button'
-import { Field, Select, TextInput } from './Field'
+import { Field, Select, TextInput, inputClass } from './Field'
 import { Modal } from './Modal'
 
 interface Props {
@@ -33,7 +33,7 @@ const STATES: RegistrationForm['state'][] = [
   'Outside Australia'
 ]
 
-const PRIVACY_NOTE = `We collect your name, school, email, state and role to send your registration key and to contact your school about ${brand.name}. It is kept on Google Cloud in Sydney and in Dave Armstrong's email, seen only by Dave Armstrong, and never shared. Email ${REGISTRATION_EMAIL} to have it removed.`
+const PRIVACY_NOTE = `We collect your name, school, email, state, role and any notes you add to send your registration key and to contact your school about ${brand.name}. It is kept on Google Cloud in Sydney and in Dave Armstrong's email, seen only by Dave Armstrong, and never shared. Email ${REGISTRATION_EMAIL} to have it removed.`
 
 /** Shown when a request to main fails outright, so the form is never left stuck or silent. */
 const SOMETHING_WRONG = `Something went wrong. Try again, or close ${brand.name} and open it again.`
@@ -182,6 +182,7 @@ const PROBLEMS: Record<string, string> = {
   email: 'Type your email address, for example name@school.edu.au.',
   state: 'Choose your state.',
   role: 'Make your role shorter.',
+  notes: 'Make your notes shorter (up to 1000 characters).',
   privacyAgreed: 'Tick the box to agree to the privacy note.'
 }
 
@@ -197,6 +198,7 @@ function RegisterForm({
   const [email, setEmail] = useState('')
   const [state, setState] = useState('')
   const [role, setRole] = useState('')
+  const [notes, setNotes] = useState('')
   const [agreed, setAgreed] = useState(false)
   const [problems, setProblems] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
@@ -210,6 +212,7 @@ function RegisterForm({
       email,
       state,
       ...(role.trim() ? { role } : {}),
+      ...(notes.trim() ? { notes } : {}),
       privacyAgreed: agreed
     })
     if (!parsed.success) {
@@ -271,6 +274,9 @@ function RegisterForm({
       }}
       className="space-y-4"
     >
+      <p className="text-sm font-semibold" data-testid="free-wording">
+        In most circumstances, {brand.name} is free for schools. Registering costs nothing.
+      </p>
       <Field label="Your name" htmlFor="reg-name">
         <TextInput
           id="reg-name"
@@ -317,6 +323,20 @@ function RegisterForm({
           onChange={(e) => setRole(e.target.value)}
           maxLength={100}
           autoComplete="organization-title"
+        />
+      </Field>
+      <Field
+        label="Notes (optional)"
+        htmlFor="reg-notes"
+        hint="Anything you'd like Dave to know, for example how your school plans to use Locker Manager."
+      >
+        <textarea
+          id="reg-notes"
+          rows={3}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          maxLength={1000}
+          className={cn(inputClass, 'h-auto py-2.5 leading-relaxed')}
         />
       </Field>
       <label className="flex items-start gap-3 rounded-2xl bg-surface-muted p-4 text-sm">

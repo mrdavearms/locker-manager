@@ -33,6 +33,7 @@ export const RegistrationFormSchema = z.object({
   email: z.string().trim().email().max(200),
   state: z.enum(['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA', 'Outside Australia']),
   role: z.string().trim().max(100).optional(),
+  notes: z.string().trim().max(1000).optional(),
   privacyAgreed: z.literal(true)
 })
 export type RegistrationForm = z.infer<typeof RegistrationFormSchema>

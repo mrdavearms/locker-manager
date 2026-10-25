@@ -99,8 +99,8 @@ file but cannot change it until the key arrives.
 
 1. Open Locker Manager and click **Register this school**. You can also click **Help**,
    then **Registration…**.
-2. Type your name, your school, your email address and your school's state. Your role is
-   optional.
+2. Type your name, your school, your email address and your school's state. Your role and any
+   notes are optional.
 3. Tick the box to agree to the privacy note, then click **Send**.
 4. Wait for the email with your key. It comes from dave@dandsarmstrong.com.
 5. Click **I have a key**, paste the key, and click **Register**. The app checks it
@@ -134,8 +134,8 @@ a key. Once the key is entered, everything works again. Nothing is lost while yo
 
 ### What is sent, and what is not
 
-When you click **Send**, Locker Manager sends your name, school, email address, state and
-role to the registration service, once. Dave sees them and nobody else does.
+When you click **Send**, Locker Manager sends your name, school, email address, state,
+role and any notes you add to the registration service, once. Dave sees them and nobody else does.
 
 Nothing from your school's file is ever sent. No student names, no lockers, no codes. The
 app never sends anything to check a key. It checks the key on the computer, with no

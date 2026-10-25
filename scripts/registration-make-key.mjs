@@ -149,6 +149,7 @@ async function main() {
       email: args.email,
       state: 'Not given',
       role: null,
+      notes: null,
       source: 'manual',
       appVersion: null,
       ipHash: 'manual',

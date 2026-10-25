@@ -42,6 +42,7 @@ export function toDaveEmail(row: Registration, reviewLink: string): Email {
       `Email: ${row.email}`,
       `State: ${row.state}`,
       `Role: ${row.role ?? '(not given)'}`,
+      `Notes: ${row.notes ?? '(none)'}`,
       `Sent from: ${sentFrom(row)}`,
       '',
       'To approve or reject it, open this page and press a button there:',

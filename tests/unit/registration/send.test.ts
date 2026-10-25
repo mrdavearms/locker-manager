@@ -13,6 +13,7 @@ const form: RegistrationForm = {
   email: 'pat@example.edu.au',
   state: 'VIC',
   role: 'Assistant principal',
+  notes: 'We will use it for Year 7 lockers.',
   privacyAgreed: true
 }
 
@@ -119,6 +120,7 @@ describe('registrationMailto', () => {
         'Email: pat@example.edu.au',
         'State: VIC',
         'Role: Assistant principal',
+        'Notes: We will use it for Year 7 lockers.',
         'App version: 0.13.0'
       ].join('\n')
     )
@@ -129,6 +131,11 @@ describe('registrationMailto', () => {
   it('leaves out an empty role', () => {
     const m = registrationMailto({ ...form, role: '' }, '0.13.0')
     expect(decodeURIComponent(m)).not.toContain('Role:')
+  })
+
+  it('leaves out empty notes', () => {
+    const m = registrationMailto({ ...form, notes: '' }, '0.13.0')
+    expect(decodeURIComponent(m)).not.toContain('Notes:')
   })
 
   it('goes to the one registration address', () => {

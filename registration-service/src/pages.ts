@@ -71,6 +71,7 @@ function detailsTable(row: Registration): string {
     ['Email', row.email],
     ['State', row.state],
     ['Role', row.role ?? '(not given)'],
+    ['Notes', row.notes ?? '(none)'],
     ['Sent from', sentFrom(row)]
   ]
   return `<table>${lines.map(([k, v]) => `<tr><th>${k}</th><td>${e(v)}</td></tr>`).join('')}</table>`
@@ -158,6 +159,7 @@ export function listPage(rows: Registration[]): Page {
     'Email',
     'State',
     'Role',
+    'Notes',
     'Status',
     'Decided',
     'Sent from'
@@ -172,6 +174,8 @@ export function listPage(rows: Registration[]): Page {
         r.email,
         r.state,
         r.role ?? '',
+      r.notes ?? '',
+        r.notes ?? '',
         r.status,
         r.decidedAt ? longDate(r.decidedAt) : '',
         sentFrom(r)
@@ -213,6 +217,7 @@ export function listCsv(rows: Registration[]): string {
     'Email',
     'State',
     'Role',
+    'Notes',
     'Status',
     'Decided',
     'Sent from'
@@ -226,6 +231,7 @@ export function listCsv(rows: Registration[]): string {
       r.email,
       r.state,
       r.role ?? '',
+      r.notes ?? '',
       r.status,
       r.decidedAt ?? '',
       csvSource(r)

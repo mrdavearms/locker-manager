@@ -88,6 +88,7 @@ const good = {
   email: 'hsmith@example.vic.edu.au',
   state: 'VIC',
   role: 'Business manager',
+  notes: 'Year 7 lockers first.',
   privacyAgreed: true,
   source: 'app',
   appVersion: '0.13.0'
@@ -127,6 +128,7 @@ describe('register', () => {
       email: 'hsmith@example.vic.edu.au',
       state: 'VIC',
       role: 'Business manager',
+      notes: 'Year 7 lockers first.',
       source: 'app',
       appVersion: '0.13.0',
       ipHash: createHash('sha256').update('admin-token-for-tests:203.0.113.5').digest('hex'),
@@ -146,12 +148,14 @@ describe('register', () => {
       'Email: hsmith@example.vic.edu.au',
       'State: VIC',
       'Role: Business manager',
+      'Notes: Year 7 lockers first.',
       'Sent from: the app, version 0.13.0',
       `https://example.invalid/review?id=R-00001&token=${row?.reviewToken}`
     ])
       expect(toDave?.text).toContain(text)
     expect(toThem?.to).toBe('hsmith@example.vic.edu.au')
     expect(toThem?.subject).toBe("We've received your Locker Manager registration")
+    expect(toThem?.text).not.toContain('Year 7 lockers first.')
     expect(toThem?.text).toBe(
       "Thanks for registering with Locker Manager. Dave Armstrong checks each registration by hand, usually within a day. Your registration key will come to this address.\n\nIf you didn't register, you can ignore this email.\n\nDave Armstrong\n"
     )
@@ -173,10 +177,11 @@ describe('register', () => {
     await handleRegister(good, '203.0.113.5', deps)
     mailer.sent = []
     const { appVersion: _, ...fromSite } = good
-    await handleRegister({ ...fromSite, source: 'website', role: undefined }, '1.1.1.1', deps)
-    expect(await store.get('R-00002')).toMatchObject({ role: null, appVersion: null })
+    await handleRegister({ ...fromSite, source: 'website', role: undefined, notes: undefined }, '1.1.1.1', deps)
+    expect(await store.get('R-00002')).toMatchObject({ role: null, notes: null, appVersion: null })
     expect(mailer.sent[0]?.text).toContain('Sent from: the website')
     expect(mailer.sent[0]?.text).toContain('Role: (not given)')
+    expect(mailer.sent[0]?.text).toContain('Notes: (none)')
   })
 
   it('refuses a bad email and sends nothing', async () => {
@@ -254,6 +259,7 @@ async function fillToday(count: number): Promise<void> {
       email: 'filler@example.edu.au',
       state: 'VIC',
       role: null,
+      notes: null,
       source: 'website',
       appVersion: null,
       ipHash: `filler-${i}`,
@@ -341,16 +347,19 @@ describe('review', () => {
     const row = await registerOne({
       ...good,
       name: 'Bob "<b>" O\'Brien & Co',
-      school: '<script>alert(1)</script> College'
+      school: '<script>alert(1)</script> College',
+      notes: 'Note <script>alert(2)</script>'
     })
     const page = (await handleReview(row.id, row.reviewToken, deps)).html
     expect(page).not.toContain('<script>')
     expect(page).not.toContain('<b>')
     expect(page).toContain('&lt;script&gt;alert(1)&lt;/script&gt; College')
+    expect(page).toContain('Note &lt;script&gt;alert(2)&lt;/script&gt;')
     expect(page).toContain('Bob &quot;&lt;b&gt;&quot; O&#39;Brien &amp; Co')
     const list = await handleList('admin-token-for-tests', 'html', deps)
     expect(list.body).not.toContain('<script>')
     expect(list.body).toContain('&lt;script&gt;alert(1)&lt;/script&gt; College')
+    expect(list.body).toContain('Note &lt;script&gt;alert(2)&lt;/script&gt;')
   })
 })
 
@@ -521,7 +530,7 @@ describe('list', () => {
   it('gives a CSV with a header row and spreadsheet formulas made harmless', async () => {
     await registerOne()
     await handleRegister(
-      { ...good, name: '=HYPERLINK("x")', school: '+Plus School, "Quoted"', role: '-1' },
+      { ...good, name: '=HYPERLINK("x")', school: '+Plus School, "Quoted"', role: '-1', notes: '=cmd|calc' },
       '1.1.1.1',
       deps
     )
@@ -531,12 +540,13 @@ describe('list', () => {
     expect(res.contentType).toBe('text/csv; charset=utf-8')
     const lines = res.body.replace(/^﻿/, '').trimEnd().split('\r\n')
     expect(lines).toHaveLength(4)
-    expect(lines[0]).toBe('Number,Received,Name,School,Email,State,Role,Status,Decided,Sent from')
+    expect(lines[0]).toBe('Number,Received,Name,School,Email,State,Role,Notes,Status,Decided,Sent from')
     expect(lines[1]).toContain(`R-00003,`)
     expect(lines[1]).toContain(`'@Sum School`)
     expect(lines[2]).toContain(`"'=HYPERLINK(""x"")"`)
     expect(lines[2]).toContain(`"'+Plus School, ""Quoted"""`)
     expect(lines[2]).toContain(`'-1`)
+    expect(lines[2]).toContain(`'=cmd|calc`)
     expect(lines[3]).toContain('Example Secondary College')
     expect(res.body).not.toMatch(/[0-9a-f]{64}/)
     expect(res.body).not.toContain('203.0.113.5')

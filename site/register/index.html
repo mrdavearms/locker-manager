@@ -151,7 +151,8 @@
       }
       input[type='text'],
       input[type='email'],
-      select {
+      select,
+      textarea {
         width: 100%;
         font: inherit;
         color: var(--ink);
@@ -162,9 +163,18 @@
       }
       input:focus-visible,
       select:focus-visible,
+      textarea:focus-visible,
       button:focus-visible {
         outline: 3px solid var(--accent);
         outline-offset: 2px;
+      }
+      textarea {
+        resize: vertical;
+      }
+      .hint {
+        margin: 6px 0 0;
+        font-size: 14px;
+        color: var(--muted);
       }
       .hp {
         position: absolute;
@@ -256,6 +266,9 @@
             Fill this in once. We email you a registration key, and you paste it into Locker
             Manager.
           </p>
+          <p class="lead">
+            In most circumstances, Locker Manager is free for schools. Registering costs nothing.
+          </p>
         </div>
 
         <form class="card" id="form" novalidate>
@@ -285,6 +298,13 @@
           <label for="role">Your role <span class="optional">(optional)</span></label>
           <input id="role" name="role" type="text" autocomplete="organization-title" />
 
+          <label for="notes">Notes <span class="optional">(optional)</span></label>
+          <textarea id="notes" name="notes" rows="4" maxlength="1000"></textarea>
+          <p class="hint">
+            Anything you'd like Dave to know, for example how your school plans to use Locker
+            Manager.
+          </p>
+
           <div class="hp" aria-hidden="true">
             <label for="website">Leave this empty</label>
             <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
@@ -296,10 +316,10 @@
           </label>
 
           <p class="note" id="privacy">
-            We collect your name, school, email, state and role to send your registration key and to
-            contact your school about Locker Manager. It is kept on Google Cloud in Sydney and in
-            Dave Armstrong's email, seen only by Dave Armstrong, and never shared. Email
-            dave@dandsarmstrong.com to have it removed.
+            We collect your name, school, email, state, role and any notes you add to send your
+            registration key and to contact your school about Locker Manager. It is kept on Google
+            Cloud in Sydney and in Dave Armstrong's email, seen only by Dave Armstrong, and never
+            shared. Email dave@dandsarmstrong.com to have it removed.
           </p>
 
           <button class="submit" type="submit" id="send">Register</button>
@@ -351,6 +371,7 @@
           'State: ' + f.state
         ]
         if (f.role) lines.push('Role: ' + f.role)
+        if (f.notes) lines.push('Notes: ' + f.notes)
         return (
           'mailto:' +
           DAVE +
@@ -380,7 +401,8 @@
           school: value('school'),
           email: value('email'),
           state: document.getElementById('state').value,
-          role: value('role')
+          role: value('role'),
+          notes: value('notes')
         }
         var problem = null
         if (f.name.length < 2) problem = 'Please enter your name.'
@@ -407,6 +429,7 @@
           website: document.getElementById('website').value
         }
         if (f.role) payload.role = f.role
+        if (f.notes) payload.notes = f.notes
 
         button.disabled = true
         fetch(REGISTRATION_URL, {

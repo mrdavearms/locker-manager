@@ -22,6 +22,7 @@ export function registrationMailto(form: RegistrationForm, appVersion: string): 
     `Email: ${form.email}`,
     `State: ${form.state}`,
     ...(form.role ? [`Role: ${form.role}`] : []),
+    ...(form.notes ? [`Notes: ${form.notes}`] : []),
     `App version: ${appVersion}`
   ]
   const subject = encodeURIComponent('Locker Manager registration')

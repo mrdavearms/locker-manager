@@ -23,6 +23,8 @@ export interface Registration {
   email: string
   state: string
   role: string | null
+  /** Anything the registrant chose to add. Rows made before notes existed have none. */
+  notes: string | null
   /** 'manual' is a key Dave made by hand with `npm run registration:make-key`. */
   source: 'app' | 'website' | 'manual'
   appVersion: string | null
@@ -149,6 +151,7 @@ export async function handleRegister(
     email: form.email,
     state: form.state,
     role: form.role ? form.role : null,
+    notes: form.notes ? form.notes : null,
     source: form.source,
     appVersion: form.source === 'app' && form.appVersion ? form.appVersion : null,
     ipHash,

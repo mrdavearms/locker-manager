@@ -275,7 +275,7 @@ whole, and Settings, This computer, says why. The app reads the file each time i
 
 ## Registration
 
-From version 0.13.0, a school registers Locker Manager once. It is free. Someone from the school sends their name, school, email address, state and an optional role. Dave Armstrong approves each one by hand, usually within a day, and emails a registration key.
+From version 0.13.0, a school registers Locker Manager once. It is free. Someone from the school sends their name, school, email address, state, an optional role and optional notes. Dave Armstrong approves each one by hand, usually within a day, and emails a registration key.
 
 There is no grace period. A copy with no key opens the school's file read-only and cannot change it. It can still look up students and lockers, print lists and export without codes. The demo school and updates always work. If you can, register before updating a computer to 0.13.0.
 
