@@ -49,7 +49,7 @@ describe('the key IT puts on the computer', () => {
       '/Library/Application Support/Locker Manager/registration.key'
     )
     expect(registrationKeyPath('win32', true)).toBe(
-      join('C:\\ProgramData', 'Locker Manager', 'registration.key')
+      'C:\\ProgramData\\Locker Manager\\registration.key'
     )
   })
 })

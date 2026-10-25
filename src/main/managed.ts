@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join, posix, win32 } from 'node:path'
 import { ManagedSchema, type Managed } from '@shared/computer'
 
 // Managed settings for school IT (SPEC.md 9.5): one JSON file in a machine-wide
@@ -34,7 +34,9 @@ export function registrationKeyPath(
 ): string {
   if (!packaged && process.env.LOCKER_MANAGER_MANAGED_DIR)
     return join(process.env.LOCKER_MANAGER_MANAGED_DIR, 'registration.key')
-  return join(dirname(managedPath(platform, true)), 'registration.key')
+  // The target platform's path rules, so a Mac path stays a Mac path when tested on Windows.
+  const path = platform === 'win32' ? win32 : posix
+  return path.join(path.dirname(managedPath(platform, true)), 'registration.key')
 }
 
 /** The key IT supplied, or null when there is none or it cannot be read. */
