@@ -355,6 +355,11 @@ All data reads and writes from the window go through ONE channel, `rpc`:
 - e2e tests run with registration off unless `launchApp({ registration: 'enforce' })`. The
   e2e fixture is a demo file (meta `demo=1`), which never needs a key, so registration tests
   set demo to `'0'` (see `placeSchoolFile` in tests/e2e/registration.spec.ts).
+- `npm run registration:make-key` calls the real `gcloud`, which hits the dave@ re-sign-in
+  problem (global CLAUDE.md). Run it with the ADC token: put
+  `command gcloud auth application-default print-access-token` in a temp file and set
+  `CLOUDSDK_AUTH_ACCESS_TOKEN_FILE` to it and `GOOGLE_CLOUD_QUOTA_PROJECT=locker-manager-reg`.
+  Worked 25 Oct 2026 (R-00003, a test key).
 
 - **Electron's fs treats a `.asar` file as a folder.** A recursive `rm` of a folder holding a
   downloaded app fails with ENOTEMPTY. 0.11.0 to 0.11.3 hit this on `pending-update`, so
