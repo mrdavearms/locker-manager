@@ -31,7 +31,8 @@ test('a window whose code crashes reloads by itself', async () => {
             'document.querySelector("h1")?.textContent ?? null'
           )) as string | null
         }),
-      { timeout: 20_000 }
+      // Slow Windows runners need longer to restart a crashed window.
+      { timeout: 45_000 }
     )
     .toContain('Every locker, every code')
   await close()

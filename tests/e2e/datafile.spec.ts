@@ -247,7 +247,8 @@ test('a backup can be previewed and restored', async () => {
   await expect(l.page.getByTestId('backup-preview')).toContainText('Renamed the school')
   await l.page.getByRole('button', { name: 'Restore this backup…' }).click()
   await l.page.getByRole('button', { name: 'Yes, restore it' }).click()
-  await expect(dialog).toBeHidden()
+  // Restoring keeps a backup first; slow Windows runners took over 5 seconds.
+  await expect(dialog).toBeHidden({ timeout: 30_000 })
   await expect(l.page.getByTestId('school-name')).toHaveText('Demo Secondary College')
   await l.close()
 })
