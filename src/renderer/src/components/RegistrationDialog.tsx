@@ -55,7 +55,7 @@ export function RegistrationDialog({
       open={tab !== null}
       onOpenChange={(o) => !o && onClose()}
       title={`Register ${brand.name}`}
-      description={`${brand.name} is free for schools. Register once and every computer that opens your school's file is covered.`}
+      description={`In most circumstances, ${brand.name} is free for schools. Register once and every computer that opens your school's file is covered.`}
       testId="registration-dialog"
     >
       {view?.state === 'registered' && view.enforced && (
@@ -275,7 +275,7 @@ function RegisterForm({
       className="space-y-4"
     >
       <p className="text-sm font-semibold" data-testid="free-wording">
-        In most circumstances, {brand.name} is free for schools. Registering costs nothing.
+        Registering costs nothing.
       </p>
       <Field label="Your name" htmlFor="reg-name">
         <TextInput

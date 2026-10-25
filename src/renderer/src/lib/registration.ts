@@ -25,7 +25,7 @@ export function registerHeading(appName: string): string {
 }
 
 export function registerBlurb(appName: string, demoAllowed: boolean): string {
-  const start = `${appName} is free for schools. Register once and every computer that opens your school's file is covered.`
+  const start = `In most circumstances, ${appName} is free for schools. Register once and every computer that opens your school's file is covered.`
   return demoAllowed
     ? `${start} Until then you can try the demo school.`
     : `${start} You need to register before you can start. You can still open your school's file to look things up.`
