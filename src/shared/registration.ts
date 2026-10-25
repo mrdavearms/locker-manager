@@ -20,8 +20,9 @@ export const KEY_PREFIX = 'LM1.'
 /** Dave's address: registrations by email go here, and keys come from here. */
 export const REGISTRATION_EMAIL = 'dave@dandsarmstrong.com'
 
-/** The registration service's `register` function. Placeholder until the service is deployed. */
-export const REGISTRATION_URL = 'https://registration.invalid/register'
+/** The registration service's `register` function (Firebase project locker-manager-reg, Sydney). */
+export const REGISTRATION_URL =
+  'https://australia-southeast1-locker-manager-reg.cloudfunctions.net/register'
 
 /** The website form, used when the app cannot reach the service. */
 export const REGISTER_PAGE_URL = 'https://mrdavearms.github.io/locker-manager/register/'

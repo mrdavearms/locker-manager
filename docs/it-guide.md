@@ -93,13 +93,11 @@ signature is in place the prompt disappears.
 
 Allow outbound HTTPS (port 443) to:
 
-<!-- TODO(task 11): replace with the real registration service host once the service is deployed. -->
-
 | Host | Used for |
 |---|---|
 | `github.com` | update check: `/mrdavearms/locker-manager/releases.atom`, `/mrdavearms/locker-manager/releases/latest`, and `/mrdavearms/locker-manager/releases/download/...` |
 | `release-assets.githubusercontent.com` | GitHub redirects every `/releases/download/...` address here: `latest.yml`, `latest-mac.yml` and the installers |
-| the registration service address (added when the service goes live) | Registering from inside the app only. Nothing else uses it. The website form at `https://mrdavearms.github.io/locker-manager/register/` needs no firewall change beyond normal web access. |
+| `australia-southeast1-locker-manager-reg.cloudfunctions.net` (Google Cloud, Sydney) | Registering from inside the app only. Nothing else uses it. The website form at `https://mrdavearms.github.io/locker-manager/register/` needs no firewall change beyond normal web access. |
 
 Checked on 9 October 2026: a request for a release file on `github.com` answers with a
 redirect to `release-assets.githubusercontent.com`, which serves the file. GitHub has

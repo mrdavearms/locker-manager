@@ -7,8 +7,12 @@ import { readFileKey } from './fileKey'
 import { checkKey, cleanKeyText, type KeyCheck } from './keyFormat'
 import { registrationStatus, type RegistrationStatus } from './policy'
 
-/** Base64 SPKI DER of the key that checks real registration keys. Set in task 11. */
-export const PRODUCTION_PUBLIC_KEY: string | null = null
+/**
+ * Base64 SPKI DER of the key that checks real registration keys. Its private half is
+ * REG_SIGNING_KEY in Secret Manager (project locker-manager-reg), made 25 Oct 2026.
+ */
+export const PRODUCTION_PUBLIC_KEY: string | null =
+  'MCowBQYDK2VwAyEADNymBL6Nw0nO8nO1ggBYj5iF/Mp/VNn3k2BSTXjsZD8='
 
 type Reason = Extract<KeyCheck, { ok: false }>['reason']
 
