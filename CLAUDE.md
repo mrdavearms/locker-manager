@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 24 October 2026 (v0.12.1 released; security audit fixes on main, decision 30; 1.0 waits for Dave's hand checks)._
+_Last updated: 25 October 2026 (registration for 0.13.0, decision 31; service live as project locker-manager-reg; 1.0 waits for Dave's hand checks)._
 
 ## What this is
 
@@ -264,7 +264,7 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     needing Dave: publisher-checked updates (signing, or an app-level update signature) and
     signing secrets reaching the ungated build job.
 
-30. **Registration** (Dave, 25 Oct 2026; docs/superpowers/specs/2026-10-24-registration-design.md).
+31. **Registration** (Dave, 25 Oct 2026; docs/superpowers/specs/2026-10-24-registration-design.md).
     From 0.13.0 a school registers once, free. No grace period: a copy with no key opens the
     school's file read-only with reason `unregistered` (no edit lock); demo and updates always
     work. Dave approves each registration by hand; keys are signed (Ed25519) and emailed from

@@ -214,7 +214,7 @@ staff or its students; like any web request, GitHub sees the computer's internet
 IT can turn automatic checks off (see the IT guide).
 
 From 0.13.0, a school registers once. Pressing Send on the registration form sends the
-person's name, school, email address, state and optional role to a small registration
+person's name, school, email address, state, and optional role and notes, to a small registration
 service, and nothing else. The app never sends anything to check a key; it checks the key on
 the computer with no internet.
 

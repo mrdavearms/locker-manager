@@ -52,7 +52,7 @@ Locker Manager does that whole job in one desktop app, for staff with low techni
 
 _Note, 25 October 2026:_ version 0.13.0 adds free school registration (a small cloud
 service that emails a key, no accounts, no billing). See
-`docs/superpowers/specs/2026-10-24-registration-design.md` and decision 30 in CLAUDE.md.
+`docs/superpowers/specs/2026-10-24-registration-design.md` and decision 31 in CLAUDE.md.
 The wording above is the original and is kept as it was.
 
 ### 1.3 Who uses it
