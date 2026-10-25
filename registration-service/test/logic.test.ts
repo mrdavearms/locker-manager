@@ -148,7 +148,7 @@ describe('register', () => {
       'Email: hsmith@example.vic.edu.au',
       'State: VIC',
       'Role: Business manager',
-      'Notes: Year 7 lockers first.',
+      '  Year 7 lockers first.',
       'Sent from: the app, version 0.13.0',
       `https://example.invalid/review?id=R-00001&token=${row?.reviewToken}`
     ])
@@ -181,7 +181,14 @@ describe('register', () => {
     expect(await store.get('R-00002')).toMatchObject({ role: null, notes: null, appVersion: null })
     expect(mailer.sent[0]?.text).toContain('Sent from: the website')
     expect(mailer.sent[0]?.text).toContain('Role: (not given)')
-    expect(mailer.sent[0]?.text).toContain('Notes: (none)')
+    expect(mailer.sent[0]?.text).toContain('  (none)')
+  })
+
+  it('indents every line of a note so it cannot pass as a field', async () => {
+    await handleRegister({ ...good, notes: 'hi\nState: ACT' }, '203.0.113.5', deps)
+    const text = mailer.sent[0]?.text ?? ''
+    expect(text).toContain('\n  hi\n  State: ACT\n')
+    expect(text.trimEnd().endsWith('  State: ACT')).toBe(true)
   })
 
   it('refuses a bad email and sends nothing', async () => {
@@ -360,6 +367,11 @@ describe('review', () => {
     expect(list.body).not.toContain('<script>')
     expect(list.body).toContain('&lt;script&gt;alert(1)&lt;/script&gt; College')
     expect(list.body).toContain('Note &lt;script&gt;alert(2)&lt;/script&gt;')
+    const rows = list.body.split('<tr>').slice(1)
+    const heads = (rows[0]?.match(/<th>/g) ?? []).length
+    const cells = (rows[1]?.match(/<td>/g) ?? []).length
+    expect(cells).toBe(heads)
+    expect(rows[1]).toContain('<td>waiting</td>')
   })
 })
 

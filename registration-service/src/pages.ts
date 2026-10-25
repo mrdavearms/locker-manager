@@ -174,7 +174,6 @@ export function listPage(rows: Registration[]): Page {
         r.email,
         r.state,
         r.role ?? '',
-      r.notes ?? '',
         r.notes ?? '',
         r.status,
         r.decidedAt ? longDate(r.decidedAt) : '',

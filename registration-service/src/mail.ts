@@ -42,11 +42,13 @@ export function toDaveEmail(row: Registration, reviewLink: string): Email {
       `Email: ${row.email}`,
       `State: ${row.state}`,
       `Role: ${row.role ?? '(not given)'}`,
-      `Notes: ${row.notes ?? '(none)'}`,
       `Sent from: ${sentFrom(row)}`,
       '',
       'To approve or reject it, open this page and press a button there:',
       reviewLink,
+      '',
+      'Notes from the registrant (each line indented):',
+      ...(row.notes ? row.notes.split(/\r?\n/).map((l) => `  ${l}`) : ['  (none)']),
       ''
     ].join('\n')
   }

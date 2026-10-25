@@ -299,8 +299,14 @@
           <input id="role" name="role" type="text" autocomplete="organization-title" />
 
           <label for="notes">Notes <span class="optional">(optional)</span></label>
-          <textarea id="notes" name="notes" rows="4" maxlength="1000"></textarea>
-          <p class="hint">
+          <textarea
+            id="notes"
+            name="notes"
+            aria-describedby="notes-hint"
+            rows="4"
+            maxlength="1000"
+          ></textarea>
+          <p class="hint" id="notes-hint">
             Anything you'd like Dave to know, for example how your school plans to use Locker
             Manager.
           </p>
