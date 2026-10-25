@@ -32,6 +32,14 @@ async function expectedTriggers(version: number): Promise<Map<string, string>> {
 
 const quoted = (name: string): string => `"${name.replace(/"/g, '""')}"`
 
+/**
+ * The same trigger, ignoring line endings: a copy built from a Windows checkout made its
+ * triggers with CRLF, and a Mac copy with LF. Without this, each treated the other's
+ * file as tampered with.
+ */
+const sameSql = (a: string | null | undefined, b: string | null): boolean =>
+  a != null && b != null && a.replace(/\r\n/g, '\n') === b.replace(/\r\n/g, '\n')
+
 export interface SchemaRepair {
   removed: string[]
   restored: string[]
@@ -53,7 +61,7 @@ export async function repairSchemaObjects(db: LockerDb): Promise<SchemaRepair> {
   )
   db.transaction(() => {
     for (const o of present) {
-      if (o.type === 'trigger' && expected.get(o.name) === o.sql) continue
+      if (o.type === 'trigger' && sameSql(expected.get(o.name), o.sql)) continue
       db.run(`DROP ${o.type === 'view' ? 'VIEW' : 'TRIGGER'} ${quoted(o.name)}`)
       repair.removed.push(o.name)
     }

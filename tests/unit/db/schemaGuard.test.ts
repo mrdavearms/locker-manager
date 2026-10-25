@@ -28,6 +28,19 @@ describe('triggers and views made outside the app', () => {
     db.close()
   })
 
+  it('leaves the app’s triggers alone when only their line endings differ (Windows and Mac copies)', async () => {
+    const db = await open('v5-SYNTHETIC.lockers')
+    const triggers = db.all<{ name: string; sql: string }>(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'trigger'"
+    )
+    for (const t of triggers) {
+      db.run(`DROP TRIGGER "${t.name}"`)
+      db.execScript(t.sql.replace(/\r?\n/g, '\r\n'))
+    }
+    expect(await repairSchemaObjects(db)).toEqual({ removed: [], restored: [] })
+    db.close()
+  })
+
   it('removes a planted trigger and view, and puts back a guard that was dropped or changed', async () => {
     const db = await open('v5-SYNTHETIC.lockers')
     const appObjects = objects(db)
