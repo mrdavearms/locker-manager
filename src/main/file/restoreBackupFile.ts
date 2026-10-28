@@ -1,4 +1,5 @@
 import { basename, dirname, join } from 'node:path'
+import { getMeta } from '../db/context'
 import { LockerDb } from '../db/db'
 import { saveAtomically } from './atomicSave'
 import {
@@ -125,7 +126,9 @@ export async function restoreBackupFile(
 /**
  * When the file being replaced can still be read, the restored version keeps its PIN
  * and every history and reveal line written since the backup (carryForward.ts), as
- * restoring from the Backups screen does. A damaged file gives nothing to keep.
+ * restoring from the Backups screen does. A damaged file gives nothing to keep, and
+ * nor does a different school's file (or a different file of the same school): its
+ * history and PIN belong to that file.
  */
 async function keepFromCurrent(existing: Uint8Array, backup: Uint8Array): Promise<Uint8Array> {
   let current: LockerDb
@@ -142,6 +145,8 @@ async function keepFromCurrent(existing: Uint8Array, backup: Uint8Array): Promis
       return backup
     const restored = await LockerDb.fromBytes(backup)
     try {
+      const id = getMeta(restored, 'file_id')
+      if (!id || getMeta(current, 'file_id') !== id) return backup
       restored.run('PRAGMA foreign_keys = OFF')
       restored.transaction(() => {
         carryAppendOnly(current, restored)
