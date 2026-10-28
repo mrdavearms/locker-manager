@@ -61,4 +61,17 @@ describe('triggers and views made outside the app', () => {
     expect(() => db.run("UPDATE audit_log SET reason = 'SYNTHETIC'")).toThrow()
     db.close()
   })
+
+  it('removes a planted view that has its own trigger (dropping the view drops the trigger)', async () => {
+    const db = await open('v5-SYNTHETIC.lockers')
+    const appObjects = objects(db)
+    db.execScript(`
+      CREATE VIEW planted_view AS SELECT 1 AS x;
+      CREATE TRIGGER planted_on_view INSTEAD OF INSERT ON planted_view BEGIN SELECT 1; END;
+    `)
+    const repair = await repairSchemaObjects(db)
+    expect(repair.removed).toEqual(['planted_view'])
+    expect(objects(db)).toEqual(appObjects)
+    db.close()
+  })
 })

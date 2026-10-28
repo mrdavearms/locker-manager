@@ -56,14 +56,22 @@ export async function repairSchemaObjects(db: LockerDb): Promise<SchemaRepair> {
   const repair: SchemaRepair = { removed: [], restored: [] }
   if (version < 1 || version > migrations.length) return repair
   const expected = await expectedTriggers(version)
-  const present = db.all<{ type: string; name: string; sql: string | null }>(
-    "SELECT type, name, sql FROM sqlite_master WHERE type IN ('trigger', 'view')"
-  )
+  const objects = (type: 'trigger' | 'view'): { name: string; sql: string | null }[] =>
+    db.all<{ name: string; sql: string | null }>(
+      'SELECT name, sql FROM sqlite_master WHERE type = ?',
+      [type]
+    )
   db.transaction(() => {
-    for (const o of present) {
-      if (o.type === 'trigger' && sameSql(expected.get(o.name), o.sql)) continue
-      db.run(`DROP ${o.type === 'view' ? 'VIEW' : 'TRIGGER'} ${quoted(o.name)}`)
-      repair.removed.push(o.name)
+    // Views first: dropping a view also drops any trigger on it, so the triggers are
+    // read only once the views are gone.
+    for (const v of objects('view')) {
+      db.run(`DROP VIEW ${quoted(v.name)}`)
+      repair.removed.push(v.name)
+    }
+    for (const t of objects('trigger')) {
+      if (sameSql(expected.get(t.name), t.sql)) continue
+      db.run(`DROP TRIGGER ${quoted(t.name)}`)
+      repair.removed.push(t.name)
     }
     const kept = new Set(
       db

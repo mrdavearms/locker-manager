@@ -796,6 +796,21 @@ describe('a file changed outside the app', () => {
     expect(triggers).not.toContain('planted')
     expect(actions).toContain('file.schema_repaired')
   })
+
+  it('a file whose repair fails does not open, and gives back the edit lock', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const broken = await LockerDb.fromBytes(new Uint8Array(readFileSync(path)))
+    // With the table gone, the app's own trigger on it cannot be put back.
+    broken.execScript('DROP TABLE code_reveal_log;')
+    writeFileSync(path, broken.export())
+    broken.close()
+    const dave = person('Dave', 'DAVE-MAC', dir)
+    const result = await dave.session.open(path)
+    expect(result.ok).toBe(false)
+    expect(existsSync(lockPathFor(path))).toBe(false)
+    expect(dave.session.state.status).not.toBe('open')
+  })
 })
 
 describe('restoring a backup (SPEC.md 4.12)', () => {

@@ -434,19 +434,19 @@ export class DataFileSession {
           canStartEditing: false
         }
       }
-      // Triggers or views nobody in the app made are removed before anything runs
-      // (schemaGuard.ts), and recorded when this computer is editing.
-      const repaired = await repairSchemaObjects(db)
-      if (repaired.removed.length + repaired.restored.length > 0 && c.mode === 'edit') {
-        appendAudit(db, this.ctx(), {
-          action: 'file.schema_repaired',
-          entity: 'file',
-          after: repaired
-        })
-        this.markChanged()
-      }
-      if (schema.kind === 'older') {
-        try {
+      try {
+        // Triggers or views nobody in the app made are removed before anything runs
+        // (schemaGuard.ts), and recorded when this computer is editing.
+        const repaired = await repairSchemaObjects(db)
+        if (repaired.removed.length + repaired.restored.length > 0 && c.mode === 'edit') {
+          appendAudit(db, this.ctx(), {
+            action: 'file.schema_repaired',
+            entity: 'file',
+            after: repaired
+          })
+          this.markChanged()
+        }
+        if (schema.kind === 'older') {
           if (c.mode === 'edit') {
             // SPEC.md 6.6: named backup, migrate, verify, save.
             await this.backupBytes(read.bytes, `before update to ${this.d.appVersion}`)
@@ -464,18 +464,18 @@ export class DataFileSession {
             migrate(db)
             await repairSchemaObjects(db)
           }
-        } catch (error) {
-          // Nothing has been written to the file yet; give back the edit lock so
-          // nobody else is shut out by a file this computer could not open.
-          if (c.mode === 'edit') await releaseLock(this.lockDeps()).catch(() => undefined)
-          db.close()
-          this.cur = null
-          this.emit()
-          const why = error instanceof Error ? error.message : String(error)
-          return {
-            ok: false,
-            message: `This file could not be updated for this version of the app (${why}). The file was not changed.`
-          }
+        }
+      } catch (error) {
+        // Nothing has been written to the file yet; give back the edit lock so
+        // nobody else is shut out by a file this computer could not open.
+        if (c.mode === 'edit') await releaseLock(this.lockDeps()).catch(() => undefined)
+        db.close()
+        this.cur = null
+        this.emit()
+        const why = error instanceof Error ? error.message : String(error)
+        return {
+          ok: false,
+          message: `This file could not be ${schema.kind === 'older' ? 'updated for' : 'opened in'} this version of the app (${why}). The file was not changed.`
         }
       }
     }
@@ -979,10 +979,15 @@ export class DataFileSession {
     if (!c) return false
     const next = await LockerDb.fromBytes(bytes)
     const schema = schemaState(next)
-    await repairSchemaObjects(next)
-    if (schema.kind === 'older') {
-      migrate(next)
+    try {
       await repairSchemaObjects(next)
+      if (schema.kind === 'older') {
+        migrate(next)
+        await repairSchemaObjects(next)
+      }
+    } catch (error) {
+      next.close()
+      throw error
     }
     c.db.close()
     c.db = next
