@@ -59,7 +59,11 @@ export default defineConfig({
     // and their named exports are not reachable from an ES-module main process.
     build: {
       rollupOptions: {
-        input: { index: resolve('src/main/index.ts') },
+        // importWorker reads import files in a worker thread with a memory limit.
+        input: {
+          index: resolve('src/main/index.ts'),
+          importWorker: resolve('src/main/import/parseWorker.ts')
+        },
         // original-fs is built into Electron, not a package in node_modules.
         external: ['original-fs'],
         output: { format: 'cjs' }

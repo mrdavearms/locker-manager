@@ -56,11 +56,12 @@ function preview(
 export async function loadImport(
   files: readonly { name: string; bytes: Uint8Array }[],
   pasted: string | null,
-  saved: Record<string, Partial<FileSettings['mapping']>>
+  saved: Record<string, Partial<FileSettings['mapping']>>,
+  parse: (name: string, bytes: Uint8Array) => Promise<ParsedFile> = parseFile
 ): Promise<{ importId: string; previews: FilePreview[] }> {
   sweep()
   const parsed: ParsedFile[] = []
-  for (const f of files) parsed.push(await parseFile(f.name, f.bytes))
+  for (const f of files) parsed.push(await parse(f.name, f.bytes))
   if (pasted && pasted.trim()) parsed.push(parsePasted(pasted))
   if (parsed.length === 0) throw new Error('Choose at least one file, or paste a table.')
   for (const p of parsed) {

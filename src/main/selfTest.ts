@@ -5,6 +5,7 @@ import log from 'electron-log/main'
 import { brand } from '@shared/brand'
 import { createDemoDatabase } from './demo/demoSchool'
 import { loadSqlJs } from './db/db'
+import { importWorkerPath, parseInWorker } from './import/parseInWorker'
 import { checkProductionKey, PRODUCTION_PUBLIC_KEY } from './registration/registration'
 
 // `Locker Manager --self-test`: checks that an installed copy can do its work, then
@@ -40,6 +41,15 @@ export async function runSelfTest(): Promise<number> {
       () => {
         for (const file of ['../renderer/index.html', '../preload/index.cjs'])
           if (!existsSync(join(__dirname, file))) throw new Error(`${file} is missing`)
+      }
+    ],
+    [
+      // Import files are read in a worker thread loaded from inside the package.
+      'import reader',
+      async () => {
+        const csv = new TextEncoder().encode('Student ID,First name\nSELFTEST1,Self\n')
+        const file = await parseInWorker(importWorkerPath(), 'self-test.csv', csv)
+        if (file.sheets[0]?.rows.length !== 2) throw new Error('the test table read wrongly')
       }
     ],
     [

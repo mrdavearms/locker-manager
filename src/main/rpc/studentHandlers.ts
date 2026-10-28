@@ -3,6 +3,7 @@ import type { FileSettings, ImportOptions } from '@shared/importTypes'
 import type { LockerDb } from '../db/db'
 import { analyseImport, buildStudents } from '../import/analyse'
 import { applyImport } from '../import/apply'
+import { importWorkerPath, parseInWorker } from '../import/parseInWorker'
 import {
   discardImport,
   headersFor,
@@ -88,7 +89,13 @@ type StudentKeys =
   | 'group.setSortLast'
 
 export const studentHandlers: Pick<Handlers, StudentKeys> = {
-  'import.load': { kind: 'pure', run: (p) => loadImport(p.files, p.pasted, readSavedMappings()) },
+  'import.load': {
+    kind: 'pure',
+    run: (p) =>
+      loadImport(p.files, p.pasted, readSavedMappings(), (name, bytes) =>
+        parseInWorker(importWorkerPath(), name, bytes)
+      )
+  },
   'import.options.get': { kind: 'read', run: (db) => importOptions(db) },
   'import.analyse': {
     kind: 'read',
