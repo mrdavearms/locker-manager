@@ -336,7 +336,7 @@ export function App(): React.JSX.Element {
                     </div>
                   )}
                   <ScreenErrorBoundary
-                    screenKey={helpOpen ? 'help' : screen}
+                    screenKey={helpOpen ? 'help' : open ? `${screen}:${open.path}` : 'welcome'}
                     onHome={() => {
                       setHelpOpen(false)
                       setScreen('home')

@@ -80,7 +80,15 @@ export class ScreenErrorBoundary extends Component<ScreenProps, State> {
           <p className="text-sm text-ink-muted break-words">{this.state.message}</p>
           <div className="flex gap-3">
             <Button onClick={() => this.setState({ message: null })}>Try again</Button>
-            <Button variant="secondary" onClick={this.props.onHome}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                // On Home (or the first screen) the screen does not change, so the
+                // error is cleared here too.
+                this.setState({ message: null })
+                this.props.onHome()
+              }}
+            >
               Go to Home
             </Button>
           </div>

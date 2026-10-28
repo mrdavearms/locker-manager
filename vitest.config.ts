@@ -2,9 +2,16 @@ import { resolve } from 'node:path'
 import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  resolve: { alias: { '@shared': resolve('src/shared') } },
+  resolve: {
+    alias: { '@shared': resolve('src/shared'), '@renderer': resolve('src/renderer/src') }
+  },
   test: {
-    include: ['tests/unit/**/*.test.ts', 'tests/crash/**/*.test.ts', 'src/**/*.test.ts'],
+    include: [
+      'tests/unit/**/*.test.ts',
+      'tests/renderer/**/*.test.ts',
+      'tests/crash/**/*.test.ts',
+      'src/**/*.test.ts'
+    ],
     // The registration service runs its own tests (npm test --prefix registration-service).
     exclude: [...configDefaults.exclude, 'registration-service/**'],
     environment: 'node',
