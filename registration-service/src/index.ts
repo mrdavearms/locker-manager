@@ -10,12 +10,14 @@ import { defineSecret, defineString } from 'firebase-functions/params'
 import * as logger from 'firebase-functions/logger'
 import type { Response } from 'express'
 import {
+  checkLimits,
   handleDecide,
   handleList,
   handleListForm,
   handleRegister,
   handleReview,
   registrationId,
+  senderAddress,
   type Deps,
   type Registration,
   type Store
@@ -45,19 +47,27 @@ function firestoreStore(db: Firestore): Store {
   const registrations = db.collection('registrations')
   const counter = db.collection('counters').doc('registrations')
   const emailPause = db.collection('counters').doc('emailPause')
+  // Recent registration times, for the limits. Every registration reads and writes this
+  // one document inside its transaction, so two can never pass the limits together.
+  const limitsDoc = db.collection('counters').doc('limits')
   return {
-    async add(r) {
-      const row: Registration = { ...r, id: registrationId(r.number) }
-      await registrations.doc(row.id).create(row)
-      return row
+    async addWithinLimits(r, limits) {
+      return db.runTransaction(async (tx) => {
+        const [counterSnap, limitsSnap] = await tx.getAll(counter, limitsDoc)
+        const checked = checkLimits(limitsSnap?.data(), r.ipHash, r.createdAt, limits)
+        if ('refused' in checked) return checked
+        const number = Number(counterSnap?.get('last') ?? 0) + 1
+        const row: Registration = { ...r, number, id: registrationId(number) }
+        tx.set(counter, { last: number })
+        tx.set(limitsDoc, checked.state)
+        tx.create(registrations.doc(row.id), row)
+        return { added: row, earlierToday: checked.earlierToday }
+      })
     },
     async get(id) {
       if (!ID.test(id)) return null
       const snap = await registrations.doc(id).get()
       return snap.exists ? (snap.data() as Registration) : null
-    },
-    async update(id, patch) {
-      await registrations.doc(id).update(patch as UpdateData<Registration>)
     },
     async list() {
       const snap = await registrations.orderBy('number', 'desc').get()
@@ -72,31 +82,12 @@ function firestoreStore(db: Firestore): Store {
         return true
       })
     },
-    async countRecentFromHash(ipHash, sinceMs) {
-      // One equality filter needs no extra Firestore index; the time is checked here.
-      const snap = await registrations.where('ipHash', '==', ipHash).get()
-      return snap.docs.filter((d) => Date.parse(String(d.get('createdAt'))) >= sinceMs).length
-    },
-    async countSince(sinceMs) {
-      // createdAt is an ISO date, so text order is time order; a single-field filter needs no extra index.
-      const since = new Date(sinceMs).toISOString()
-      const snap = await registrations.where('createdAt', '>=', since).count().get()
-      return snap.data().count
-    },
     async claimPauseAlert(day) {
       return db.runTransaction(async (tx) => {
         const snap = await tx.get(emailPause)
         if (snap.get('day') === day) return false
         tx.set(emailPause, { day })
         return true
-      })
-    },
-    async nextNumber() {
-      return db.runTransaction(async (tx) => {
-        const snap = await tx.get(counter)
-        const next = Number(snap.get('last') ?? 0) + 1
-        tx.set(counter, { last: next })
-        return next
       })
     }
   }
@@ -111,7 +102,8 @@ function deps(): Deps {
     adminToken: REG_ADMIN_TOKEN.value(),
     daveEmail: REGISTRATION_EMAIL,
     baseUrl: BASE_URL.value().replace(/\/+$/, ''),
-    now: () => new Date()
+    now: () => new Date(),
+    warn: (message) => logger.warn(message)
   }
   return cached
 }
@@ -149,8 +141,8 @@ export const register = onRequest({ secrets, cors: [SITE_ORIGIN] }, async (req: 
   }
   try {
     const body: unknown = req.body
-    // The address as the platform works it out. Task 11's live test checks it is the sender's.
-    const result = await handleRegister(body, req.ip || 'unknown', deps())
+    const ip = senderAddress(req.headers['x-forwarded-for'], req.ip || 'unknown')
+    const result = await handleRegister(body, ip, deps())
     res.status(result.status).json(result.json)
   } catch (err) {
     failed(res, err, true)

@@ -18,6 +18,12 @@ export function escapeHtml(text: string): string {
 
 const e = escapeHtml
 
+/** The page where Dave approves or rejects one registration. */
+export function reviewLink(row: Registration, baseUrl: string): string {
+  const query = new URLSearchParams({ id: row.id, token: row.reviewToken })
+  return `${baseUrl}/review?${query.toString()}`
+}
+
 /** "2 November 2026", in Victorian time. */
 export function longDate(iso: string): string {
   return new Intl.DateTimeFormat('en-AU', {
@@ -98,7 +104,9 @@ export function reviewPage(row: Registration, baseUrl: string): Page {
 <p><label><input type="checkbox" name="sendRejectEmail" value="yes"> Send a short, polite rejection email</label></p>
 <button type="submit">Reject</button>
 </form>`
-      : `<p><strong>${e(decisionLine(row))}</strong></p>`
+      : `<p><strong>${e(decisionLine(row))}</strong></p>` +
+        // So a key whose email failed, or was lost, can always be sent again by hand.
+        (row.status === 'approved' && row.key ? `<p>Key:</p><p><code>${e(row.key)}</code></p>` : '')
   return page(
     200,
     `Registration ${row.id}`,
@@ -150,7 +158,8 @@ export function listFormPage(baseUrl: string): Page {
   )
 }
 
-export function listPage(rows: Registration[]): Page {
+/** Every registration, newest first, each with a link to its review page. */
+export function listPage(rows: Registration[], baseUrl: string): Page {
   const head = [
     'Number',
     'Received',
@@ -162,25 +171,29 @@ export function listPage(rows: Registration[]): Page {
     'Notes',
     'Status',
     'Decided',
-    'Sent from'
+    'Sent from',
+    'Review'
   ]
   const body = rows
-    .map((r) =>
-      [
-        r.id,
-        longDate(r.createdAt),
-        r.name,
-        r.school,
-        r.email,
-        r.state,
-        r.role ?? '',
-        r.notes ?? '',
-        r.status,
-        r.decidedAt ? longDate(r.decidedAt) : '',
-        sentFrom(r)
-      ]
-        .map((v) => `<td>${e(v)}</td>`)
-        .join('')
+    .map(
+      (r) =>
+        [
+          r.id,
+          longDate(r.createdAt),
+          r.name,
+          r.school,
+          r.email,
+          r.state,
+          r.role ?? '',
+          r.notes ?? '',
+          r.status,
+          r.decidedAt ? longDate(r.decidedAt) : '',
+          sentFrom(r)
+        ]
+          .map((v) => `<td>${e(v)}</td>`)
+          .join('') +
+        // The only way to a registration whose email to Dave failed or was held back.
+        `<td><a href="${e(reviewLink(r, baseUrl))}">${r.status === 'waiting' ? 'Approve or reject' : 'Open'}</a></td>`
     )
     .map((cells) => `<tr>${cells}</tr>`)
     .join('\n')

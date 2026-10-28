@@ -11,9 +11,12 @@ import {
   listFormPage,
   listPage,
   notFoundPage,
+  reviewLink,
   reviewPage,
   type Page
 } from './pages'
+
+export { reviewLink }
 
 export interface Registration {
   id: string
@@ -37,23 +40,40 @@ export interface Registration {
   key: string | null
 }
 
-/** A registration before the store gives it its id (see `registrationId`). */
-export type NewRegistration = Omit<Registration, 'id'>
+/** A registration before the store gives it its number and id (see `registrationId`). */
+export type NewRegistration = Omit<Registration, 'id' | 'number'>
+
+/** How many registrations may be saved, from one address in an hour and from everyone in a day. */
+export interface Limits {
+  perHourFromOneAddress: number
+  mostPerDay: number
+}
+
+/** Recent registration times, kept in one document so the limits are checked in one step. */
+export interface LimitsState {
+  /** When each registration of the last 24 hours arrived. */
+  recent: string[]
+  /** When each registration of the last hour arrived, by `ipHash`. */
+  byAddress: Record<string, string[]>
+}
+
+export type AddResult =
+  { added: Registration; earlierToday: number } | { refused: 'address' | 'everyone' }
 
 export interface Store {
-  add(r: NewRegistration): Promise<Registration>
+  /**
+   * Checks the limits and saves the registration in one step, so a burst of requests
+   * sent together can never all pass the check before any of them is saved.
+   * `earlierToday` is how many were saved in the 24 hours before this one.
+   */
+  addWithinLimits(r: NewRegistration, limits: Limits): Promise<AddResult>
   get(id: string): Promise<Registration | null>
-  update(id: string, patch: Partial<Registration>): Promise<void>
   /** Every registration, newest first. */
   list(): Promise<Registration[]>
   /** Writes the patch only while the registration is still waiting, in one step. False if it was already decided. */
   claimDecision(id: string, patch: Partial<Registration>): Promise<boolean>
-  countRecentFromHash(ipHash: string, sinceMs: number): Promise<number>
-  /** How many registrations were stored since this time, from any address. */
-  countSince(sinceMs: number): Promise<number>
   /** Records that Dave was told the emails paused on this day (YYYY-MM-DD), in one step. False if he already was. */
   claimPauseAlert(day: string): Promise<boolean>
-  nextNumber(): Promise<number>
 }
 
 export interface Mailer {
@@ -69,6 +89,8 @@ export interface Deps {
   /** Where the functions live, with no slash at the end, for example https://australia-southeast1-locker-manager-reg.cloudfunctions.net */
   baseUrl: string
   now: () => Date
+  /** Records a problem that was handled, such as an email that could not be sent. Never given a person's details. */
+  warn?: (message: string) => void
 }
 
 const PER_HOUR_FROM_ONE_ADDRESS = 5
@@ -81,6 +103,16 @@ const PER_DAY_FROM_EVERYONE = 50
 /** Past this many in a day the service stops saving registrations too, so a flood cannot fill the database. */
 const MOST_PER_DAY = 500
 const DAY_MS = 24 * HOUR_MS
+const LIMITS: Limits = {
+  perHourFromOneAddress: PER_HOUR_FROM_ONE_ADDRESS,
+  mostPerDay: MOST_PER_DAY
+}
+
+/**
+ * Line breaks become spaces in the one-line answers, so a name or school typed with a
+ * line break can never add a line of its own to Dave's email, the pages or the key.
+ */
+const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim()
 
 /** What the app and the website send: the form, where it came from, and a hidden field only robots fill in. */
 const PayloadSchema = RegistrationFormSchema.extend({
@@ -111,6 +143,62 @@ export function sameSecret(given: string, expected: string): boolean {
   return timingSafeEqual(a, b)
 }
 
+/**
+ * The sender's internet address. Google adds the address it saw to the end of
+ * X-Forwarded-For; anything before it is whatever the sender chose to put there, and
+ * req.ip (the first entry) let anyone pick a new address for every request.
+ */
+export function senderAddress(
+  forwardedFor: string | string[] | undefined,
+  fallback: string
+): string {
+  const header = Array.isArray(forwardedFor) ? forwardedFor.join(',') : (forwardedFor ?? '')
+  const last = header
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .pop()
+  return last ?? fallback
+}
+
+/**
+ * Whether one more registration fits the limits, and if so the state to save with it.
+ * `stored` is the limits document as read, which may be missing or from an older version.
+ */
+export function checkLimits(
+  stored: unknown,
+  ipHash: string,
+  createdAt: string,
+  limits: Limits
+): { refused: 'address' | 'everyone' } | { state: LimitsState; earlierToday: number } {
+  const at = Date.parse(createdAt)
+  const within = (ms: number, times: unknown): string[] =>
+    (Array.isArray(times) ? times : []).filter(
+      (t): t is string => typeof t === 'string' && Date.parse(t) >= at - ms
+    )
+  const doc =
+    typeof stored === 'object' && stored !== null ? (stored as Record<string, unknown>) : {}
+  const recent = within(DAY_MS, doc.recent)
+  const byAddress: Record<string, string[]> = {}
+  const addresses = doc.byAddress
+  if (typeof addresses === 'object' && addresses !== null) {
+    for (const [hash, times] of Object.entries(addresses)) {
+      const kept = within(HOUR_MS, times)
+      if (kept.length > 0) byAddress[hash] = kept
+    }
+  }
+  const mine = byAddress[ipHash] ?? []
+  if (mine.length >= limits.perHourFromOneAddress) return { refused: 'address' }
+  if (recent.length >= limits.mostPerDay) return { refused: 'everyone' }
+  return {
+    state: {
+      recent: [...recent, createdAt],
+      byAddress: { ...byAddress, [ipHash]: [...mine, createdAt] }
+    },
+    earlierToday: recent.length
+  }
+}
+
 /** Lets the hourly limit recognise a sender without keeping their internet address. */
 export function hashAddress(ip: string, adminToken: string): string {
   return createHash('sha256').update(`${adminToken}:${ip}`, 'utf8').digest('hex')
@@ -132,55 +220,48 @@ export async function handleRegister(
   const parsed = PayloadSchema.safeParse(body)
   if (!parsed.success) return { status: 400, json: { ok: false, error: 'invalid' } }
   const now = deps.now()
-  const ipHash = hashAddress(ip, deps.adminToken)
-  const recent = await deps.store.countRecentFromHash(ipHash, now.getTime() - HOUR_MS)
-  if (recent >= PER_HOUR_FROM_ONE_ADDRESS) {
-    return { status: 429, json: { ok: false, error: 'too_many' } }
-  }
-  const today = await deps.store.countSince(now.getTime() - DAY_MS)
-  if (today >= MOST_PER_DAY) {
-    return { status: 429, json: { ok: false, error: 'too_many' } }
-  }
-
   const form = parsed.data
-  const number = await deps.store.nextNumber()
-  const row = await deps.store.add({
-    number,
-    name: form.name,
-    school: form.school,
-    email: form.email,
-    state: form.state,
-    role: form.role ? form.role : null,
-    notes: form.notes ? form.notes : null,
-    source: form.source,
-    appVersion: form.source === 'app' && form.appVersion ? form.appVersion : null,
-    ipHash,
-    createdAt: now.toISOString(),
-    status: 'waiting',
-    reviewToken: randomBytes(32).toString('base64url'),
-    decidedAt: null,
-    key: null
-  })
+  const result = await deps.store.addWithinLimits(
+    {
+      name: oneLine(form.name),
+      school: oneLine(form.school),
+      email: form.email,
+      state: form.state,
+      role: form.role ? oneLine(form.role) : null,
+      notes: form.notes ? form.notes : null,
+      source: form.source,
+      appVersion: form.source === 'app' && form.appVersion ? oneLine(form.appVersion) : null,
+      ipHash: hashAddress(ip, deps.adminToken),
+      createdAt: now.toISOString(),
+      status: 'waiting',
+      reviewToken: randomBytes(32).toString('base64url'),
+      decidedAt: null,
+      key: null
+    },
+    LIMITS
+  )
+  if ('refused' in result) return { status: 429, json: { ok: false, error: 'too_many' } }
+  const row = result.added
 
-  if (today >= PER_DAY_FROM_EVERYONE) {
+  // The registration is saved, so the sender is told it went through even if an email
+  // fails: a retry would only save it twice. Dave finds it on the list page.
+  const send = async (to: string, mail: { subject: string; text: string }): Promise<void> => {
+    try {
+      await deps.mailer.send(to, mail.subject, mail.text)
+    } catch (err) {
+      deps.warn?.(`an email about ${row.id} could not be sent: ${String(err)}`)
+    }
+  }
+  if (result.earlierToday >= PER_DAY_FROM_EVERYONE) {
     // Tell Dave once a day, however many registrations arrive together, then stay quiet.
     if (await deps.store.claimPauseAlert(schoolDate(now))) {
-      const paused = emailsPausedEmail()
-      await deps.mailer.send(deps.daveEmail, paused.subject, paused.text)
+      await send(deps.daveEmail, emailsPausedEmail())
     }
     return { status: 200, json: { ok: true } }
   }
-
-  const toDave = toDaveEmail(row, reviewLink(row, deps.baseUrl))
-  await deps.mailer.send(deps.daveEmail, toDave.subject, toDave.text)
-  const received = receivedEmail()
-  await deps.mailer.send(row.email, received.subject, received.text)
+  await send(deps.daveEmail, toDaveEmail(row, reviewLink(row, deps.baseUrl)))
+  await send(row.email, receivedEmail())
   return { status: 200, json: { ok: true } }
-}
-
-export function reviewLink(row: Registration, baseUrl: string): string {
-  const query = new URLSearchParams({ id: row.id, token: row.reviewToken })
-  return `${baseUrl}/review?${query.toString()}`
 }
 
 async function findWithToken(id: string, token: string, deps: Deps): Promise<Registration | null> {
@@ -208,13 +289,12 @@ export async function handleDecide(
   if (row.status !== 'waiting') return alreadyDecided(row, deps)
   const now = deps.now()
   const decidedAt = now.toISOString()
-  // Claimed in one step, so a double-click or an overlapping Reject can never send a second email.
-  const status = decision === 'approve' ? 'approved' : 'rejected'
-  if (!(await deps.store.claimDecision(row.id, { status, decidedAt }))) {
-    return alreadyDecided((await deps.store.get(row.id)) ?? row, deps)
-  }
 
   if (decision === 'reject') {
+    // Claimed in one step, so a double-click or an overlapping Approve can never send a second email.
+    if (!(await deps.store.claimDecision(row.id, { status: 'rejected', decidedAt }))) {
+      return alreadyDecided((await deps.store.get(row.id)) ?? row, deps)
+    }
     const rejected: Registration = { ...row, status: 'rejected', decidedAt }
     if (!sendRejectEmail) return decidedPage(rejected, 'not_emailed')
     const mail = rejectEmail()
@@ -231,9 +311,12 @@ export async function handleDecide(
     plan: 'free',
     expires: null
   }
+  // Made first and saved with the decision in one step: a registration is never marked
+  // approved without its key, and the key is saved before any email is tried.
   const key = signKey(details, deps.privateKey)
-  // Stored first, so a failed email never leaves Dave without the key.
-  await deps.store.update(row.id, { key })
+  if (!(await deps.store.claimDecision(row.id, { status: 'approved', decidedAt, key }))) {
+    return alreadyDecided((await deps.store.get(row.id)) ?? row, deps)
+  }
   const approved: Registration = { ...row, status: 'approved', decidedAt, key }
   return sendThenShow(approved, keyEmail(approved, key), deps)
 }
@@ -274,6 +357,6 @@ export async function handleList(
   if (format === 'csv') {
     return { status: 200, body: listCsv(rows), contentType: 'text/csv; charset=utf-8' }
   }
-  const page = listPage(rows)
+  const page = listPage(rows, deps.baseUrl)
   return { status: 200, body: page.html, contentType: 'text/html; charset=utf-8' }
 }

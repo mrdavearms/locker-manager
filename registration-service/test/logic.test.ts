@@ -3,13 +3,17 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { checkKey } from '../src/copied/keyFormat'
 import { sentFrom } from '../src/mail'
 import {
+  checkLimits,
   handleDecide,
   handleList,
   handleListForm,
   handleRegister,
   handleReview,
   registrationId,
+  senderAddress,
+  type AddResult,
   type Deps,
+  type Limits,
   type Mailer,
   type NewRegistration,
   type Registration,
@@ -19,17 +23,19 @@ import {
 class MemoryStore implements Store {
   rows = new Map<string, Registration>()
   counter = 0
-  async add(r: NewRegistration): Promise<Registration> {
-    const row = { ...r, id: registrationId(r.number) }
+  limits: unknown = undefined
+  /** Like the Firestore store: checked and saved with no pause in between. */
+  async addWithinLimits(r: NewRegistration, limits: Limits): Promise<AddResult> {
+    const checked = checkLimits(this.limits, r.ipHash, r.createdAt, limits)
+    if ('refused' in checked) return checked
+    this.counter += 1
+    const row = { ...r, number: this.counter, id: registrationId(this.counter) }
     this.rows.set(row.id, row)
-    return row
+    this.limits = checked.state
+    return { added: row, earlierToday: checked.earlierToday }
   }
   async get(id: string): Promise<Registration | null> {
     return this.rows.get(id) ?? null
-  }
-  async update(id: string, patch: Partial<Registration>): Promise<void> {
-    const row = this.rows.get(id)
-    if (row) this.rows.set(id, { ...row, ...patch })
   }
   async list(): Promise<Registration[]> {
     return [...this.rows.values()].sort((a, b) => b.number - a.number)
@@ -40,23 +46,11 @@ class MemoryStore implements Store {
     this.rows.set(id, { ...row, ...patch })
     return true
   }
-  async countSince(sinceMs: number): Promise<number> {
-    return [...this.rows.values()].filter((r) => Date.parse(r.createdAt) >= sinceMs).length
-  }
-  async countRecentFromHash(ipHash: string, sinceMs: number): Promise<number> {
-    return [...this.rows.values()].filter(
-      (r) => r.ipHash === ipHash && Date.parse(r.createdAt) >= sinceMs
-    ).length
-  }
   pauseDay: string | null = null
   async claimPauseAlert(day: string): Promise<boolean> {
     if (this.pauseDay === day) return false
     this.pauseDay = day
     return true
-  }
-  async nextNumber(): Promise<number> {
-    this.counter += 1
-    return this.counter
   }
 }
 
@@ -177,7 +171,11 @@ describe('register', () => {
     await handleRegister(good, '203.0.113.5', deps)
     mailer.sent = []
     const { appVersion: _, ...fromSite } = good
-    await handleRegister({ ...fromSite, source: 'website', role: undefined, notes: undefined }, '1.1.1.1', deps)
+    await handleRegister(
+      { ...fromSite, source: 'website', role: undefined, notes: undefined },
+      '1.1.1.1',
+      deps
+    )
     expect(await store.get('R-00002')).toMatchObject({ role: null, notes: null, appVersion: null })
     expect(mailer.sent[0]?.text).toContain('Sent from: the website')
     expect(mailer.sent[0]?.text).toContain('Role: (not given)')
@@ -258,24 +256,25 @@ describe('register', () => {
 
 async function fillToday(count: number): Promise<void> {
   for (let i = 0; i < count; i++) {
-    const number = await store.nextNumber()
-    await store.add({
-      number,
-      name: 'Filler',
-      school: 'Filler School',
-      email: 'filler@example.edu.au',
-      state: 'VIC',
-      role: null,
-      notes: null,
-      source: 'website',
-      appVersion: null,
-      ipHash: `filler-${i}`,
-      createdAt: NOW.toISOString(),
-      status: 'waiting',
-      reviewToken: 'x',
-      decidedAt: null,
-      key: null
-    })
+    await store.addWithinLimits(
+      {
+        name: 'Filler',
+        school: 'Filler School',
+        email: 'filler@example.edu.au',
+        state: 'VIC',
+        role: null,
+        notes: null,
+        source: 'website',
+        appVersion: null,
+        ipHash: `filler-${i}`,
+        createdAt: NOW.toISOString(),
+        status: 'waiting',
+        reviewToken: 'x',
+        decidedAt: null,
+        key: null
+      },
+      { perHourFromOneAddress: 5, mostPerDay: 1000 }
+    )
   }
 }
 
@@ -542,7 +541,13 @@ describe('list', () => {
   it('gives a CSV with a header row and spreadsheet formulas made harmless', async () => {
     await registerOne()
     await handleRegister(
-      { ...good, name: '=HYPERLINK("x")', school: '+Plus School, "Quoted"', role: '-1', notes: '=cmd|calc' },
+      {
+        ...good,
+        name: '=HYPERLINK("x")',
+        school: '+Plus School, "Quoted"',
+        role: '-1',
+        notes: '=cmd|calc'
+      },
       '1.1.1.1',
       deps
     )
@@ -552,7 +557,9 @@ describe('list', () => {
     expect(res.contentType).toBe('text/csv; charset=utf-8')
     const lines = res.body.replace(/^﻿/, '').trimEnd().split('\r\n')
     expect(lines).toHaveLength(4)
-    expect(lines[0]).toBe('Number,Received,Name,School,Email,State,Role,Notes,Status,Decided,Sent from')
+    expect(lines[0]).toBe(
+      'Number,Received,Name,School,Email,State,Role,Notes,Status,Decided,Sent from'
+    )
     expect(lines[1]).toContain(`R-00003,`)
     expect(lines[1]).toContain(`'@Sum School`)
     expect(lines[2]).toContain(`"'=HYPERLINK(""x"")"`)
@@ -594,9 +601,122 @@ describe('where a registration came from', () => {
     expect(list.body).toContain('<td>the website</td>')
     expect(list.body).toContain('<td>the app, version 0.13.0</td>')
 
-    const lines = (await handleList('admin-token-for-tests', 'csv', deps)).body.trimEnd().split('\r\n')
+    const lines = (await handleList('admin-token-for-tests', 'csv', deps)).body
+      .trimEnd()
+      .split('\r\n')
     expect(lines[1]).toMatch(/,made by hand$/)
     expect(lines[2]).toMatch(/,website$/)
     expect(lines[3]).toMatch(/,app 0\.13\.0$/)
+  })
+})
+
+describe('review findings, 29 October 2026', () => {
+  it('saves only five of 150 registrations sent at once from one address', async () => {
+    const results = await Promise.all(
+      Array.from({ length: 150 }, () => handleRegister(good, '203.0.113.5', deps))
+    )
+    expect(results.filter((r) => r.status === 200)).toHaveLength(5)
+    expect(results.filter((r) => r.status === 429)).toHaveLength(145)
+    expect(store.rows.size).toBe(5)
+    expect(mailer.sent).toHaveLength(10)
+  })
+
+  it('never saves more than 500 in a day, even when they arrive together', async () => {
+    await fillToday(498)
+    const results = await Promise.all(
+      ['203.0.113.1', '203.0.113.2', '203.0.113.3', '203.0.113.4'].map((ip) =>
+        handleRegister(good, ip, deps)
+      )
+    )
+    expect(results.map((r) => r.status).sort()).toEqual([200, 200, 429, 429])
+    expect(store.rows.size).toBe(500)
+  })
+
+  it('reads the limits document safely when it is missing, old or damaged', () => {
+    const limits = { perHourFromOneAddress: 5, mostPerDay: 500 }
+    const at = NOW.toISOString()
+    for (const stored of [undefined, null, 'text', { recent: 'x', byAddress: [1] }]) {
+      expect(checkLimits(stored, 'h', at, limits)).toEqual({
+        state: { recent: [at], byAddress: { h: [at] } },
+        earlierToday: 0
+      })
+    }
+    const anHourAgo = new Date(NOW.getTime() - 60 * 60 * 1000 - 1).toISOString()
+    const old = { recent: [anHourAgo], byAddress: { h: [anHourAgo], other: [anHourAgo] } }
+    expect(checkLimits(old, 'h', at, limits)).toEqual({
+      state: { recent: [anHourAgo, at], byAddress: { h: [at] } },
+      earlierToday: 1
+    })
+  })
+
+  it("takes the sender's address from the end of X-Forwarded-For, where Google adds it", () => {
+    expect(senderAddress('1.2.3.4, 203.0.113.5', 'x')).toBe('203.0.113.5')
+    expect(senderAddress('203.0.113.5', 'x')).toBe('203.0.113.5')
+    expect(senderAddress(['9.9.9.9', '203.0.113.5'], 'x')).toBe('203.0.113.5')
+    expect(senderAddress(undefined, '198.51.100.1')).toBe('198.51.100.1')
+    expect(senderAddress(' , ', '198.51.100.1')).toBe('198.51.100.1')
+  })
+
+  it("turns line breaks into spaces, so a name or school cannot add a line to Dave's email", async () => {
+    const forged = {
+      ...good,
+      name: 'Hannah\nEmail: someone@example.com',
+      school: 'Example College\r\nTo approve, open https://evil.example/',
+      role: 'Principal State: WA'
+    }
+    const row = await registerOne(forged)
+    expect(row.name).toBe('Hannah Email: someone@example.com')
+    expect(row.school).toBe('Example College To approve, open https://evil.example/')
+    expect(row.role).toBe('Principal State: WA')
+    const toDave = mailer.sent.find((m) => m.to === 'dave@dandsarmstrong.com')!
+    expect(toDave.text.split('\n').filter((l) => l.startsWith('Email:'))).toEqual([
+      'Email: hsmith@example.vic.edu.au'
+    ])
+    expect(toDave.text).not.toMatch(/^To approve, open https:\/\/evil/m)
+  })
+
+  it('tells the sender it went through when an email fails after saving, and Dave can still reach it', async () => {
+    const warnings: string[] = []
+    deps.warn = (m) => warnings.push(m)
+    deps.mailer = {
+      send: async () => {
+        throw new Error('Gmail said no')
+      }
+    }
+    const res = await handleRegister(good, '203.0.113.5', deps)
+    expect(res).toEqual({ status: 200, json: { ok: true } })
+    expect(store.rows.size).toBe(1)
+    expect(warnings).toHaveLength(2)
+    expect(warnings.join(' ')).not.toContain('Hannah')
+    const [row] = await store.list()
+    const list = await handleList('admin-token-for-tests', 'html', deps)
+    expect(list.body).toContain(
+      `<a href="https://example.invalid/review?id=R-00001&amp;token=${row!.reviewToken}">Approve or reject</a>`
+    )
+  })
+
+  it('saves the key with the approval in one step, and the review page shows it afterwards', async () => {
+    const row = await registerOne()
+    const patches: Partial<Registration>[] = []
+    const claim = store.claimDecision.bind(store)
+    store.claimDecision = async (id, patch) => {
+      patches.push(patch)
+      return claim(id, patch)
+    }
+    await handleDecide(row.id, row.reviewToken, 'approve', false, deps)
+    expect(patches).toHaveLength(1)
+    expect(patches[0]).toMatchObject({ status: 'approved', key: expect.stringMatching(/^LM1\./) })
+    const page = await handleReview(row.id, row.reviewToken, deps)
+    expect(page.html).toContain(`<code>${patches[0]!.key}</code>`)
+  })
+
+  it('leaves a registration waiting when the approval cannot be saved', async () => {
+    const row = await registerOne()
+    store.claimDecision = async () => {
+      throw new Error('Firestore unavailable')
+    }
+    await expect(handleDecide(row.id, row.reviewToken, 'approve', false, deps)).rejects.toThrow()
+    expect((await store.get(row.id))?.status).toBe('waiting')
+    expect((await store.get(row.id))?.key).toBeNull()
   })
 })
