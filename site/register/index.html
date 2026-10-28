@@ -274,10 +274,17 @@
 
         <form class="card" id="form" novalidate>
           <label for="name">Your name</label>
-          <input id="name" name="name" type="text" autocomplete="name" required />
+          <input id="name" name="name" type="text" autocomplete="name" maxlength="100" required />
 
           <label for="school">School</label>
-          <input id="school" name="school" type="text" autocomplete="organization" required />
+          <input
+            id="school"
+            name="school"
+            type="text"
+            autocomplete="organization"
+            maxlength="150"
+            required
+          />
 
           <label for="email">Email</label>
           <input
@@ -285,6 +292,7 @@
             name="email"
             type="email"
             autocomplete="email"
+            maxlength="200"
             aria-describedby="email-hint"
             required
           />
@@ -307,7 +315,13 @@
           </select>
 
           <label for="role">Your role <span class="optional">(optional)</span></label>
-          <input id="role" name="role" type="text" autocomplete="organization-title" />
+          <input
+            id="role"
+            name="role"
+            type="text"
+            autocomplete="organization-title"
+            maxlength="100"
+          />
 
           <label for="notes">Notes <span class="optional">(optional)</span></label>
           <textarea
@@ -323,8 +337,8 @@
           </p>
 
           <div class="hp" aria-hidden="true">
-            <label for="website">Leave this empty</label>
-            <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
+            <label for="lm-extra">Leave this empty</label>
+            <input id="lm-extra" name="lm-extra" type="text" tabindex="-1" autocomplete="off" />
           </div>
 
           <label class="check" for="agree">
@@ -423,7 +437,12 @@
         var problem = null
         if (f.name.length < 2) problem = 'Please enter your name.'
         else if (f.school.length < 3) problem = 'Please enter your school.'
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email))
+        // The same check the registration service makes (zod's email pattern).
+        else if (
+          !/^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/.test(
+            f.email
+          )
+        )
           problem = 'Please enter a valid email.'
         else if (!f.state) problem = 'Please choose your state or territory.'
         else if (!document.getElementById('agree').checked)
@@ -442,18 +461,27 @@
           state: f.state,
           privacyAgreed: true,
           source: 'website',
-          website: document.getElementById('website').value
+          // Sent as "website", the name the service checks; the field itself has a name
+          // browsers do not fill in for people.
+          website: document.getElementById('lm-extra').value
         }
         if (f.role) payload.role = f.role
         if (f.notes) payload.notes = f.notes
 
         button.disabled = true
+        // A school filter can hold a request open; give up after 20 seconds.
+        var controller = new AbortController()
+        var timer = setTimeout(function () {
+          controller.abort()
+        }, 20000)
         fetch(REGISTRATION_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          signal: controller.signal
         })
           .then(function (res) {
+            clearTimeout(timer)
             button.disabled = false
             if (res.ok) {
               show('ok', function (box) {
@@ -470,11 +498,17 @@
                 f,
                 'Too many registrations have come from this network in the last hour. Try again later.'
               )
+            } else if (res.status === 400) {
+              failure(
+                f,
+                'The registration service did not accept one of your answers. Check your email address, and that no answer is very long.'
+              )
             } else {
               failure(f, 'The registration did not go through. Please try again in a few minutes.')
             }
           })
           .catch(function () {
+            clearTimeout(timer)
             button.disabled = false
             failure(
               f,
