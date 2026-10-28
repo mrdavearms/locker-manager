@@ -4,7 +4,7 @@ Working notes for Claude Code. Keep this short and current. Read SPEC.md before 
 non-trivial change; it is the full product and technical specification, and section 15
 ("Lessons from the real WHS deployment") is a list of hard requirements, not background.
 
-_Last updated: 25 October 2026 (registration for 0.13.0, decision 31; service live as project locker-manager-reg; 1.0 waits for Dave's hand checks)._
+_Last updated: 29 October 2026 (review fixes, decision 32; registration for 0.13.0, decision 31; 1.0 waits for Dave's hand checks)._
 
 ## What this is
 
@@ -273,6 +273,16 @@ is disabled in a development build and says so. End-to-end tests drive the BUILT
     managed.json. The app never sends anything to check a key. The test overrides
     `LOCKER_MANAGER_REGISTRATION=enforce` and `LOCKER_MANAGER_REG_TEST_PUBKEY` are ignored in
     an installed copy, and `--self-test` fails a packaged build with no production public key.
+
+32. **Review fixes, app side** (29 Oct 2026). Import files are read in a worker thread
+    (`src/main/import/parseInWorker.ts`, built as `out/main/importWorker.cjs`) with a
+    1,024 MB memory limit and a 2-minute time limit: a few-kilobyte crafted spreadsheet could
+    make ExcelJS or SheetJS build millions of cells and close the app. `--self-test` reads a
+    small table through the worker, so every release proves it loads from inside the asar.
+    The whole-file rebuild (`portable/workbook.ts`) still reads in the main process.
+    `repairSchemaObjects` drops views before reading triggers (a view takes its own triggers
+    with it), and a failed repair on open gives back the edit lock. "Open a backup…" carries
+    history and the PIN forward only from a file with the same `file_id`.
 
 ## Known, accepted
 

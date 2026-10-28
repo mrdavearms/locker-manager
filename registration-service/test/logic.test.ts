@@ -405,7 +405,7 @@ describe('decide', () => {
     expect(mail?.subject).toBe('Your Locker Manager registration key for Example Secondary College')
     expect(mail?.text).toContain('1. Open Locker Manager.')
     expect(mail?.text).toContain('2. Choose "I have a key" (or Help, then Registration).')
-    expect(mail?.text).toContain('3. Paste this key and press Register:')
+    expect(mail?.text).toContain('3. Paste this key and press Use this key:')
     expect(mail?.text).toContain(`\n\n${key}\n\n`)
     expect(mail?.text).toContain(
       "This key covers every computer that opens your school's Locker Manager file."

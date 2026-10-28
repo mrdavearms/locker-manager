@@ -83,7 +83,7 @@ export function keyEmail(row: Registration, key: string): Email {
     text: [
       '1. Open Locker Manager.',
       '2. Choose "I have a key" (or Help, then Registration).',
-      '3. Paste this key and press Register:',
+      '3. Paste this key and press Use this key:',
       '',
       key,
       '',

@@ -206,8 +206,9 @@ The PIN guards the app's screens; it does not encrypt the file.
 
 ### What leaves the computer
 
-No student data, ever. There is no telemetry, no analytics and no crash reporting. The only
-network traffic is the update check, a few seconds after the app starts and every four hours:
+No student data, ever. There is no telemetry, no analytics and no crash reporting. Apart from
+registering once (below), the only network traffic is the update check, a few seconds after
+the app starts and every four hours:
 the app asks GitHub (`github.com`) whether a newer version exists and downloads it from
 `release-assets.githubusercontent.com`. The requests carry nothing about the school, its
 staff or its students; like any web request, GitHub sees the computer's internet address.

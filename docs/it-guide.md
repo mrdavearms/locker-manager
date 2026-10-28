@@ -6,7 +6,8 @@ _Last updated: 18 October 2026 (version 0.11.3)._
 
 A desktop app built with Electron. It runs entirely on the user's computer. There is no
 server, no account and no telemetry. The only network traffic is the update check
-described below. Source code: https://github.com/mrdavearms/locker-manager (MIT licence).
+described below, and registering once (see Registration), which sends the details a person
+types into the form. Source code: https://github.com/mrdavearms/locker-manager (MIT licence).
 
 ## Installing
 
@@ -271,7 +272,8 @@ the default file appears on the Welcome screen; the demo school is simply not of
 | `requirePinForCodes` | `true` means codes cannot be shown, printed or exported until a PIN is set for the file and entered. The PIN cannot then be removed. |
 
 A file that is not valid JSON, or has an unknown key or a wrong value, is ignored as a
-whole, and Settings, This computer, says why. The app reads the file each time it checks registration, so there is no need to restart it: a key put there while the app is running takes effect the next time a school file is opened.
+whole, and Settings, This computer, says why. The app reads the file when it starts, so
+restart the app after changing it.
 
 ## Registration
 
@@ -290,7 +292,7 @@ Save the key text, and nothing else, in a file called `registration.key` in the 
 | Windows | `C:\ProgramData\Locker Manager\registration.key` |
 | macOS | `/Library/Application Support/Locker Manager/registration.key` |
 
-The key is a single line starting with `LM1.`. The file is read when the app starts. As with `managed.json`, an installed copy reads only this exact path.
+The key is a single line starting with `LM1.`. Any text encoding works, including the UTF-16 that Windows PowerShell's `>` and `Out-File` save. The app reads this file each time it checks registration, so there is no need to restart it: a key put there while the app is running takes effect the next time a school file is opened. As with `managed.json`, an installed copy reads only this exact path.
 
 The key is a separate file because `managed.json` is checked strictly. An older copy of the app that met an unknown setting in it would ignore every managed setting. With the demo turned off (`demoEnabled: false`), a copy without a key can only open your school's file to look; it needs a key before anyone can make changes.
 
