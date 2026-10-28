@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { codeKey, decryptCode } from '../../src/main/codes/cipher'
 import { getMeta } from '../../src/main/db/context'
 import { LATEST_SCHEMA_VERSION } from '../../src/main/db/migrate'
@@ -72,6 +72,21 @@ describe('portable export (SPEC.md 5.5)', () => {
     expect(
       back.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM lock WHERE code_status = 'set'")!.n
     ).toBe(0)
+  })
+
+  it('reads each row once, without walking the whole sheet for every row', async () => {
+    // ExcelJS's columnCount walks every row, so reading it once per row made a large
+    // school's rebuild take minutes (about 10 seconds per 20,000 rows).
+    const { db } = await allocatedDemo()
+    const bytes = await exportWorkbook(db, info(true))
+    const proto = Object.getPrototypeOf(new ExcelJS.Workbook().addWorksheet('x')) as object
+    const spy = vi.spyOn(proto as { columnCount: number }, 'columnCount', 'get')
+    try {
+      await importWorkbook(bytes, testContext())
+      expect(spy).not.toHaveBeenCalled()
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('refuses a workbook that is not an export', async () => {
