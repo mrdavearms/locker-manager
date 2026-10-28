@@ -649,7 +649,7 @@ export function registerFileHandlers(): void {
 
   ipcMain.handle(channels.fileTakeOver, async (): Promise<ActionResult> => {
     log.info('take over editing requested')
-    return session.takeOver()
+    return afterOpen(await session.takeOver())
   })
   ipcMain.handle(channels.fileStartEditing, async (): Promise<ActionResult> =>
     afterOpen(await session.startEditing())
@@ -741,10 +741,10 @@ export function registerFileHandlers(): void {
       const key = await session.ignoreKey(name)
       if (s.status === 'open' && key) await prefs.ignoreCopy(s.path, key)
       session.closeComparison()
-      if (s.status === 'open') await session.open(s.path)
+      if (s.status === 'open') return afterOpen(await session.open(s.path))
       return { ok: true }
     }
-    return session.resolveCopy(name, choice)
+    return afterOpen(await session.resolveCopy(name, choice))
   })
 
   ipcMain.handle(channels.backupsList, () => session.listAllBackups())
@@ -753,7 +753,7 @@ export function registerFileHandlers(): void {
   )
   ipcMain.handle(channels.backupsRestore, async (_e, raw: unknown): Promise<ActionResult> => {
     log.info('restore requested')
-    return session.restoreBackup(BackupRefSchema.parse(raw))
+    return afterOpen(await session.restoreBackup(BackupRefSchema.parse(raw)))
   })
 
   ipcMain.handle(channels.schoolRename, (_e, raw: unknown): ActionResult => {

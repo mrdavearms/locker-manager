@@ -146,6 +146,29 @@ describe('an unregistered copy opens the file read-only', () => {
     expect(existsSync(lockPathFor(path))).toBe(false)
   })
 
+  it('notices when a colleague puts the key into the file, and offers editing once they finish', async () => {
+    const dir = tempDir()
+    const path = await newSchoolFile(dir)
+    const sam = person('Sam', 'SAM-PC', dir)
+    await sam.open(path)
+    const dave = person('Dave', 'DAVE-MAC', dir, {
+      mayEdit: (db) => readFileKey(db) !== null
+    })
+    await dave.open(path)
+    expect(openState(dave).readOnly?.reason).toBe('unregistered')
+
+    sam.write({ action: 'registration.added', entity: 'file' }, (db) => writeFileKey(db, keyA))
+    await sam.flush()
+    await dave.tick()
+    expect(openState(dave).readOnly).toMatchObject({ reason: 'locked', canStartEditing: false })
+
+    await sam.close()
+    await dave.tick()
+    expect(openState(dave).readOnly).toMatchObject({ reason: 'locked', canStartEditing: true })
+    expect(await dave.startEditing()).toEqual({ ok: true })
+    expect(openState(dave).mode).toBe('edit')
+  })
+
   it('refuses a write', async () => {
     const dir = tempDir()
     const path = await newSchoolFile(dir)

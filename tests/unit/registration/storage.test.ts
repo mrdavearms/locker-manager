@@ -44,6 +44,14 @@ describe('the key IT puts on the computer', () => {
     expect(readItRegistrationKey()).toBe('LM1.abc')
   })
 
+  it('reads a key saved as UTF-16 by Windows PowerShell', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lm-reg-'))
+    process.env.LOCKER_MANAGER_MANAGED_DIR = dir
+    const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('LM1.abc\r\n', 'utf16le')])
+    writeFileSync(join(dir, 'registration.key'), utf16)
+    expect(readItRegistrationKey()).toBe('LM1.abc')
+  })
+
   it('sits beside managed.json in an installed copy', () => {
     expect(registrationKeyPath('darwin', true)).toBe(
       '/Library/Application Support/Locker Manager/registration.key'

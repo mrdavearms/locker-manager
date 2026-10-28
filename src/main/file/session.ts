@@ -395,12 +395,7 @@ export class DataFileSession {
       // An unregistered copy only looks: it never writes, refreshes or takes over the
       // edit lock, so a colleague who is editing is never disturbed (registration 7.4).
       // If the check itself fails, the file opens read-only: looking is always safe.
-      let mayEdit: boolean
-      try {
-        mayEdit = this.d.mayEdit?.(db) ?? true
-      } catch {
-        mayEdit = false
-      }
+      const mayEdit = this.mayEditNow(c)
       this.lockSeen = null
       let lock: Awaited<ReturnType<typeof acquireLock>> | null = null
       if (mayEdit) {
@@ -1260,10 +1255,24 @@ export class DataFileSession {
     this.emit()
   }
 
+  private mayEditNow(c: Open): boolean {
+    try {
+      return this.d.mayEdit?.(c.db) ?? true
+    } catch {
+      return false
+    }
+  }
+
   private async readOnlyTick(c: Open): Promise<void> {
     const d = await this.diskChanged(c)
     if (d.changed && d.bytes) await this.replaceInMemory(d.bytes)
     if (this.cur === c) await this.scanSiblings()
+    // A colleague's copy may have put the school's key into the file. From here the
+    // file is treated like any other one open read-only, and the lock check below says
+    // whether this computer can start editing.
+    if (c.readOnly?.reason === 'unregistered' && d.changed && this.mayEditNow(c)) {
+      c.readOnly = { reason: 'locked', holder: null, canTakeOver: false, canStartEditing: false }
+    }
     if (
       c.readOnly &&
       (c.readOnly.reason === 'locked' ||

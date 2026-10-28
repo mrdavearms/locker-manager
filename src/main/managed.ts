@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join, posix, win32 } from 'node:path'
 import { ManagedSchema, type Managed } from '@shared/computer'
+import { decodeText } from './import/decode'
 
 // Managed settings for school IT (SPEC.md 9.5): one JSON file in a machine-wide
 // folder that ordinary users cannot change. Every key is optional. A file that
@@ -42,9 +43,9 @@ export function registrationKeyPath(
 /** The key IT supplied, or null when there is none or it cannot be read. */
 export function readItRegistrationKey(): string | null {
   try {
-    const text = readFileSync(registrationKeyPath(), 'utf8')
-      .replace(/^\uFEFF/, '')
-      .trim()
+    // Windows PowerShell 5.1's `>` and Out-File save UTF-16, which read as UTF-8
+    // looked like no key at all.
+    const text = decodeText(readFileSync(registrationKeyPath())).text.trim()
     return text === '' ? null : text
   } catch {
     return null
